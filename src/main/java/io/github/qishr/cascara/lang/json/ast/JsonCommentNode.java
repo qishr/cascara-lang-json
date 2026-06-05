@@ -10,10 +10,7 @@ import java.util.List;
 public class JsonCommentNode extends JsonNode implements ScalarAstNode<JsonNode>, CommentAstNode {
     private String value;
     private String rawValue;
-    private QuoteStyle quoteStyle;
     private final boolean multiLine;
-
-    // public JsonCommentNode() {}
 
     public JsonCommentNode(int line, int column, URI uri, String rawValue, String stringValue, boolean multiLine) {
         this.value = stringValue;
@@ -21,21 +18,8 @@ public class JsonCommentNode extends JsonNode implements ScalarAstNode<JsonNode>
         this.multiLine = multiLine;
     }
 
-    // public JsonCommentNode(int line, int column, URI uri, String rawValue, String stringValue, QuoteStyle quoteStyle) {
-    //     super(line, column, uri);
-    //     this.rawValue = rawValue;
-    //     this.value = stringValue;
-    //     this.quoteStyle = quoteStyle;
-    //     this.multiLine = false;
-    // }
-
-    // public JsonCommentNode(String stringValue) {
-    //     this.value = stringValue;
-    //     this.rawValue = stringValue;
-    // }
-
-    //    @Override
-    public String getValue() {
+    // @Override
+    public String getContent() {
         return value != null ? value.toString() : null;
     }
 
@@ -50,13 +34,6 @@ public class JsonCommentNode extends JsonNode implements ScalarAstNode<JsonNode>
     }
 
     @Override
-    public void setValue(String value) {
-        // Here you can add logic to try and parse the string back
-        // into a Boolean or Double if your AST requires typed primitives
-        this.value = value;
-    }
-
-    @Override
     public List<JsonNode> getChildren() {
         return List.of(); // Scalars never have children
     }
@@ -67,58 +44,52 @@ public class JsonCommentNode extends JsonNode implements ScalarAstNode<JsonNode>
     }
 
     /// Returns the original raw string as seen in the source file.
-    public String getRawValue() {
+    public String getRaw() {
         return (rawValue != null) ? rawValue : value;
     }
 
-
-    // @Override
-    // public String getString() {
-    //     return rawValue;
-    // }
-
     @Override
-    public int getInteger() {
+    public int asInteger() {
         return 0; //TODO:  cascara://projman/CASC-00027711
     }
 
     @Override
-    public int getInteger(int defaultValue) {
+    public int asInteger(int defaultValue) {
         return 0;
     }
 
     @Override
-    public double getDouble() {
+    public double asDouble() {
         return 0;
     }
 
     @Override
-    public double getDouble(double defaultValue) {
+    public double asDouble(double defaultValue) {
         return 0;
     }
 
     @Override
-    public boolean getBoolean() {
+    public boolean asBoolean() {
         return false;
     }
 
     @Override
-    public boolean getBoolean(boolean defaultValue) {
+    public boolean asBoolean(boolean defaultValue) {
         return false;
     }
 
     @Override
-    public Object getPrimitiveValue() {
+    public Object getPrimitive() {
         return null;
     }
 
     @Override
-    public void setPrimitiveValue(Object value) {
+    public void setPrimitive(Object value) {
         this.value = String.valueOf(value);
     }
 
     @Override
-    public String getString() {
+    public String asString() {
         return value;
     }
 

@@ -1,6 +1,6 @@
 package io.github.qishr.cascara.lang.json.processor;
 
-import io.github.qishr.cascara.common.diagnostic.SimpleReporter;
+import io.github.qishr.cascara.common.diagnostic.StandardReporter;
 import io.github.qishr.cascara.common.diagnostic.Diagnostic.Level;
 import io.github.qishr.cascara.lang.json.token.JsonToken;
 import io.github.qishr.cascara.lang.json.token.JsonTokenType;
@@ -12,28 +12,28 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 class JsonTokenizerTest {
-    private final JsonTokenizer tokenizer = new JsonTokenizer().setReporter(new SimpleReporter().setLevel(Level.TRACE));
+    private final JsonTokenizer tokenizer = new JsonTokenizer().setReporter(new StandardReporter().setLevel(Level.TRACE));
     private final URI testUri = URI.create("test://file.json");
 
     @Test
     void testBasicTokens() {
         String input = "{ \"key\": 123, unquoted: true }";
-        List<JsonToken> tokens = tokenizer.tokenize(input, testUri);
+        List<JsonToken> tokens = tokenizer.tokenize(input);
 
         // Expected: {, STRING, :, NUMBER, ,, IDENTIFIER, :, BOOLEAN, }, EOF
         assertEquals(10, tokens.size());
         assertEquals(JsonTokenType.LEFT_BRACE, tokens.get(0).getType());
-        assertEquals("key", tokens.get(1).getValue());
-        assertEquals("123", tokens.get(3).getValue());
+        assertEquals("key", tokens.get(1).getContent());
+        assertEquals("123", tokens.get(3).getContent());
         assertEquals(JsonTokenType.IDENTIFIER, tokens.get(5).getType());
-        assertEquals("unquoted", tokens.get(5).getValue());
+        assertEquals("unquoted", tokens.get(5).getContent());
         assertEquals(JsonTokenType.EOF, tokens.get(9).getType());
     }
 
     @Test
     void testCoordinates() {
         String input = "\n  \"line2\"";
-        List<JsonToken> tokens = tokenizer.tokenize(input, testUri);
+        List<JsonToken> tokens = tokenizer.tokenize(input);
 
         JsonToken stringTok = tokens.get(0);
         assertEquals(2, stringTok.getStartLine());
@@ -49,7 +49,7 @@ class JsonTokenizerTest {
         String input = "[ +.5, 0x123, 1. ]";
 
         // JsonTokenizer tokenizer = new JsonTokenizer();
-        List<JsonToken> tokens = tokenizer.tokenize(input, URI.create("test://numbers.json"));
+        List<JsonToken> tokens = tokenizer.tokenize(input);
 
         // We expect: [ (LEFT_BRACKET), NUMBER, (COMMA), NUMBER, (COMMA), NUMBER, ] (RIGHT_BRACKET)
 
@@ -71,18 +71,18 @@ class JsonTokenizerTest {
         String input = "// Line comment\n/* Block\ncomment */";
 
         JsonTokenizer tokenizer = new JsonTokenizer();
-        List<JsonToken> tokens = tokenizer.tokenize(input, URI.create("test://comments.json"));
+        List<JsonToken> tokens = tokenizer.tokenize(input);
 
         // tokens.get(0) is the // Line comment
         // Lexeme should be the raw source
         assertEquals("// Line comment", tokens.get(0).getLexeme());
         // Value should be JUST the text (failing here)
-        assertEquals(" Line comment", tokens.get(0).getValue(),
+        assertEquals(" Line comment", tokens.get(0).getContent(),
             "Single-line comment value should not include slashes");
 
         // tokens.get(1) is the /* Block comment */
         assertEquals("/* Block\ncomment */", tokens.get(1).getLexeme());
-        assertEquals(" Block\ncomment ", tokens.get(1).getValue(),
+        assertEquals(" Block\ncomment ", tokens.get(1).getContent(),
             "Multi-line comment value should not include /* or */");
     }
 
@@ -90,7 +90,7 @@ class JsonTokenizerTest {
     void testCommentValueStripping2() {
         String input = "// Line comment";
         JsonTokenizer tokenizer = new JsonTokenizer();
-        List<JsonToken> tokens = tokenizer.tokenize(input, URI.create("test://test.json"));
+        List<JsonToken> tokens = tokenizer.tokenize(input);
 
         JsonToken comment = tokens.get(0);
 
@@ -98,7 +98,7 @@ class JsonTokenizerTest {
         assertEquals("// Line comment", comment.getLexeme());
 
         // THIS WILL FAIL: expected: [ Line comment] but was: [// Line comment]
-        assertEquals(" Line comment", comment.getValue(),
+        assertEquals(" Line comment", comment.getContent(),
             "The token 'value' should have markers stripped, while 'lexeme' keeps them.");
     }
 }

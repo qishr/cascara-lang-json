@@ -11,7 +11,7 @@ public class JsonSequenceNode extends JsonNode implements SequenceAstNode<JsonNo
     private final List<JsonNode> elements = new ArrayList<>();
 
     public JsonSequenceNode() { super(); }
-    public JsonSequenceNode(int line, int column, URI uri) { super(line, column, uri); }
+    public JsonSequenceNode(int line, int column, URI uri) { super(line, column); }
 
     @Override public JsonSequenceNode add(JsonNode item) { elements.add(item); return this; }
 

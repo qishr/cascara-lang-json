@@ -1,110 +1,140 @@
 package io.github.qishr.cascara.lang.json.ast;
 
-import java.net.URI;
 import java.util.List;
 import java.util.Objects;
+
 import io.github.qishr.cascara.common.lang.QuoteStyle;
 import io.github.qishr.cascara.common.lang.ast.ScalarAstNode;
+import io.github.qishr.cascara.lang.json.JsonPrimitive;
 
 public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> {
-    private String value;
-    private String rawValue;
+    private String raw;
+    private JsonPrimitive primitive;
     private QuoteStyle quoteStyle = QuoteStyle.PLAIN;
 
-    public JsonScalarNode(int line, int column, URI uri, String rawValue, String stringValue, QuoteStyle quoteStyle) {
-        super(line, column, uri);
-        this.rawValue = rawValue;
-        this.value = stringValue;
+    /// Constructor for use in parsers.
+    /// Used when reading raw text from a file stream.
+    /// Takes a String and triggers full lexical dialect type inference.
+    public JsonScalarNode(int line, int column, String raw, String unescapedContent, QuoteStyle quoteStyle) {
+        super(line, column);
+        this.raw = raw;
+        // fromString treats the input as text content to be parsed
+        this.primitive = JsonPrimitive.fromString(unescapedContent, quoteStyle);
         this.quoteStyle = quoteStyle;
     }
 
-    public JsonScalarNode(String stringValue) {
-        super(0, 0, null);
-        this.value = stringValue;
+    /// A programmatic and serializer constructor.
+    /// Used when building an AST dynamically in code.
+    /// Takes a pre-typed Object and skips text-based type inference.
+    public JsonScalarNode(Object primitiveValue, QuoteStyle quoteStyle) {
+        super(0, 0);
+        this.raw = null; // Cleared cache marks it as dirty for the emitter
+        // Pass the object directly into the primitive wrapper
+        this.primitive = new JsonPrimitive(primitiveValue, quoteStyle);
+        this.quoteStyle = quoteStyle;
     }
 
+    /// A programmatic and serializer constructor.
+    /// Used when building an AST dynamically in code.
+    /// Takes a pre-typed Object and skips text-based type inference.
+    public JsonScalarNode(Object primitiveValue) {
+        super(0, 0);
+        this.raw = null; // Cleared cache marks it as dirty for the emitter
+        this.primitive = new JsonPrimitive(primitiveValue);
+        this.quoteStyle = primitive.getQuoteStyle();
+    }
+
+    /// The default constructor
     public JsonScalarNode() {
-        super(0, 0, null);
-        this.value = null;
-    }
-
-    @Override public String getString() { return value; }
-    @Override public String getRawValue() { return value; }
-
-    @Override
-    public void setValue(String newValue) {
-        this.value = newValue;
-        this.rawValue = null; // Mark as dirty
+        super(0, 0);
+        this.raw = null;
+        this.quoteStyle = QuoteStyle.PLAIN;
+        this.primitive = new JsonPrimitive(null, QuoteStyle.PLAIN);
     }
 
     @Override
-    public int getInteger() { return getInteger(0); }
-
-    @Override
-    public int getInteger(int defaultValue) {
-        try { return value == null ? defaultValue : Integer.parseInt(value); }
-        catch (NumberFormatException e) { return defaultValue; }
+    public List<JsonNode> getChildren() {
+        return List.of();
     }
 
     @Override
-    public double getDouble() { return getDouble(0.0); }
-
-    @Override
-    public double getDouble(double defaultValue) {
-        try { return value == null ? defaultValue : Double.parseDouble(value); }
-        catch (NumberFormatException e) { return defaultValue; }
+    public QuoteStyle getQuoteStyle() {
+        return quoteStyle;
     }
 
     @Override
-    public boolean getBoolean() { return getBoolean(false); }
+    public void setQuoteStyle(QuoteStyle style) {
+        this.quoteStyle = style;
+    }
+
 
     @Override
-    public boolean getBoolean(boolean defaultValue) {
-        if (value == null) return defaultValue;
-        return Boolean.parseBoolean(value);
+    public String getRaw() {
+        return raw;
     }
 
     @Override
-    public Object getPrimitiveValue() {
-        if (value == null || value.equals("null")) return null;
-        if (isQuoted()) return value; // Quoted values are always strings
-
-        // Boolean check
-        if (value.equalsIgnoreCase("true")) return Boolean.TRUE;
-        if (value.equalsIgnoreCase("false")) return Boolean.FALSE;
-
-        // Number checks
-        try { return Integer.parseInt(value); } catch (NumberFormatException e) {}
-        try { return Double.parseDouble(value); } catch (NumberFormatException e) {}
-
-        return value;
+    public Object getPrimitive() {
+        return primitive.unwrap();
     }
 
     @Override
-    public void setPrimitiveValue(Object value) {
-        this.value = String.valueOf(value);
+    public void setPrimitive(Object value) {
+        this.primitive = new JsonPrimitive(value, this.quoteStyle);
+        this.raw = null;
     }
 
-    public boolean isQuoted() { return quoteStyle != QuoteStyle.PLAIN; }
-    @Override public QuoteStyle getQuoteStyle() { return quoteStyle; }
-    @Override public void setQuoteStyle(QuoteStyle style) { this.quoteStyle = style; }
+    /// Returns the logical clean text value, stripped of outer formatting and escape markers.
+    @Override
+    public String asString() {
+        return primitive.asString();
+    }
 
-    @Override public List<JsonNode> getChildren() { return List.of(); }
+    @Override
+    public int asInteger() {
+        return asInteger(0);
+    }
+
+    @Override
+    public int asInteger(int defaultValue) {
+        return primitive.asInteger(defaultValue);
+    }
+
+    @Override
+    public double asDouble() {
+        return asDouble(0.0);
+    }
+
+    @Override
+    public double asDouble(double defaultValue) {
+        return primitive.asDouble(defaultValue);
+    }
+
+    @Override
+    public boolean asBoolean() {
+        return asBoolean(false);
+    }
+
+    @Override
+    public boolean asBoolean(boolean defaultValue) {
+        return primitive.asBoolean(defaultValue);
+    }
 
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (!(o instanceof JsonScalarNode that)) return false;
-        return Objects.equals(value, that.value);
+        return Objects.equals(raw, that.raw) && Objects.equals(primitive, that.primitive);
     }
 
     @Override
-    public int hashCode() { return Objects.hash(value); }
+    public int hashCode() {
+        return Objects.hash(raw, primitive);
+    }
 
     /// {@inheritDoc}
     @Override
     public String toString() {
-        return value;
+        return raw;
     }
-
 }

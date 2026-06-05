@@ -1,6 +1,5 @@
 package io.github.qishr.cascara.lang.json.processor;
 
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -11,23 +10,19 @@ import io.github.qishr.cascara.lang.json.token.JsonTokenType;
 public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implements Tokenizer<JsonToken>{
     private String source;
     private List<JsonToken> tokens;
-    private URI uri;
     private int current = 0;
     private int currentLine = 1;
     private int currentColumn = 1;
     private char c = 0;
 
+    /// Default constructor for SPI
     public JsonTokenizer() {}
 
     @Override protected JsonTokenizer self() { return this; }
 
+    @Override
     public List<JsonToken> tokenize(String text) {
-        return tokenize(text, null);
-    }
-
-    public List<JsonToken> tokenize(String text, URI uri) {
         this.source = text;
-        this.uri = uri;
         this.tokens = new ArrayList<>();
 
         current = 0;

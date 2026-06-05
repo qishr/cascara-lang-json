@@ -5,15 +5,15 @@ import io.github.qishr.cascara.common.lang.token.Token;
 public class JsonToken implements Token {
     private JsonTokenType type;
     private String lexeme;
-    private Object value;
+    private String content;
     private int offset;
     private int startLine;
     private int startColumn;
 
-    public JsonToken(JsonTokenType type, String lexeme, Object value, int startIndex, int line, int column) {
+    public JsonToken(JsonTokenType type, String lexeme, String content, int startIndex, int line, int column) {
         this.type = type;
         this.lexeme = lexeme;
-        this.value = value;
+        this.content = content;
         this.offset = startIndex;
         this.startLine = line;
         this.startColumn = column;
@@ -31,8 +31,8 @@ public class JsonToken implements Token {
     }
 
     @Override
-    public Object getValue() {
-        return value;
+    public String getContent() {
+        return content;
     }
 
     @Override
@@ -53,7 +53,7 @@ public class JsonToken implements Token {
     @Override
     public String toString() {
         String displayLexeme = lexeme.replace("\n", "\\n").replace("\r", "\\r").replace("\"", "\\\"");
-        String valuePart = (value != null) ? " (Value: " + value + ")" : "";
+        String valuePart = (content != null) ? " (Value: " + content + ")" : "";
 
         return String.format("[%-20s | '%-15s'%s | L:%d C:%d]",
             type,

@@ -1,7 +1,6 @@
 package io.github.qishr.cascara.lang.json.processor;
 
 import io.github.qishr.cascara.common.util.ContentType;
-import io.github.qishr.cascara.common.lang.StructuredDocument;
 import io.github.qishr.cascara.common.lang.ast.AstNode;
 import io.github.qishr.cascara.common.lang.ast.MapAstNode;
 import io.github.qishr.cascara.common.lang.ast.MapEntryAstNode;
@@ -9,7 +8,6 @@ import io.github.qishr.cascara.common.lang.QuoteStyle;
 import io.github.qishr.cascara.common.lang.ast.ScalarAstNode;
 import io.github.qishr.cascara.common.lang.ast.SequenceAstNode;
 import io.github.qishr.cascara.common.lang.processor.AstConverter;
-import io.github.qishr.cascara.lang.json.JsonDocument;
 import io.github.qishr.cascara.lang.json.ast.JsonMapNode;
 import io.github.qishr.cascara.lang.json.ast.JsonNode;
 import io.github.qishr.cascara.lang.json.ast.JsonScalarNode;
@@ -30,10 +28,7 @@ public class JsonConverter extends AbstractJsonProcessor<JsonConverter> implemen
     }
 
     public JsonNode fromAst(AstNode ast) {
-        if (ast instanceof StructuredDocument astDoc) {
-            JsonDocument yamlDoc = new JsonDocument(fromAst(astDoc.getRoot()));
-            return yamlDoc;
-        } else if (ast instanceof MapAstNode astMap) {
+        if (ast instanceof MapAstNode astMap) {
             JsonMapNode map = new JsonMapNode();
             for (Object entry : astMap.getEntries()) {
                 if (entry instanceof MapEntryAstNode astMapEntry) {
@@ -58,9 +53,9 @@ public class JsonConverter extends AbstractJsonProcessor<JsonConverter> implemen
             return sequence;
         } else if (ast instanceof ScalarAstNode astScalar) {
             JsonScalarNode scalar = new JsonScalarNode();
-            scalar.setPrimitiveValue(astScalar.getPrimitiveValue());
-            scalar.setValue(astScalar.getString());
-            Object value = scalar.getPrimitiveValue();
+            scalar.setPrimitive(astScalar.getPrimitive());
+            // scalar.setRaw(astScalar.getString());
+            Object value = scalar.getPrimitive();
             if (value == null
                 || value instanceof Integer
                 || value instanceof Double

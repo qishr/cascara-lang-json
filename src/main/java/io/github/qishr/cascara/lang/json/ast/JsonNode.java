@@ -1,6 +1,5 @@
 package io.github.qishr.cascara.lang.json.ast;
 
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -13,20 +12,17 @@ public abstract class JsonNode implements AstNode {
     private final int startColumn;
     private int endLine = 0;
     private int endColumn = 0;
-    private final URI originUri;
     private final List<CommentAstNode> comments = new ArrayList<>();
     private JsonToken token;
 
     protected JsonNode() {
         this.startLine = 1;
         this.startColumn = 1;
-        this.originUri = null;
     }
 
-    protected JsonNode(int line, int column, URI uri) {
+    protected JsonNode(int line, int column) {
         this.startLine = line;
         this.startColumn = column;
-        this.originUri = uri;
     }
 
     @Override public abstract List<? extends JsonNode> getChildren();
@@ -34,7 +30,6 @@ public abstract class JsonNode implements AstNode {
     @Override public int getStartColumn() { return startColumn; }
     @Override public int getEndLine() { return endLine; }
     @Override public int getEndColumn() { return endColumn; }
-    @Override public URI getOriginUri() { return originUri; }
     @Override public List<CommentAstNode> getComments() { return comments; }
     @Override public JsonToken getToken() { return token; }
     public void setToken(JsonToken token) { this.token = token; }

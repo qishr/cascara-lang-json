@@ -21,7 +21,8 @@ public abstract class AbstractJsonProcessor<P extends Processor> implements Proc
 
     protected abstract P self();
 
-    public Properties getCapabilities() {
+    @Override
+    public Properties getServiceProperties() {
         if (capabilities == null) {
             capabilities = new Properties();
             capabilities.set("contentType", "application/json");

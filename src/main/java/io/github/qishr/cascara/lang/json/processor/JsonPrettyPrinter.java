@@ -24,7 +24,7 @@ public class JsonPrettyPrinter {
         // 1. Print any comments attached to this node
         for (CommentAstNode comment : node.getComments()) {
             writeIndent();
-            writer.write(comment.getRawValue()); // Raw value includes # or //
+            writer.write(comment.getRaw()); // Raw value includes # or //
             writer.write("\n");
         }
 
@@ -34,8 +34,8 @@ public class JsonPrettyPrinter {
         } else if (node instanceof JsonSequenceNode seq) {
             printSequence(seq);
         } else if (node instanceof JsonScalarNode scalar) {
-            // ScalarAstNode provides getRawValue() to preserve quotes/formatting
-            writer.write(scalar.getRawValue());
+            // ScalarAstNode provides getRaw() to preserve quotes/formatting
+            writer.write(scalar.getRaw());
         }
     }
 

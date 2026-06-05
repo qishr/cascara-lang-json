@@ -1,6 +1,5 @@
 package io.github.qishr.cascara.lang.json.ast;
 
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -11,13 +10,12 @@ import java.util.stream.Collectors;
 import io.github.qishr.cascara.common.lang.annotation.Nullable;
 import io.github.qishr.cascara.common.lang.ast.MapAstNode;
 import io.github.qishr.cascara.common.lang.QuoteStyle;
-import io.github.qishr.cascara.common.lang.simple.SimpleMapEntryNode;
 
 public class JsonMapNode extends JsonNode implements MapAstNode<JsonNode, JsonMapEntryNode> {
     private final List<JsonMapEntryNode> entries = new ArrayList<>();
 
     public JsonMapNode() { super(); }
-    public JsonMapNode(int line, int column, URI uri) { super(line, column, uri); }
+    public JsonMapNode(int line, int column) { super(line, column); }
 
     @Override
     public boolean containsKey(JsonNode key) {
@@ -39,6 +37,7 @@ public class JsonMapNode extends JsonNode implements MapAstNode<JsonNode, JsonMa
     @Nullable
     public JsonMapEntryNode getEntry(JsonNode key) {
         for (JsonMapEntryNode entry : entries) {
+            // TODO: This equals isn't working
             if (entry.getKey().equals(key)) return entry;
         }
         return null;
@@ -47,9 +46,13 @@ public class JsonMapNode extends JsonNode implements MapAstNode<JsonNode, JsonMa
     /// Convenience method for internal use and testing.
     /// Not part of the MapAstNode interface.
     public JsonMapEntryNode getEntry(String keyName) {
-        // Create a temporary "search" node
-        JsonScalarNode searchKey = new JsonScalarNode(0, 0, null, keyName, keyName, QuoteStyle.PLAIN);
-        return getEntry(searchKey);
+        for (JsonMapEntryNode entry : entries) {
+            if (entry.getKey().asString().equals(keyName)) return entry;
+        }
+        return null;
+        // // Create a temporary "search" node
+        // JsonScalarNode searchKey = new JsonScalarNode(0, 0, keyName, keyName, QuoteStyle.PLAIN);
+        // return getEntry(searchKey);
     }
 
     @Override
@@ -71,11 +74,11 @@ public class JsonMapNode extends JsonNode implements MapAstNode<JsonNode, JsonMa
     public JsonMapNode put(JsonNode key, JsonNode value) {
         for (JsonMapEntryNode entry : entries) {
             if (entry.getKey().equals(key)) {
-                entry.setValue(value);
+                entry.setRaw(value);
                 return this;
             }
         }
-        entries.add(new JsonMapEntryNode(key.getStartLine(), key.getStartColumn(), getOriginUri(), key, value));
+        entries.add(new JsonMapEntryNode(key.getStartLine(), key.getStartColumn(), key, value));
         return this;
     }
 
@@ -88,7 +91,7 @@ public class JsonMapNode extends JsonNode implements MapAstNode<JsonNode, JsonMa
     public void remove(String key) {
         entries.removeIf(e -> {
             if (e.getKey() instanceof JsonScalarNode scalar) {
-                return scalar.getString().equals(key);
+                return scalar.asString().equals(key);
             }
             return false;
         });
@@ -101,7 +104,7 @@ public class JsonMapNode extends JsonNode implements MapAstNode<JsonNode, JsonMa
         if (key == null) return null;
         for (JsonMapEntryNode entry : entries) {
             JsonNode kNode = entry.getKey();
-            String entryKey = (kNode instanceof JsonScalarNode scalar) ? scalar.getString() : kNode.toString();
+            String entryKey = (kNode instanceof JsonScalarNode scalar) ? scalar.asString() : kNode.toString();
             if (key.equals(entryKey)) return entry.getValue();
         }
         return null;
@@ -122,19 +125,19 @@ public class JsonMapNode extends JsonNode implements MapAstNode<JsonNode, JsonMa
     @Override
     public JsonMapNode put(String key, JsonNode value) {
         for (JsonMapEntryNode entry : entries) {
-            if (entry.getKey() instanceof JsonScalarNode scalar && key.equals(scalar.getString())) {
-                entry.setValue(value);
+            if (entry.getKey() instanceof JsonScalarNode scalar && key.equals(scalar.asString())) {
+                entry.setRaw(value);
                 return this;
             }
         }
-        JsonScalarNode keyNode = new JsonScalarNode(0, 0, getOriginUri(), key, key, QuoteStyle.DOUBLE);
-        entries.add(new JsonMapEntryNode(0, 0, getOriginUri(), keyNode, value));
+        JsonScalarNode keyNode = new JsonScalarNode(0, 0, key, key, QuoteStyle.DOUBLE);
+        entries.add(new JsonMapEntryNode(0, 0, keyNode, value));
         return this;
     }
 
     public boolean containsKey(String key) {
         for (JsonMapEntryNode entry : entries) {
-            if (entry.getKey() instanceof JsonScalarNode scalar && key.equals(scalar.getString())) {
+            if (entry.getKey() instanceof JsonScalarNode scalar && key.equals(scalar.asString())) {
                 return true;
             }
         }
