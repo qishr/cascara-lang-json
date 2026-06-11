@@ -1,29 +1,11 @@
 package io.github.qishr.cascara.lang.json;
 
-import io.github.qishr.cascara.common.lang.AbstractPrimitive;
 import io.github.qishr.cascara.common.lang.QuoteStyle;
+import io.github.qishr.cascara.common.lang.type.PrimitiveDelegate;
 
-public class JsonPrimitive extends AbstractPrimitive {
-
-    public JsonPrimitive(Object primitiveValue, QuoteStyle quoteStyle) {
-        this(primitiveValue, quoteStyle, true);
-    }
-
-    public JsonPrimitive(Object primitiveValue) {
-        super(primitiveValue);
-    }
-
-    /// Parses unescaped text and infers its type.
-    public static JsonPrimitive fromString(String unescapedContent, QuoteStyle quoteStyle) {
-        return new JsonPrimitive(unescapedContent, quoteStyle, false);
-    }
-
-    private JsonPrimitive(Object input, QuoteStyle quoteStyle, boolean isNative) {
-        super(input, quoteStyle, isNative);
-    }
-
+public class JsonPrimitiveDelegate implements PrimitiveDelegate {
     @Override
-    protected QuoteStyle inferQuoteStyle(Object value) {
+    public QuoteStyle inferQuoteStyle(Object value) {
         QuoteStyle style = QuoteStyle.PLAIN;
         if (value instanceof CharSequence || value instanceof Character) {
 
@@ -35,7 +17,7 @@ public class JsonPrimitive extends AbstractPrimitive {
     /// Converts JSON primitive literal values into native Java types.
     /// Strictly handles case-sensitive 'true', 'false', and 'null'.
     @Override
-    protected Object coerceLiteralValue(String text) {
+    public Object coerceLiteralValue(String text) {
         if ("true".equals(text)) return Boolean.TRUE;
         if ("false".equals(text)) return Boolean.FALSE;
         if ("null".equals(text)) return null;
@@ -45,7 +27,7 @@ public class JsonPrimitive extends AbstractPrimitive {
 
     /// Handles strict JSON string unescaping mechanics for double-quoted strings.
     @Override
-    protected String unescapeQuotedString(String text, QuoteStyle style) {
+    public String unescapeQuotedString(String text, QuoteStyle style) {
         if (style != QuoteStyle.DOUBLE || text == null || text.isEmpty()) {
             return text;
         }

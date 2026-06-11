@@ -82,7 +82,7 @@ public class JsonEmitter extends AbstractJsonProcessor<JsonEmitter>  implements 
         return switch (scalar.getQuoteStyle()) {
             case DOUBLE -> "\"" + escapeJson(value) + "\"";
             case SINGLE -> "'" + escapeJson(value) + "'";
-            case LITERAL, FOLDED -> value; // Usually used for multi-line or raw blocks
+            case LITERAL_BLOCK, FOLDED -> value; // Usually used for multi-line or raw blocks
             case PLAIN -> value; // For numbers, booleans, or unquoted keys
             default -> value;
         };

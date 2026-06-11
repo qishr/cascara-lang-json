@@ -4,10 +4,12 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 
+import io.github.qishr.cascara.common.diagnostic.code.DiagnosticCode;
 import io.github.qishr.cascara.common.lang.QuoteStyle;
 import io.github.qishr.cascara.common.lang.exception.ParserException;
 import io.github.qishr.cascara.common.lang.processor.Parser;
 import io.github.qishr.cascara.lang.json.ast.*;
+import io.github.qishr.cascara.lang.json.exception.JsonDiagnosticCode;
 import io.github.qishr.cascara.lang.json.token.JsonToken;
 import io.github.qishr.cascara.lang.json.token.JsonTokenType;
 
@@ -79,7 +81,7 @@ public class JsonParser extends AbstractJsonProcessor<JsonParser> implements Par
         depth++;
         trace("parseMap");
         try {
-            JsonToken start = consume(JsonTokenType.LEFT_BRACE, "Expected '{'");
+            JsonToken start = consume(JsonTokenType.LEFT_BRACE, JsonDiagnosticCode.EXPECTED_OPEN_BRACE);
             JsonMapNode map = new JsonMapNode(start.getStartLine(), start.getStartColumn());
 
             attachComments(map);
@@ -107,7 +109,7 @@ public class JsonParser extends AbstractJsonProcessor<JsonParser> implements Par
                     // The key claims EVERYTHING in the buffer since the last key's value was finished
                     attachComments(key);
 
-                    consume(JsonTokenType.COLON, "Expected ':'");
+                    consume(JsonTokenType.COLON, JsonDiagnosticCode.EXPECTED_COLON_MAP_KEY);
                     JsonNode value = parseValue(); // parseValue should NOT call attachComments internally
                     map.put(key, value);
 
@@ -115,7 +117,7 @@ public class JsonParser extends AbstractJsonProcessor<JsonParser> implements Par
                 } while (!isAtEnd() && match(JsonTokenType.COMMA));
             }
 
-            consume(JsonTokenType.RIGHT_BRACE, "Expected '}'");
+            consume(JsonTokenType.RIGHT_BRACE, JsonDiagnosticCode.EXPECTED_CLOSE_BRACE);
             return map;
         } finally {
             depth--;
@@ -126,7 +128,7 @@ public class JsonParser extends AbstractJsonProcessor<JsonParser> implements Par
         depth++;
         trace("parseSequence");
         try {
-            JsonToken start = consume(JsonTokenType.LEFT_BRACKET, "Expected '['");
+            JsonToken start = consume(JsonTokenType.LEFT_BRACKET, JsonDiagnosticCode.EXPECTED_OPEN_BRACKET);
             JsonSequenceNode seq = new JsonSequenceNode(start.getStartLine(), start.getStartColumn(), uri);
 
             attachComments(seq);
@@ -153,7 +155,7 @@ public class JsonParser extends AbstractJsonProcessor<JsonParser> implements Par
                 } while (!isAtEnd() && match(JsonTokenType.COMMA));
             }
 
-            consume(JsonTokenType.RIGHT_BRACKET, "Expected ']'");
+            consume(JsonTokenType.RIGHT_BRACKET, JsonDiagnosticCode.EXPECTED_CLOSE_BRACKET);
             return seq;
         } finally {
             depth--;
@@ -221,16 +223,16 @@ public class JsonParser extends AbstractJsonProcessor<JsonParser> implements Par
         if (check(JsonTokenType.STRING) || check(JsonTokenType.IDENTIFIER)) {
             return advance();
         }
-        error(peek(), "Expected key (string or identifier)");
+        error(peek(), JsonDiagnosticCode.EXPECTED_MAP_KEY);
         // If we're at EOF or wrong token, return current and let the parser try to recover
         return advance();
     }
 
-    private JsonToken consume(JsonTokenType type, String message) {
+    private JsonToken consume(JsonTokenType type, DiagnosticCode code, Object... details) {
         if (check(type)) return advance();
 
         // Report the error but don't crash
-        error(peek(), message);
+        error(peek(), code, details);
 
         // Return the current token anyway to avoid crashing the caller,
         // or return a dummy token.
@@ -261,10 +263,10 @@ public class JsonParser extends AbstractJsonProcessor<JsonParser> implements Par
             peek().getStartLine(), peek().getStartColumn(), indent, methodName, peek().getType());
     }
 
-    private void error(JsonToken token, String message) {
-        reporter.errorAt(token, null, message);
+    private void error(JsonToken token, DiagnosticCode code, Object... details) {
+        reporter.errorAt(token, code, details);
         if (!reporter.collectsProblems()) {
-            throw new ParserException(message, token.getStartLine(), token.getStartColumn());
+            throw new ParserException(token, code, details);
         }
     }
 }

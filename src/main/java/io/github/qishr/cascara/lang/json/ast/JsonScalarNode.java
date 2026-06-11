@@ -5,11 +5,15 @@ import java.util.Objects;
 
 import io.github.qishr.cascara.common.lang.QuoteStyle;
 import io.github.qishr.cascara.common.lang.ast.ScalarAstNode;
-import io.github.qishr.cascara.lang.json.JsonPrimitive;
+import io.github.qishr.cascara.common.lang.type.Primitive;
+import io.github.qishr.cascara.common.lang.type.PrimitiveDelegate;
+import io.github.qishr.cascara.lang.json.JsonPrimitiveDelegate;
 
 public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> {
+    private static PrimitiveDelegate JSON_PRIMITIVE_DELEGATE = new JsonPrimitiveDelegate();
+
     private String raw;
-    private JsonPrimitive primitive;
+    private Primitive primitive;
     private QuoteStyle quoteStyle = QuoteStyle.PLAIN;
 
     /// Constructor for use in parsers.
@@ -19,7 +23,8 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
         super(line, column);
         this.raw = raw;
         // fromString treats the input as text content to be parsed
-        this.primitive = JsonPrimitive.fromString(unescapedContent, quoteStyle);
+        this.primitive = Primitive.fromString(unescapedContent, quoteStyle)
+            .setDelegate(JSON_PRIMITIVE_DELEGATE);
         this.quoteStyle = quoteStyle;
     }
 
@@ -30,7 +35,8 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
         super(0, 0);
         this.raw = null; // Cleared cache marks it as dirty for the emitter
         // Pass the object directly into the primitive wrapper
-        this.primitive = new JsonPrimitive(primitiveValue, quoteStyle);
+        this.primitive = Primitive.of(primitiveValue)
+            .setQuoteStyle(quoteStyle);
         this.quoteStyle = quoteStyle;
     }
 
@@ -40,7 +46,8 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
     public JsonScalarNode(Object primitiveValue) {
         super(0, 0);
         this.raw = null; // Cleared cache marks it as dirty for the emitter
-        this.primitive = new JsonPrimitive(primitiveValue);
+        this.primitive = Primitive.of(primitiveValue)
+            .setDelegate(JSON_PRIMITIVE_DELEGATE);
         this.quoteStyle = primitive.getQuoteStyle();
     }
 
@@ -49,7 +56,8 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
         super(0, 0);
         this.raw = null;
         this.quoteStyle = QuoteStyle.PLAIN;
-        this.primitive = new JsonPrimitive(null, QuoteStyle.PLAIN);
+        this.primitive = Primitive.of(null)
+            .setDelegate(JSON_PRIMITIVE_DELEGATE);
     }
 
     @Override
@@ -80,7 +88,9 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
 
     @Override
     public void setPrimitive(Object value) {
-        this.primitive = new JsonPrimitive(value, this.quoteStyle);
+        this.primitive = Primitive.of(value)
+            .setDelegate(JSON_PRIMITIVE_DELEGATE)
+            .setQuoteStyle(this.quoteStyle);
         this.raw = null;
     }
 
