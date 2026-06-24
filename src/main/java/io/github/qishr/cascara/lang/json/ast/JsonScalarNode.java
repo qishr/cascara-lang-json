@@ -6,7 +6,6 @@ import java.util.Objects;
 import io.github.qishr.cascara.common.lang.QuoteStyle;
 import io.github.qishr.cascara.common.lang.ast.ScalarAstNode;
 import io.github.qishr.cascara.common.lang.type.Primitive;
-import io.github.qishr.cascara.common.lang.type.PrimitiveDelegate;
 import io.github.qishr.cascara.lang.json.JsonPrimitiveDelegate;
 
 public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> {
@@ -44,11 +43,18 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
     /// Used when building an AST dynamically in code.
     /// Takes a pre-typed Object and skips text-based type inference.
     public JsonScalarNode(Object primitiveValue) {
+        this(primitiveValue, false);
+    }
+
+    /// A programmatic and serializer constructor.
+    /// Used when building an AST dynamically in code.
+    /// Takes a pre-typed Object and skips text-based type inference.
+    public JsonScalarNode(Object primitiveValue, boolean isKey) {
         super(0, 0);
         this.raw = null; // Cleared cache marks it as dirty for the emitter
         this.primitive = Primitive.of(primitiveValue)
             .setDelegate(JSON_PRIMITIVE_DELEGATE);
-        this.quoteStyle = primitive.getQuoteStyle();
+        this.quoteStyle = isKey ? QuoteStyle.DOUBLE : primitive.getQuoteStyle();
     }
 
     /// The default constructor

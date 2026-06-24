@@ -13,6 +13,7 @@ public class JsonFactory implements AstFactory<JsonNode,JsonScalarNode,JsonSeque
 
     @Override
     public JsonScalarNode createScalarNode(Object primitiveValue) {
+        System.out.println("createScalarNode " + primitiveValue);
         // TODO: Should this parameter be called:
         // - `primitiveValue` (used in AstNode), or
         // - `jvmInstance` (used in Serializer) ?
@@ -21,8 +22,21 @@ public class JsonFactory implements AstFactory<JsonNode,JsonScalarNode,JsonSeque
     }
 
     @Override
+    public JsonScalarNode createScalarNode(Object key, QuoteStyle quoteStyle) {
+        System.out.println("createScalarNode " + key + " " + quoteStyle);
+        return new JsonScalarNode(key, quoteStyle);
+    }
+
+    @Override
     public JsonScalarNode createScalarNode(Primitive primitive) {
+        System.out.println("createScalarNode primitive: " + primitive);
         return JsonScalarNode.fromPrimitive(primitive);
+    }
+
+    @Override
+    public JsonScalarNode createScalarKeyNode(Object key) {
+        System.out.println("createScalarKeyNode " + key);
+        return new JsonScalarNode(key, true);
     }
 
     @Override
@@ -33,9 +47,5 @@ public class JsonFactory implements AstFactory<JsonNode,JsonScalarNode,JsonSeque
     @Override
     public JsonMapNode createMapNode() {
         return new JsonMapNode();
-    }
-
-    public JsonScalarNode createScalarNode(Object key, QuoteStyle quoteStyle) {
-        return new JsonScalarNode(key, quoteStyle);
     }
 }

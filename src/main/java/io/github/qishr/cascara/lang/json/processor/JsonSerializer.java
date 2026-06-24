@@ -51,10 +51,6 @@ public class JsonSerializer extends AbstractSerializer<JsonSerializer,JsonNode,J
         return this;
     }
 
-    //
-    // Serializer Implementation
-    //
-
     @Override
     public JsonSerializer setParser(Parser<JsonNode,?> parser) {
         if (!(parser instanceof JsonParser jsonParser)) {
