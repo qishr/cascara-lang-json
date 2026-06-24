@@ -8,7 +8,6 @@ public class JsonPrimitiveDelegate implements PrimitiveDelegate {
     public QuoteStyle inferQuoteStyle(Object value) {
         QuoteStyle style = QuoteStyle.PLAIN;
         if (value instanceof CharSequence || value instanceof Character) {
-
             style = QuoteStyle.DOUBLE;
         }
         return style;
