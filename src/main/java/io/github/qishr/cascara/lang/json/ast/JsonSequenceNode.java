@@ -23,7 +23,7 @@ public class JsonSequenceNode extends JsonNode implements SequenceAstNode<JsonNo
         return this;
     }
 
-    @Override public void clear() { elements.clear(); }
+    @Override public JsonSequenceNode clear() { elements.clear(); return this; }
     @Override public int size() { return elements.size(); }
     @Override public JsonNode get(int index) { return elements.get(index); }
     @Override public List<JsonNode> getElements() { return elements; }

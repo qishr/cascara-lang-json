@@ -19,7 +19,7 @@ public class JsonEmitter extends AbstractJsonProcessor<JsonEmitter>  implements 
 
     @Override
     public ContentType getContentType() {
-        return JsonParser.contentType;
+        return JsonParser.JSON_CONTENT_TYPE;
     }
 
     public String emit(JsonNode root) {

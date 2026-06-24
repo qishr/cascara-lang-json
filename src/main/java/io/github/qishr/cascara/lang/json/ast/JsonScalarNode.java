@@ -10,7 +10,7 @@ import io.github.qishr.cascara.common.lang.type.PrimitiveDelegate;
 import io.github.qishr.cascara.lang.json.JsonPrimitiveDelegate;
 
 public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> {
-    private static PrimitiveDelegate JSON_PRIMITIVE_DELEGATE = new JsonPrimitiveDelegate();
+    private static JsonPrimitiveDelegate JSON_PRIMITIVE_DELEGATE = new JsonPrimitiveDelegate();
 
     private String raw;
     private Primitive primitive;
@@ -60,6 +60,15 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
             .setDelegate(JSON_PRIMITIVE_DELEGATE);
     }
 
+    public static JsonScalarNode fromPrimitive(Primitive primitive) {
+        JsonScalarNode node = new JsonScalarNode();
+        node.raw = null; // Cleared cache marks it as dirty for the emitter
+        node.primitive = primitive;
+        node.primitive.setDelegate(JSON_PRIMITIVE_DELEGATE);
+        node.quoteStyle = primitive.getQuoteStyle();
+        return node;
+    }
+
     @Override
     public List<JsonNode> getChildren() {
         return List.of();
@@ -87,11 +96,12 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
     }
 
     @Override
-    public void setPrimitive(Object value) {
+    public JsonScalarNode setPrimitive(Object value) {
         this.primitive = Primitive.of(value)
             .setDelegate(JSON_PRIMITIVE_DELEGATE)
             .setQuoteStyle(this.quoteStyle);
         this.raw = null;
+        return this;
     }
 
     /// Returns the logical clean text value, stripped of outer formatting and escape markers.

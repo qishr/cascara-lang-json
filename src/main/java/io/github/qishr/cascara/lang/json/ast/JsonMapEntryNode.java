@@ -25,8 +25,9 @@ public class JsonMapEntryNode extends JsonNode implements MapEntryAstNode<JsonNo
 
     @Override public JsonNode getValue() { return value; }
 
-    @Override public void setRaw(JsonNode value) {
+    @Override public JsonMapEntryNode setRaw(JsonNode value) {
         this.value = value;
+        return this;
     }
 
     @Override public List<JsonNode> getChildren() {

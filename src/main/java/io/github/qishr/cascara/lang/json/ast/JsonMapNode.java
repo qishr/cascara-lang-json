@@ -83,18 +83,20 @@ public class JsonMapNode extends JsonNode implements MapAstNode<JsonNode, JsonMa
     }
 
     @Override
-    public void remove(JsonNode key) {
+    public JsonMapNode remove(JsonNode key) {
         entries.removeIf(e -> e.getKey().equals(key));
+        return this;
     }
 
     @Override
-    public void remove(String key) {
+    public JsonMapNode remove(String key) {
         entries.removeIf(e -> {
             if (e.getKey() instanceof JsonScalarNode scalar) {
                 return scalar.asString().equals(key);
             }
             return false;
         });
+        return this;
     }
 
     // --- Convenience Accessors ---
@@ -146,14 +148,14 @@ public class JsonMapNode extends JsonNode implements MapAstNode<JsonNode, JsonMa
 
     /// {@inheritDoc}
     @Override
-    public Collection<JsonNode> values() {
+    public List<JsonNode> values() {
         // TODO Auto-generated method stub
         throw new UnsupportedOperationException("Unimplemented method 'values'");
     }
 
     /// {@inheritDoc}
     @Override
-    public JsonNode put(String key, String value) {
+    public JsonMapNode put(String key, String value) {
         return put(key, new JsonScalarNode(value));
     }
 }
