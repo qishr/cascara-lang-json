@@ -1,7 +1,7 @@
 package io.github.qishr.cascara.lang.json.processor;
 
-import io.github.qishr.cascara.common.lang.QuoteStyle;
-import io.github.qishr.cascara.common.lang.processor.AstFactory;
+import io.github.qishr.cascara.common.lang.ast.AstNodeFactory;
+import io.github.qishr.cascara.common.lang.util.QuoteStyle;
 import io.github.qishr.cascara.common.lang.type.Primitive;
 import io.github.qishr.cascara.lang.json.ast.JsonMapEntryNode;
 import io.github.qishr.cascara.lang.json.ast.JsonMapNode;
@@ -9,7 +9,7 @@ import io.github.qishr.cascara.lang.json.ast.JsonNode;
 import io.github.qishr.cascara.lang.json.ast.JsonScalarNode;
 import io.github.qishr.cascara.lang.json.ast.JsonSequenceNode;
 
-public class JsonFactory implements AstFactory<JsonNode,JsonScalarNode,JsonSequenceNode,JsonMapNode,JsonMapEntryNode> {
+public class JsonNodeFactory implements AstNodeFactory<JsonNode,JsonScalarNode,JsonSequenceNode,JsonMapNode,JsonMapEntryNode> {
 
     @Override
     public JsonScalarNode createScalarNode(Object primitiveValue) {

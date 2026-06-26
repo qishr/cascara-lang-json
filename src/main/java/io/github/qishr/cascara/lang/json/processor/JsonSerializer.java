@@ -1,9 +1,11 @@
 package io.github.qishr.cascara.lang.json.processor;
 
+import java.io.InputStream;
+
 import io.github.qishr.cascara.common.diagnostic.NoOpReporter;
 import io.github.qishr.cascara.common.diagnostic.Reporter;
 import io.github.qishr.cascara.common.diagnostic.code.GenericDiagnosticCode;
-import io.github.qishr.cascara.common.lang.LanguageOptions;
+import io.github.qishr.cascara.common.lang.util.LanguageOptions;
 import io.github.qishr.cascara.common.lang.exception.SerializerException;
 import io.github.qishr.cascara.common.lang.processor.AbstractSerializer;
 import io.github.qishr.cascara.common.lang.processor.Parser;
@@ -24,7 +26,7 @@ public class JsonSerializer extends AbstractSerializer<JsonSerializer,JsonNode,J
     private Reporter reporter = new NoOpReporter();
 
     public JsonSerializer() {
-        super(AbstractJsonProcessor.JSON_CONTENT_TYPE_STRING, new JsonFactory(), new JsonPrimitiveDelegate());
+        super(AbstractJsonProcessor.JSON_CONTENT_TYPE_STRING, new JsonNodeFactory(), new JsonPrimitiveDelegate());
     }
 
     @Override
@@ -69,6 +71,12 @@ public class JsonSerializer extends AbstractSerializer<JsonSerializer,JsonNode,J
     @Override
     public <C> C fromText(String text, Class<C> jvmType) {
         JsonNode ast = getParser().parse(text);
+        return fromAst(ast, jvmType);
+    }
+
+    @Override
+    public <C> C fromStream(InputStream is, Class<C> jvmType) {
+        JsonNode ast = getParser().parse(is);
         return fromAst(ast, jvmType);
     }
 

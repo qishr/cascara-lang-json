@@ -4,12 +4,11 @@ import io.github.qishr.cascara.common.diagnostic.Diagnostic.Level;
 import io.github.qishr.cascara.common.diagnostic.SilentErrorTracker;
 import io.github.qishr.cascara.common.diagnostic.StandardReporter;
 import io.github.qishr.cascara.common.lang.ast.CommentAstNode;
-import io.github.qishr.cascara.common.lang.QuoteStyle;
+import io.github.qishr.cascara.common.lang.util.QuoteStyle;
 import io.github.qishr.cascara.lang.json.ast.*;
 
 import org.junit.jupiter.api.Test;
 
-import java.net.URI;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -170,7 +169,7 @@ class JsonParserTest {
         JsonMapNode root = (JsonMapNode) parser.parse(input);
 
         JsonMapNode level1 = root.getMap("level1");
-        JsonMapNode level2 = level1.getMap("level2");
+        // JsonMapNode level2 = level1.getMap("level2");
 
         assertTrue(level1.get("level2") instanceof JsonSequenceNode);
         JsonSequenceNode seq = level1.getSequence("level2");

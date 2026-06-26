@@ -1,10 +1,9 @@
 package io.github.qishr.cascara.lang.json.ast;
 
 import io.github.qishr.cascara.common.lang.ast.CommentAstNode;
-import io.github.qishr.cascara.common.lang.QuoteStyle;
+import io.github.qishr.cascara.common.lang.util.QuoteStyle;
 import io.github.qishr.cascara.common.lang.ast.ScalarAstNode;
 
-import java.net.URI;
 import java.util.List;
 
 public class JsonCommentNode extends JsonNode implements ScalarAstNode<JsonNode>, CommentAstNode {
@@ -12,7 +11,7 @@ public class JsonCommentNode extends JsonNode implements ScalarAstNode<JsonNode>
     private String rawValue;
     private final boolean multiLine;
 
-    public JsonCommentNode(int line, int column, URI uri, String rawValue, String stringValue, boolean multiLine) {
+    public JsonCommentNode(int line, int column, String rawValue, String stringValue, boolean multiLine) {
         this.value = stringValue;
         this.rawValue = rawValue;
         this.multiLine = multiLine;

@@ -4,6 +4,9 @@ import io.github.qishr.cascara.common.diagnostic.code.DiagnosticCode;
 
 public enum JsonDiagnosticCode implements DiagnosticCode {
 
+    UNEXPECTED_TOKEN("JSON-101", "Unexpected token: {0}."),
+    UNEXPECTED_UNQUOTED_STRING_VALUE("","Unexpected unquoted string value: {0}."),
+
     EXPECTED_CLOSE_BRACE("JSON-201", "Expected '}'"),
     EXPECTED_EOS("JSON-203", "Expected end of stream."),
     EXPECTED_SCALAR("JSON-204", "Expected scalar."),
@@ -26,7 +29,7 @@ public enum JsonDiagnosticCode implements DiagnosticCode {
     EXPECTED_MAP_STRUCTURE("JSON-504", "Expected a map structure for class {0}."),
     NO_SUCH_METHOD("JSON-505", "No such method: {0}."),
     FAILED_DESERIALIZE("JSON-506", "Failed to deserialize: {0}: {1}."),
-    EXPECTED_YAML_NODE("JSON-507", "Expected YamlNode for serializable type: {0}."),
+    // EXPECTED_YAML_NODE("JSON-507", "Expected YamlNode for serializable type: {0}."),
     INCOMPATIBLE_TYPES("JSON-508", "Incompatible types: Cannot map {0} to Java type {1}."),
     FAILED_DESERIALIZE_SCALAR("JSON-509", "Failed to deserialize scalar to {0}: {1}."),
     UNSUPPORTED_TYPE("JSON-510", "Unsupported field type: {0}."),

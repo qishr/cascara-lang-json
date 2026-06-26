@@ -1,0 +1,7 @@
+{
+    "name": "Cascara JSON Parser",
+    "version": 1.0,
+    "released": true,
+    "dependencies": null,
+    "supported_formats": ["JSON", "JSON5"]
+  }
