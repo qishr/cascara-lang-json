@@ -1,180 +1,305 @@
 package io.github.qishr.cascara.lang.json.processor;
 
+import java.io.InputStream;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 
 import io.github.qishr.cascara.common.lang.processor.Tokenizer;
+import io.github.qishr.cascara.common.lang.util.SourceBuffer;
+import io.github.qishr.cascara.common.lang.util.SourceInputStreamBuffer;
+import io.github.qishr.cascara.common.lang.util.SourceStringBuffer;
 import io.github.qishr.cascara.lang.json.token.JsonToken;
 import io.github.qishr.cascara.lang.json.token.JsonTokenType;
 
 public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implements Tokenizer<JsonToken>{
-    private String source;
+    private SourceBuffer buffer;
     private List<JsonToken> tokens;
-    private int current = 0;
-    private int currentLine = 1;
-    private int currentColumn = 1;
-    private char c = 0;
+    private boolean isLegacyMode = false;
+    private final Deque<JsonToken> pendingTokens = new ArrayDeque<>();
+    private boolean streamEnded = false;
 
     /// Default constructor for SPI
     public JsonTokenizer() {}
 
     @Override protected JsonTokenizer self() { return this; }
 
+
     @Override
-    public List<JsonToken> tokenize(String text) {
-        this.source = text;
-        this.tokens = new ArrayList<>();
-
-        current = 0;
-        currentLine = 1;
-        currentColumn = 1;
-
-        scanTokens();
-        return tokens;
+    public void open(String text) {
+        this.buffer = new SourceStringBuffer(text);
+        this.isLegacyMode = false;
+        resetCommonState();
     }
 
-    private void scanTokens() {
-        while (!isAtEnd()) {
+    @Override
+    public void open(InputStream is) {
+        this.buffer = new SourceInputStreamBuffer(is);
+        this.isLegacyMode = false;
+        resetCommonState();
+    }
+
+    @Override
+    public List<JsonToken> tokenize(String source) {
+        if (source == null || source.isEmpty()) {
+            return List.of();
+        }
+
+        this.tokens = new ArrayList<>();
+        this.streamEnded = false;
+
+        open(source);
+        this.isLegacyMode = true;
+
+        // Drain the stream using the sequential nextToken logic
+        JsonToken token;
+        while ((token = nextToken()) != null) {
+            if (token.getType() == JsonTokenType.EOF) {
+                break;
+            }
+        }
+        return this.tokens;
+    }
+
+    @Override
+    public Set<JsonTokenType> getTokenTypes() {
+        return EnumSet.allOf(JsonTokenType.class);
+    }
+
+    @Override
+    public JsonToken nextToken() {
+        if (!pendingTokens.isEmpty()) {
+            return queueToken(pendingTokens.pollFirst());
+        }
+
+        if (streamEnded) {
+            return null;
+        }
+
+        // 1. Loop until we either parse a token or drain the stream buffer
+        while (!buffer.isAtEnd() && pendingTokens.isEmpty()) {
             advanceWhitespaceAndComments();
 
-            if (isAtEnd()) break;
+            if (buffer.isAtEnd()) break;
 
-            trace("scanTokens");
+            buffer.startTokenWindow();
+            scanToken();
+        }
 
-            int startPosition = current;
-            int startLine = currentLine;
-            int startColumn = currentColumn;
+        // 2. If scanning populated tokens, return the first one
+        if (!pendingTokens.isEmpty()) {
+            return queueToken(pendingTokens.pollFirst());
+        }
 
-            c = advance();
-            JsonTokenType type = null;
-            String lexeme = String.valueOf(c);
-            String value = null; // Reset for every token to prevent value bleeding
+        // 3. Handle standard EOF termination without stream lifecycle markers
+        if (buffer.isAtEnd()) {
+            streamEnded = true;
+            JsonToken eof = new JsonToken(buffer.line(), buffer.column(), buffer.offset(), JsonTokenType.EOF, "", null);
+            return queueToken(eof);
+        }
 
-            switch (c) {
-                case '{' -> type = JsonTokenType.LEFT_BRACE;
-                case '}' -> type = JsonTokenType.RIGHT_BRACE;
-                case '[' -> type = JsonTokenType.LEFT_BRACKET;
-                case ']' -> type = JsonTokenType.RIGHT_BRACKET;
-                case ',' -> type = JsonTokenType.COMMA;
-                case ':' -> type = JsonTokenType.COLON;
+        return null;
+    }
 
-                case '"', '\'' -> {
-                    lexeme = scanString(c);
-                    // Extract inner value (unquoted)
-                    value = (lexeme.length() >= 2)
-                        ? lexeme.substring(1, lexeme.length() - 1)
-                        : "";
-                    type = JsonTokenType.STRING;
-                }
+    private void scanToken() {
+        trace("scanToken");
+        char c = buffer.advance();
+        JsonTokenType type = null;
+        String lexeme = String.valueOf(c);
+        String value = null;
 
-                case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '-', '+' -> {
-                    // Move the logic into a specialized method that handles the complex JSON5 cases
-                    lexeme = scanNumber(c);
+        switch (c) {
+            case '{' -> type = JsonTokenType.LEFT_BRACE;
+            case '}' -> type = JsonTokenType.RIGHT_BRACE;
+            case '[' -> type = JsonTokenType.LEFT_BRACKET;
+            case ']' -> type = JsonTokenType.RIGHT_BRACKET;
+            case ',' -> type = JsonTokenType.COMMA;
+            case ':' -> type = JsonTokenType.COLON;
+
+            case '"', '\'' -> {
+                scanString(c);
+                lexeme = buffer.getTokenWindowLexeme();
+                value = (lexeme.length() >= 2)
+                    ? lexeme.substring(1, lexeme.length() - 1)
+                    : "";
+                type = JsonTokenType.STRING;
+            }
+
+            case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '-', '+' -> {
+                scanNumber(c);
+                lexeme = buffer.getTokenWindowLexeme();
+                type = JsonTokenType.NUMBER;
+            }
+
+            case '.' -> {
+                if (isDigit(buffer.peek())) {
+                    scanNumber(c);
+                    lexeme = buffer.getTokenWindowLexeme();
                     type = JsonTokenType.NUMBER;
-                }
-
-                case '.' -> {
-                    if (isDigit(peek())) {
-                        lexeme = scanNumber(c); // Start number with '.'
-                        type = JsonTokenType.NUMBER;
-                    } else {
-                        type = JsonTokenType.DOT;
-                    }
-                }
-
-                case 't', 'f', 'n' -> {
-                    lexeme = scanLiteral(c);
-                    if ("true".equals(lexeme) || "false".equals(lexeme)) {
-                        type = JsonTokenType.BOOLEAN;
-                    } else if ("null".equals(lexeme)) {
-                        type = JsonTokenType.NULL;
-                    } else {
-                        type = JsonTokenType.ERROR;
-                    }
-                }
-
-                default -> {
-                    if (isIdentifierStart(c)) {
-                        lexeme = scanIdentifier(c);
-                        type = JsonTokenType.IDENTIFIER;
-                    } else {
-                        type = JsonTokenType.UNKNOWN;
-                    }
+                } else {
+                    type = JsonTokenType.DOT;
                 }
             }
 
-            // If value wasn't explicitly set (like in strings), use lexeme
-            if (value == null) value = lexeme;
+            case 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
+                'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+                'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
+                'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '_', '$' -> {
 
-            addToken(type, lexeme, value, startPosition, startLine, startColumn);
-        }
+                // 1. Consume the entire alphanumeric/identifier word sequence completely
+                while (isIdentifierPart(buffer.peek())) {
+                    buffer.advance();
+                }
 
-        addToken(JsonTokenType.EOF, "", "", current, currentLine, currentColumn);
-    }
+                lexeme = buffer.getTokenWindowLexeme();
 
-    private void addToken(JsonTokenType type, String lexeme, String value, int pos, int line, int col) {
-        tokens.add(new JsonToken(type, lexeme, value, pos, line, col));
-    }
-
-    // --- Core Character Consumption ---
-
-    private boolean isAtEnd() {
-        return current >= source.length();
-    }
-
-    private char advance() {
-        char c = this.source.charAt(this.current++);
-        if (c == '\n') {
-            currentLine++;
-            currentColumn = 1;
-        } else if (c == '\r') {
-            currentLine++;
-            currentColumn = 1;
-            if (!isAtEnd() && source.charAt(current) == '\n') {
-                 current++;
+                // 2. Classify the fully-extracted token word string
+                switch (lexeme) {
+                    case "true", "false"   -> type = JsonTokenType.BOOLEAN;
+                    case "null"            -> type = JsonTokenType.NULL;
+                    case "Infinity", "NaN" -> type = JsonTokenType.NUMBER; // Maps directly to scalar route
+                    default                -> type = JsonTokenType.IDENTIFIER;
+                }
             }
-        } else {
-            currentColumn++;
+
+            default -> {
+                if (isIdentifierStart(c)) {
+                    scanIdentifier(c);
+                    lexeme = buffer.getTokenWindowLexeme();
+                    type = JsonTokenType.IDENTIFIER;
+                } else {
+                    type = JsonTokenType.UNKNOWN;
+                }
+            }
         }
-        return c;
+
+        if (value == null) value = lexeme;
+        addToken(type, lexeme, value);
     }
 
-    private char peek() {
-        return this.isAtEnd() ? '\u0000' : this.source.charAt(this.current);
+    private void scanString(char quoteChar) {
+        while (!buffer.isAtEnd()) {
+            char next = buffer.advance();
+            if (next == quoteChar) return;
+
+            if (next == '\\' && !buffer.isAtEnd()) {
+                char escaped = buffer.advance();
+                if (escaped == 'u' || escaped == 'x') {
+                    int count = (escaped == 'u' ? 4 : 2);
+                    for (int i = 0; i < count && !buffer.isAtEnd(); i++) {
+                        buffer.advance();
+                    }
+                }
+            }
+        }
     }
 
-    private char peekNext() {
-        int nextIndex = this.current + 1;
-        return nextIndex >= this.source.length() ? '\u0000' : this.source.charAt(nextIndex);
+    private void scanNumber(char startChar) {
+        // 1. Handle JSON5 signed literal keywords (+Infinity, -Infinity, -NaN, etc.)
+        if ((startChar == '-' || startChar == '+') && isIdentifierStart(buffer.peek())) {
+            while (isIdentifierPart(buffer.peek())) {
+                buffer.advance();
+            }
+            return;
+        }
+
+        // 2. Handle Hexadecimal (0x...)
+        if (startChar == '0' && (buffer.peek() == 'x' || buffer.peek() == 'X')) {
+            buffer.advance(); // consume 'x'
+            while (isHexDigit(buffer.peek())) {
+                buffer.advance();
+            }
+            return;
+        }
+
+        // 3. Handle Decimal sequence
+        while (isDigit(buffer.peek())) {
+            buffer.advance();
+        }
+
+        // 4. Handle Fraction dot component
+        if (buffer.peek() == '.') {
+            buffer.advance();
+            while (isDigit(buffer.peek())) {
+                buffer.advance();
+            }
+        }
+
+        // 5. Handle Exponent notation
+        if (buffer.peek() == 'e' || buffer.peek() == 'E') {
+            buffer.advance();
+            if (buffer.peek() == '+' || buffer.peek() == '-') {
+                buffer.advance();
+            }
+            while (isDigit(buffer.peek())) {
+                buffer.advance();
+            }
+        }
     }
 
-    // --- Comment/Whitespace Logic ---
+    private void scanIdentifier(char startChar) {
+        trace("scanIdentifier");
+        while (!buffer.isAtEnd() && isIdentifierPart(buffer.peek())) {
+            buffer.advance();
+        }
+    }
+
+    private String scanSingleLineComment() {
+        trace("scanSingleLineComment");
+        buffer.advance(); // `/`
+        buffer.advance(); // `/`
+
+        // Use a window or lookahead to capture the text inside
+        StringBuilder valueBuilder = new StringBuilder();
+        while (!buffer.isAtEnd() && buffer.peek() != '\n' && buffer.peek() != '\r') {
+            valueBuilder.append(buffer.advance());
+        }
+        return valueBuilder.toString();
+    }
+
+    private String scanMultiLineComment() {
+        trace("scanMultiLineComment");
+        buffer.advance(); // `/`
+        buffer.advance(); // `*`
+
+        StringBuilder valueBuilder = new StringBuilder();
+        while (!buffer.isAtEnd()) {
+            if (buffer.peek() == '*' && buffer.peekNext() == '/') {
+                buffer.advance(); // `*`
+                buffer.advance(); // `/`
+                break;
+            }
+            valueBuilder.append(buffer.advance());
+        }
+        return valueBuilder.toString();
+    }
 
     private void advanceWhitespaceAndComments() {
         while (true) {
-            char nextC = peek();
+            char nextC = buffer.peek();
             if (nextC == '\u0000') return;
 
             if (Character.isWhitespace(nextC)) {
-                advance();
+                buffer.advance();
                 continue;
             }
 
             if (nextC == '/') {
-                char nextNextC = peekNext();
-                int startPos = current;
-                int startL = currentLine;
-                int startC = currentColumn;
-
+                char nextNextC = buffer.peekNext();
                 if (nextNextC == '/') {
+                    buffer.startTokenWindow(); // Mark comment start
                     String value = scanSingleLineComment();
-                    String lexeme = source.substring(startPos, current);
-                    addToken(JsonTokenType.COMMENT, lexeme, value, startPos, startL, startC);
+                    String lexeme = buffer.getTokenWindowLexeme();
+                    addToken(JsonTokenType.COMMENT, lexeme, value);
                     continue;
                 } else if (nextNextC == '*') {
+                    buffer.startTokenWindow(); // Mark comment start
                     String value = scanMultiLineComment();
-                    String lexeme = source.substring(startPos, current);
-                    addToken(JsonTokenType.COMMENT, lexeme, value, startPos, startL, startC);
+                    String lexeme = buffer.getTokenWindowLexeme();
+                    addToken(JsonTokenType.COMMENT, lexeme, value);
                     continue;
                 }
             }
@@ -182,71 +307,44 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         }
     }
 
-    private String scanSingleLineComment() {
-        int startOffset = current; // Start after //
-        advance(); // /
-        advance(); // /
+    //
+    //
+    //
 
-        // The 'value' starts after the two slashes
-        int valueStart = current;
-
-        while (!isAtEnd() && peek() != '\n' && peek() != '\r') {
-            advance();
-        }
-
-        // Return the "clean" content
-        return source.substring(valueStart, current);
+    private void addToken(JsonTokenType type, String lexeme, String value) {
+        JsonToken t = new JsonToken(
+            buffer.windowStartLine(),
+            buffer.windowStartColumn(),
+            buffer.windowStartOffset(),
+            type, lexeme, value
+        );
+        pendingTokens.add(t); // Pushes directly into the streaming line!
     }
 
-    private String scanMultiLineComment() {
-        advance(); // /
-        advance(); // *
-        int valueStart = current;
-
-        while (!isAtEnd()) {
-            if (peek() == '*' && peekNext() == '/') {
-                String value = source.substring(valueStart, current);
-                advance(); // *
-                advance(); // /
-                return value;
-            }
-            advance();
+    // Small interceptor ensuring that if someone runs the old tokenize() API,
+    // tokens get copied to the collection output array correctly.
+    private JsonToken queueToken(JsonToken token) {
+        if (isLegacyMode && token != null) {
+            tokens.add(token);
         }
-        return source.substring(valueStart, current); // Unterminated case
+        return token;
     }
 
-    // --- Literals and Identifiers ---
-
-    private String scanString(char quoteChar) {
-        StringBuilder sb = new StringBuilder(String.valueOf(quoteChar));
-        while (!isAtEnd()) {
-            char peeked = peek();
-            if (peeked == '\n' || peeked == '\r') break;
-
-            char next = advance();
-            sb.append(next);
-            if (next == quoteChar) return sb.toString();
-
-            if (next == '\\' && !isAtEnd()) {
-                char escaped = advance();
-                sb.append(escaped);
-                if (escaped == 'u' || escaped == 'x') {
-                    int count = (escaped == 'u' ? 4 : 2);
-                    for (int i = 0; i < count && !isAtEnd(); i++) {
-                        sb.append(advance());
-                    }
-                }
-            }
+    private void resetCommonState() {
+        // Handle UTF-8 BOM if present at start of stream/string
+        if (buffer.peek() == '\uFEFF') {
+            buffer.advance();
         }
-        return sb.toString();
     }
 
-    private String scanIdentifier(char startChar) {
-        StringBuilder sb = new StringBuilder(String.valueOf(startChar));
-        while (!isAtEnd() && isIdentifierPart(peek())) {
-            sb.append(advance());
-        }
-        return sb.toString();
+    //
+    //
+    //
+
+    private boolean isHexDigit(char c) {
+        return (c >= '0' && c <= '9') ||
+               (c >= 'a' && c <= 'f') ||
+               (c >= 'A' && c <= 'F');
     }
 
     private boolean isIdentifierStart(char c) {
@@ -261,67 +359,15 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         return c >= '0' && c <= '9';
     }
 
-    private String scanNumber(char startChar) {
-        // 'start' was red because in this context we need the 'startPosition'
-        // recorded at the beginning of scanTokens
-        int startPos = current - 1;
-
-        // 1. Handle Hexadecimal (0x...) - only if start was '0'
-        if (startChar == '0' && (peek() == 'x' || peek() == 'X')) {
-            advance(); // x
-            while (isHexDigit(peek())) advance();
-            return source.substring(startPos, current);
-        }
-
-        // 2. Handle Decimal Part
-        while (isDigit(peek())) advance();
-
-        // 3. Handle Fraction Part (.5 or 1.)
-        if (peek() == '.') {
-            advance(); // .
-            while (isDigit(peek())) advance();
-        }
-
-        // 4. Handle Exponent Part (1e10)
-        if (peek() == 'e' || peek() == 'E') {
-            advance();
-            if (peek() == '+' || peek() == '-') advance();
-            while (isDigit(peek())) advance();
-        }
-
-        return source.substring(startPos, current);
-    }
-
-    // Helper to check the character we JUST advanced over
-    private char previousChar() {
-        if (current == 0) return '\0';
-        return source.charAt(current - 1);
-    }
-
-    private boolean isHexDigit(char c) {
-        return (c >= '0' && c <= '9') ||
-               (c >= 'a' && c <= 'f') ||
-               (c >= 'A' && c <= 'F');
-    }
-
-    private String scanLiteral(char startChar) {
-        StringBuilder sb = new StringBuilder(String.valueOf(startChar));
-        String expected = switch (startChar) {
-            case 't' -> "true";
-            case 'f' -> "false";
-            case 'n' -> "null";
-            default -> "";
-        };
-        for (int i = 1; i < expected.length(); i++) {
-            if (isAtEnd() || peek() != expected.charAt(i)) break;
-            sb.append(advance());
-        }
-        return sb.toString();
-    }
+    //
+    // Diagnostics
+    //
 
     private void trace(String method) {
         if (reporter == null) return;
-        reporter.trace("C=%03d '%s' %03d:%03d %s", current, currentChar(c), currentLine, currentColumn, method);
+        char currentC = buffer.peek();
+        reporter.trace("C=%03d '%s' %03d:%03d %s",
+            buffer.offset(), currentChar(currentC), buffer.line(), buffer.column(), method);
     }
 
     private String currentChar(char c) {

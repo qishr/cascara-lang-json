@@ -1,0 +1,6 @@
+{
+    "bad_boolean": truee,
+    "bad_null": nul,
+    "malformed_number": 1.2.3,
+    "broken_hex": 0xG123
+  }

@@ -5,15 +5,12 @@ import io.github.qishr.cascara.common.diagnostic.Diagnostic.Level;
 import io.github.qishr.cascara.lang.json.token.JsonToken;
 import io.github.qishr.cascara.lang.json.token.JsonTokenType;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import java.net.URI;
 import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 class JsonTokenizerTest {
     private final JsonTokenizer tokenizer = new JsonTokenizer().setReporter(new StandardReporter().setLevel(Level.TRACE));
-    private final URI testUri = URI.create("test://file.json");
 
     @Test
     void testBasicTokens() {

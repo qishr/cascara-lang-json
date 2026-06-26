@@ -1,21 +1,24 @@
 package io.github.qishr.cascara.lang.json.processor;
 
-import java.net.URI;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
 import io.github.qishr.cascara.common.diagnostic.code.DiagnosticCode;
-import io.github.qishr.cascara.common.lang.QuoteStyle;
 import io.github.qishr.cascara.common.lang.exception.ParserException;
 import io.github.qishr.cascara.common.lang.processor.Parser;
-import io.github.qishr.cascara.lang.json.ast.*;
+import io.github.qishr.cascara.common.lang.util.QuoteStyle;
+import io.github.qishr.cascara.lang.json.ast.JsonCommentNode;
+import io.github.qishr.cascara.lang.json.ast.JsonMapNode;
+import io.github.qishr.cascara.lang.json.ast.JsonNode;
+import io.github.qishr.cascara.lang.json.ast.JsonScalarNode;
+import io.github.qishr.cascara.lang.json.ast.JsonSequenceNode;
 import io.github.qishr.cascara.lang.json.exception.JsonDiagnosticCode;
 import io.github.qishr.cascara.lang.json.token.JsonToken;
 import io.github.qishr.cascara.lang.json.token.JsonTokenType;
 
 /// A recursive descent parser for JSON/JSON5.
 public class JsonParser extends AbstractJsonProcessor<JsonParser> implements Parser<JsonNode, JsonToken> {
-    private URI uri;
     private List<JsonToken> tokens;
     private int current = 0;
     private int depth = 0;
@@ -34,6 +37,14 @@ public class JsonParser extends AbstractJsonProcessor<JsonParser> implements Par
         tokenizer.setOptions(options);
         tokenizer.setReporter(reporter);
         return parse(tokenizer.tokenize(text));
+    }
+
+    @Override
+    public JsonNode parse(InputStream is) {
+        JsonTokenizer tokenizer = new JsonTokenizer();
+        tokenizer.setOptions(options);
+        tokenizer.setReporter(reporter);
+        return parse(tokenizer.tokenize(is));
     }
 
     @Override
@@ -69,8 +80,27 @@ public class JsonParser extends AbstractJsonProcessor<JsonParser> implements Par
             return switch (token.getType()) {
                 case LEFT_BRACE -> parseMap();
                 case LEFT_BRACKET -> parseSequence();
-                case STRING, NUMBER, BOOLEAN, NULL, IDENTIFIER -> parseScalar();
-                default -> new JsonScalarNode(token.getStartLine(), token.getStartColumn(), "", "", null);
+                case STRING, NUMBER, BOOLEAN, NULL -> parseScalar();
+                case IDENTIFIER -> {
+                    String identifier = token.getContent();
+                    if ("Infinity".equals(identifier) || "NaN".equals(identifier)) {
+                        advance(); // Consume the identifier token
+                        yield new JsonScalarNode(
+                            token.getStartLine(),
+                            token.getStartColumn(),
+                            token.getLexeme(),
+                            identifier,            // Unescaped literal text processed by Primitive.fromString()
+                            QuoteStyle.PLAIN
+                        );
+                    }
+
+                    error(token, JsonDiagnosticCode.UNEXPECTED_UNQUOTED_STRING_VALUE, token.getContent());
+                    yield new JsonScalarNode(); // Default constructor is completely safe here
+                }
+                default -> {
+                    error(token, JsonDiagnosticCode.UNEXPECTED_TOKEN, token.getType());
+                    yield new JsonScalarNode(token.getStartLine(), token.getStartColumn(), "", "", null);
+                }
             };
         } finally {
             depth--;
@@ -85,6 +115,9 @@ public class JsonParser extends AbstractJsonProcessor<JsonParser> implements Par
             JsonMapNode map = new JsonMapNode(start.getStartLine(), start.getStartColumn());
 
             attachComments(map);
+
+            // Track unique string values of keys parsed within this specific map block
+            java.util.Set<String> seenKeys = new java.util.HashSet<>();
 
             if (!check(JsonTokenType.RIGHT_BRACE)) {
                 do {
@@ -109,6 +142,13 @@ public class JsonParser extends AbstractJsonProcessor<JsonParser> implements Par
                     // The key claims EVERYTHING in the buffer since the last key's value was finished
                     attachComments(key);
 
+                    // Check for duplicate keys before moving to the value phase
+                    String keyString = key.asString();
+                    if (!seenKeys.add(keyString)) {
+                        // Report diagnostic error and throw a ParserException to fail validation structurally
+                        error(keyTok, JsonDiagnosticCode.DUPLICATE_KEY, keyString);
+                    }
+
                     consume(JsonTokenType.COLON, JsonDiagnosticCode.EXPECTED_COLON_MAP_KEY);
                     JsonNode value = parseValue(); // parseValue should NOT call attachComments internally
                     map.put(key, value);
@@ -129,7 +169,7 @@ public class JsonParser extends AbstractJsonProcessor<JsonParser> implements Par
         trace("parseSequence");
         try {
             JsonToken start = consume(JsonTokenType.LEFT_BRACKET, JsonDiagnosticCode.EXPECTED_OPEN_BRACKET);
-            JsonSequenceNode seq = new JsonSequenceNode(start.getStartLine(), start.getStartColumn(), uri);
+            JsonSequenceNode seq = new JsonSequenceNode(start.getStartLine(), start.getStartColumn());
 
             attachComments(seq);
 
@@ -165,8 +205,6 @@ public class JsonParser extends AbstractJsonProcessor<JsonParser> implements Par
     private JsonScalarNode parseScalar() {
         JsonToken token = advance();
 
-        // TODO: This should be done in TypeDescriptor
-
         // JSON5/Standard logic:
         // Strings get DOUBLE (or SINGLE in JSON5), everything else is PLAIN
         QuoteStyle style = switch (token.getType()) {
@@ -198,7 +236,6 @@ public class JsonParser extends AbstractJsonProcessor<JsonParser> implements Par
                 pendingComments.add(new JsonCommentNode(
                     tok.getStartLine(),
                     tok.getStartColumn(),
-                    uri,
                     tok.getLexeme(),
                     tok.getContent(),
                     isBlock
@@ -208,7 +245,6 @@ public class JsonParser extends AbstractJsonProcessor<JsonParser> implements Par
             break;
         }
     }
-
 
     private <T extends JsonNode> T attachComments(T node) {
         if (node == null) return null;

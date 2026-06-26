@@ -6,6 +6,9 @@ module cascara.lang.json {
     exports io.github.qishr.cascara.lang.json.processor;
     exports io.github.qishr.cascara.lang.json.token;
 
+    // For testing
+    opens io.github.qishr.cascara.lang.json;
+
     provides io.github.qishr.cascara.common.lang.processor.AstConverter
         with io.github.qishr.cascara.lang.json.processor.JsonConverter;
     provides io.github.qishr.cascara.common.lang.processor.Emitter
