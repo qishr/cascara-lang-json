@@ -3,14 +3,13 @@ package io.github.qishr.cascara.lang.json.ast;
 import java.util.List;
 import java.util.Objects;
 
-import io.github.qishr.cascara.common.lang.QuoteStyle;
+import io.github.qishr.cascara.common.lang.util.QuoteStyle;
 import io.github.qishr.cascara.common.lang.ast.ScalarAstNode;
 import io.github.qishr.cascara.common.lang.type.Primitive;
-import io.github.qishr.cascara.common.lang.type.PrimitiveDelegate;
 import io.github.qishr.cascara.lang.json.JsonPrimitiveDelegate;
 
 public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> {
-    private static PrimitiveDelegate JSON_PRIMITIVE_DELEGATE = new JsonPrimitiveDelegate();
+    private static JsonPrimitiveDelegate JSON_PRIMITIVE_DELEGATE = new JsonPrimitiveDelegate();
 
     private String raw;
     private Primitive primitive;
@@ -44,11 +43,18 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
     /// Used when building an AST dynamically in code.
     /// Takes a pre-typed Object and skips text-based type inference.
     public JsonScalarNode(Object primitiveValue) {
+        this(primitiveValue, false);
+    }
+
+    /// A programmatic and serializer constructor.
+    /// Used when building an AST dynamically in code.
+    /// Takes a pre-typed Object and skips text-based type inference.
+    public JsonScalarNode(Object primitiveValue, boolean isKey) {
         super(0, 0);
         this.raw = null; // Cleared cache marks it as dirty for the emitter
         this.primitive = Primitive.of(primitiveValue)
             .setDelegate(JSON_PRIMITIVE_DELEGATE);
-        this.quoteStyle = primitive.getQuoteStyle();
+        this.quoteStyle = isKey ? QuoteStyle.DOUBLE : primitive.getQuoteStyle();
     }
 
     /// The default constructor
@@ -58,6 +64,15 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
         this.quoteStyle = QuoteStyle.PLAIN;
         this.primitive = Primitive.of(null)
             .setDelegate(JSON_PRIMITIVE_DELEGATE);
+    }
+
+    public static JsonScalarNode fromPrimitive(Primitive primitive) {
+        JsonScalarNode node = new JsonScalarNode();
+        node.raw = null; // Cleared cache marks it as dirty for the emitter
+        node.primitive = primitive;
+        node.primitive.setDelegate(JSON_PRIMITIVE_DELEGATE);
+        node.quoteStyle = primitive.getQuoteStyle();
+        return node;
     }
 
     @Override
@@ -87,11 +102,12 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
     }
 
     @Override
-    public void setPrimitive(Object value) {
+    public JsonScalarNode setPrimitive(Object value) {
         this.primitive = Primitive.of(value)
             .setDelegate(JSON_PRIMITIVE_DELEGATE)
             .setQuoteStyle(this.quoteStyle);
         this.raw = null;
+        return this;
     }
 
     /// Returns the logical clean text value, stripped of outer formatting and escape markers.

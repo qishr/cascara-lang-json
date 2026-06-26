@@ -15,11 +15,14 @@ public enum JsonTokenType implements TokenType {
     NUMBER(TokenCategory.NUMBER),
     BOOLEAN(TokenCategory.BOOLEAN),
     NULL(TokenCategory.NULL),
-    EOF(TokenCategory.INTERNAL),
     UNKNOWN(TokenCategory.INTERNAL),
     ERROR(TokenCategory.ERROR),
     IDENTIFIER(TokenCategory.IDENTIFIER),
-    COMMENT(TokenCategory.COMMENT);// <-- New type for syntax highlighting
+    COMMENT(TokenCategory.COMMENT),
+
+    // STREAM_START(TokenCategory.INTERNAL),
+    // STREAM_END(TokenCategory.INTERNAL),
+    EOF(TokenCategory.INTERNAL);
 
     private final TokenCategory category;
 

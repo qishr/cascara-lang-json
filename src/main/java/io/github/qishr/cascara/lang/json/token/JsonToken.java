@@ -3,20 +3,20 @@ package io.github.qishr.cascara.lang.json.token;
 import io.github.qishr.cascara.common.lang.token.Token;
 
 public class JsonToken implements Token {
+    private int startLine;
+    private int startColumn;
+    private int offset;
     private JsonTokenType type;
     private String lexeme;
     private String content;
-    private int offset;
-    private int startLine;
-    private int startColumn;
 
-    public JsonToken(JsonTokenType type, String lexeme, String content, int startIndex, int line, int column) {
+    public JsonToken(int line, int column, int startIndex, JsonTokenType type, String lexeme, String content) {
+        this.startLine = line;
+        this.startColumn = column;
+        this.offset = startIndex;
         this.type = type;
         this.lexeme = lexeme;
         this.content = content;
-        this.offset = startIndex;
-        this.startLine = line;
-        this.startColumn = column;
     }
 
 

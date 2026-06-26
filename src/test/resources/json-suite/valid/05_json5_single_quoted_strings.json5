@@ -1,0 +1,4 @@
+{
+  'single': 'single quoted value',
+  "mixed": 'allowed variation'
+}
