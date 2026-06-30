@@ -65,6 +65,12 @@ public class JsonSequenceNode extends JsonNode implements SequenceAstNode<JsonNo
             throw new UnsupportedOperationException();
         }
     }
+
+    @Override
+    public boolean isEmpty() {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'isEmpty'");
+    }
 }
 
 

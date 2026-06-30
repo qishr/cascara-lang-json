@@ -157,4 +157,14 @@ public class JsonMapNode extends JsonNode implements MapAstNode<JsonNode, JsonMa
     public JsonMapNode put(String key, String value) {
         return put(key, new JsonScalarNode(value));
     }
+    @Override
+    public int size() {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'size'");
+    }
+    @Override
+    public boolean isEmpty() {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'isEmpty'");
+    }
 }

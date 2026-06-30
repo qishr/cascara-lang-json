@@ -8,7 +8,7 @@ import io.github.qishr.cascara.common.diagnostic.code.GenericDiagnosticCode;
 import io.github.qishr.cascara.common.lang.util.LanguageOptions;
 import io.github.qishr.cascara.common.lang.exception.SerializerException;
 import io.github.qishr.cascara.common.lang.processor.AbstractSerializer;
-import io.github.qishr.cascara.common.lang.processor.Parser;
+import io.github.qishr.cascara.common.lang.processor.AstParser;
 import io.github.qishr.cascara.common.util.ContentType;
 import io.github.qishr.cascara.lang.json.JsonOptions;
 import io.github.qishr.cascara.lang.json.JsonPrimitiveDelegate;
@@ -21,7 +21,7 @@ import io.github.qishr.cascara.lang.json.ast.JsonSequenceNode;
 /// Standard implementation for JSON serialization.
 public class JsonSerializer extends AbstractSerializer<JsonSerializer,JsonNode,JsonScalarNode,JsonSequenceNode,JsonMapNode,JsonMapEntryNode> {
 
-    private JsonParser parser;
+    private JsonAstParser parser;
     private JsonOptions options = new JsonOptions();
     private Reporter reporter = new NoOpReporter();
 
@@ -54,11 +54,11 @@ public class JsonSerializer extends AbstractSerializer<JsonSerializer,JsonNode,J
     }
 
     @Override
-    public JsonSerializer setParser(Parser<JsonNode,?> parser) {
-        if (!(parser instanceof JsonParser jsonParser)) {
-            throw new SerializerException(GenericDiagnosticCode.ERROR, "Parser must be a JsonParser");
+    public JsonSerializer setParser(AstParser<JsonNode,?> parser) {
+        if (!(parser instanceof JsonAstParser JsonAstParser)) {
+            throw new SerializerException(GenericDiagnosticCode.ERROR, "Parser must be a JsonAstParser");
         }
-        this.parser = jsonParser;
+        this.parser = JsonAstParser;
         return this;
     }
 
@@ -90,9 +90,9 @@ public class JsonSerializer extends AbstractSerializer<JsonSerializer,JsonNode,J
         return (C) deserialize(astNode, jvmType);
     }
 
-    private JsonParser getParser() {
+    private JsonAstParser getParser() {
         if (parser == null) {
-            parser = new JsonParser();
+            parser = new JsonAstParser();
             parser.setReporter(reporter);
         }
         return parser;

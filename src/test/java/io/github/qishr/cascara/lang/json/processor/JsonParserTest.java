@@ -13,8 +13,8 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class JsonParserTest {
-    private final JsonParser parser = new JsonParser().setReporter(new StandardReporter().setLevel(Level.TRACE));;
+class JsonAstParserTest {
+    private final JsonAstParser parser = new JsonAstParser().setReporter(new StandardReporter().setLevel(Level.TRACE));;
 
     @Test
     void testParseObjectWithComments() {

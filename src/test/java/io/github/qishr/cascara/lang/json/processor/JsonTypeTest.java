@@ -17,7 +17,7 @@ public class JsonTypeTest {
             }
             """;
 
-        JsonNode doc = new JsonParser().parse(json);
+        JsonNode doc = new JsonAstParser().parse(json);
         if (doc instanceof JsonMapNode map) {
             if (map.get("status") instanceof JsonScalarNode status) {
                 Object o = status.getPrimitive();
