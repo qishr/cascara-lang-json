@@ -6,7 +6,8 @@ import java.util.List;
 
 import io.github.qishr.cascara.common.diagnostic.code.DiagnosticCode;
 import io.github.qishr.cascara.common.lang.exception.ParserException;
-import io.github.qishr.cascara.common.lang.processor.Parser;
+import io.github.qishr.cascara.common.lang.processor.AstParser;
+import io.github.qishr.cascara.common.lang.processor.Tokenizer;
 import io.github.qishr.cascara.common.lang.util.QuoteStyle;
 import io.github.qishr.cascara.lang.json.ast.JsonCommentNode;
 import io.github.qishr.cascara.lang.json.ast.JsonMapNode;
@@ -18,7 +19,7 @@ import io.github.qishr.cascara.lang.json.token.JsonToken;
 import io.github.qishr.cascara.lang.json.token.JsonTokenType;
 
 /// A recursive descent parser for JSON/JSON5.
-public class JsonParser extends AbstractJsonProcessor<JsonParser> implements Parser<JsonNode, JsonToken> {
+public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implements AstParser<JsonNode, JsonToken> {
     private List<JsonToken> tokens;
     private int current = 0;
     private int depth = 0;
@@ -27,9 +28,9 @@ public class JsonParser extends AbstractJsonProcessor<JsonParser> implements Par
     private final List<JsonCommentNode> pendingComments = new ArrayList<>();
 
     /// Default constructor for SPI
-    public JsonParser() {}
+    public JsonAstParser() {}
 
-    @Override protected JsonParser self() { return this; }
+    @Override protected JsonAstParser self() { return this; }
 
     @Override
     public JsonNode parse(String text) {
@@ -304,5 +305,11 @@ public class JsonParser extends AbstractJsonProcessor<JsonParser> implements Par
         if (!reporter.collectsProblems()) {
             throw new ParserException(token, code, details);
         }
+    }
+
+    @Override
+    public JsonNode parse(Tokenizer<JsonToken> tokenizer) {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'parse'");
     }
 }

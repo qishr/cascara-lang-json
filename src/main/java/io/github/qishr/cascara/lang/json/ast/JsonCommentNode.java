@@ -23,8 +23,8 @@ public class JsonCommentNode extends JsonNode implements ScalarAstNode<JsonNode>
     }
 
     @Override
-    public void setQuoteStyle(QuoteStyle style) {
-
+    public JsonCommentNode setQuoteStyle(QuoteStyle style) {
+        return this;
     }
 
     @Override

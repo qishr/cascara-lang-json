@@ -18,7 +18,7 @@ public class JsonConverter extends AbstractJsonProcessor<JsonConverter> implemen
 
     @Override
     public ContentType getContentType() {
-        return JsonParser.JSON_CONTENT_TYPE;
+        return JsonAstParser.JSON_CONTENT_TYPE;
     }
 
     public String toText(AstNode ast) {

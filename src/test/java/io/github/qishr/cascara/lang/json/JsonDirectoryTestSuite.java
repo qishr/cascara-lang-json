@@ -15,19 +15,19 @@ import io.github.qishr.cascara.common.diagnostic.StandardReporter;
 import io.github.qishr.cascara.common.diagnostic.Diagnostic.Level;
 import io.github.qishr.cascara.lang.json.ast.JsonNode;
 import io.github.qishr.cascara.lang.json.processor.JsonEmitter;
-import io.github.qishr.cascara.lang.json.processor.JsonParser;
+import io.github.qishr.cascara.lang.json.processor.JsonAstParser;
 
 class JsonDirectoryTestSuite {
 
     private JsonOptions options;
-    private JsonParser parser;
+    private JsonAstParser parser;
     private Reporter reporter;
 
     @BeforeEach
     void init() {
         reporter = new StandardReporter().setLevel(Level.TRACE);
         options = new JsonOptions().setStrict(true);
-        parser = new JsonParser()
+        parser = new JsonAstParser()
             .setOptions(options)
             .setReporter(reporter);
     }
