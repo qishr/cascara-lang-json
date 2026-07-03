@@ -1,7 +1,7 @@
 package io.github.qishr.cascara.lang.json.processor;
 
 import io.github.qishr.cascara.common.diagnostic.Diagnostic.Level;
-import io.github.qishr.cascara.common.diagnostic.SilentErrorTracker;
+import io.github.qishr.cascara.common.diagnostic.SilentCollectingReporter;
 import io.github.qishr.cascara.common.diagnostic.StandardReporter;
 import io.github.qishr.cascara.common.lang.ast.CommentAstNode;
 import io.github.qishr.cascara.common.lang.util.QuoteStyle;
@@ -124,7 +124,7 @@ class JsonAstParserTest {
         // Missing closing brace
         String input = "{ \"key\": \"value\" ";
         // This should not throw an exception, but the Reporter should have errors
-        SilentErrorTracker reporter = new SilentErrorTracker();
+        SilentCollectingReporter reporter = new SilentCollectingReporter();
         parser.setReporter(reporter);
         parser.parse(input);
         // Assuming your reporter has a way to check error counts:

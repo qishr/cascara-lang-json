@@ -12,7 +12,7 @@ repositories {
 
 dependencies {
     // Cascara
-    implementation(platform("io.github.qishr:cascara-meta-bom:0.1.13"))
+    implementation(platform("io.github.qishr:cascara-meta-bom:0.1.14"))
     implementation "io.github.qishr:cascara-common"
 
     // JUnit
