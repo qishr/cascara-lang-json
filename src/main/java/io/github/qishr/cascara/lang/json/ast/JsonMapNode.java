@@ -1,17 +1,34 @@
 package io.github.qishr.cascara.lang.json.ast;
 
-import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.SequencedCollection;
+import java.util.SequencedSet;
 import java.util.Set;
-import java.util.stream.Collectors;
+import java.util.AbstractSet;
+import java.util.Iterator;
+import java.util.Set;
 
 import io.github.qishr.cascara.common.lang.annotation.Nullable;
 import io.github.qishr.cascara.common.lang.ast.MapAstNode;
 import io.github.qishr.cascara.common.lang.util.QuoteStyle;
+import io.github.qishr.cascara.lang.json.ast.JsonSequenceNode.SequenceIterator;
 
 public class JsonMapNode extends JsonNode implements MapAstNode<JsonNode, JsonMapEntryNode> {
-    private final List<JsonMapEntryNode> entries = new ArrayList<>();
+    private final LinkedHashMap<JsonNode,JsonMapEntryNode> entriesByKey = new LinkedHashMap<>();
+
+    // private Set<JsonMapEntryNode> cachedEntrySet;
+
+    // private final LinkedHashMap<String,JsonMapEntryNode> entriesByStringKey = new LinkedHashMap<>();
+    // TODO:
+    // Doing the above would double the memory usage:
+    // Everywhere entriesByKey is updated, updated entriesByStringKey too.
+    // Idea: hash map with dual keys: string and JsonNode
+    // This is touched on here: https://www.baeldung.com/java-multiple-keys-map
+    // But their implementations sound rather slow.
 
     public JsonMapNode() { super(); }
     public JsonMapNode(int line, int column) { super(line, column); }
@@ -29,72 +46,107 @@ public class JsonMapNode extends JsonNode implements MapAstNode<JsonNode, JsonMa
 
     @Override
     public List<JsonMapEntryNode> getChildren() {
-        return entries;
+        return List.copyOf(entriesByKey.values());
     }
 
     @Override
     @Nullable
     public JsonMapEntryNode getEntry(JsonNode key) {
-        for (JsonMapEntryNode entry : entries) {
-            // TODO: This equals isn't working
-            if (entry.getKey().equals(key)) return entry;
-        }
-        return null;
+        return entriesByKey.get(key);
     }
 
     /// Convenience method for internal use and testing.
     /// Not part of the MapAstNode interface.
-    public JsonMapEntryNode getEntry(String keyName) {
-        for (JsonMapEntryNode entry : entries) {
-            if (entry.getKey().asString().equals(keyName)) return entry;
+    @Nullable
+    public JsonMapEntryNode getEntry(String key) {
+        if (key == null) return null;
+
+        // TODO: (see comment at top)
+        // return entriesByStringKey.get(key);
+
+        for (Entry<JsonNode, JsonMapEntryNode> entry : entriesByKey.entrySet()) {
+            if (entry.getKey() instanceof JsonScalarNode scalar) {
+                if (key.equals(scalar.asString())) {
+                    return entry.getValue();
+                }
+            }
         }
         return null;
-        // // Create a temporary "search" node
-        // JsonScalarNode searchKey = new JsonScalarNode(0, 0, keyName, keyName, QuoteStyle.PLAIN);
-        // return getEntry(searchKey);
     }
 
     @Override
     public List<JsonMapEntryNode> getEntries() {
-        return entries;
+        return List.copyOf(entriesByKey.values());
     }
 
     @Override
     public Set<JsonNode> keySet() {
-        return entries.stream().map(JsonMapEntryNode::getKey).collect(Collectors.toSet());
+        return entriesByKey.keySet();
     }
 
     @Override
     public Set<JsonMapEntryNode> entrySet() {
-        return new HashSet<JsonMapEntryNode>(entries);
+        // var values = entriesByKey.values();
+        // we need an efficient way to return Set<JsonMapEntryNode>.
+        // values's type is LinkedHashMap$LinkedValues.
+        // maybe entriesByKey being LinkedHashMap isn't the way to go.
+        return new HashSet<JsonMapEntryNode>(entriesByKey.values());
     }
+
+    // @Override
+    // public Set<JsonMapEntryNode> entrySet() {
+    //     if (cachedEntrySet == null) {
+    //         cachedEntrySet = new AbstractSet<JsonMapEntryNode>() {
+    //             @Override
+    //             public Iterator<JsonMapEntryNode> iterator() {
+    //                 // This delegates directly to the highly optimized LinkedHashMap values iterator!
+    //                 // Zero copying, zero temporary array/hash tables created.
+    //                 return entriesByKey.values().iterator();
+    //             }
+    //             @Override
+    //             public int size() {
+    //                 return entriesByKey.size();
+    //             }
+    //             @Override
+    //             public boolean contains(Object o) {
+    //                 if (!(o instanceof JsonMapEntryNode)) return false;
+    //                 JsonMapEntryNode entry = (JsonMapEntryNode) o;
+    //                 JsonMapEntryNode match = entriesByKey.get(entry.getKey());
+    //                 return match != null && match.equals(entry);
+    //             }
+    //         };
+    //     }
+    //     return cachedEntrySet;
+    // }
 
     @Override
     public JsonMapNode put(JsonNode key, JsonNode value) {
-        for (JsonMapEntryNode entry : entries) {
-            if (entry.getKey().equals(key)) {
-                entry.setRaw(value);
-                return this;
-            }
+        JsonMapEntryNode entry = getEntry(key);
+        if (entry == null) {
+            entry = new JsonMapEntryNode(0, 0, key, value);
+            entriesByKey.put(key, entry);
+            return this;
         }
-        entries.add(new JsonMapEntryNode(key.getStartLine(), key.getStartColumn(), key, value));
+        entry.setRaw(value);
         return this;
     }
 
     @Override
     public JsonMapNode remove(JsonNode key) {
-        entries.removeIf(e -> e.getKey().equals(key));
+        entriesByKey.remove(key);
         return this;
     }
 
     @Override
     public JsonMapNode remove(String key) {
-        entries.removeIf(e -> {
-            if (e.getKey() instanceof JsonScalarNode scalar) {
-                return scalar.asString().equals(key);
+        for (Map.Entry<JsonNode,JsonMapEntryNode> entry : entriesByKey.entrySet()) {
+            if (entry.getKey() instanceof JsonScalarNode scalar) {
+                if (scalar.asString().equals(key)) {
+                    entriesByKey.remove(scalar);
+                    return this;
+                }
             }
-            return false;
-        });
+        }
         return this;
     }
 
@@ -103,10 +155,23 @@ public class JsonMapNode extends JsonNode implements MapAstNode<JsonNode, JsonMa
     @Override
     public JsonNode get(String key) {
         if (key == null) return null;
-        for (JsonMapEntryNode entry : entries) {
-            JsonNode kNode = entry.getKey();
-            String entryKey = (kNode instanceof JsonScalarNode scalar) ? scalar.asString() : kNode.toString();
-            if (key.equals(entryKey)) return entry.getValue();
+
+        for (Map.Entry<JsonNode,JsonMapEntryNode> entry : entriesByKey.entrySet()) {
+            JsonMapEntryNode entryNode = entry.getValue();
+
+            JsonNode kNode = entryNode.getKey();
+            String entryKey = null;
+            if (kNode instanceof JsonScalarNode scalar) {
+                entryKey = scalar.asString();
+            } else {
+                entryKey = kNode.toString();
+            }
+
+            if (key.equals(entryKey)) {
+                JsonNode val = entryNode.getValue();
+                // return (val instanceof JsonAnchorNode a) ? a.getInnerNode() : val;
+                return val;
+            }
         }
         return null;
     }
@@ -125,20 +190,25 @@ public class JsonMapNode extends JsonNode implements MapAstNode<JsonNode, JsonMa
 
     @Override
     public JsonMapNode put(String key, JsonNode value) {
-        for (JsonMapEntryNode entry : entries) {
-            if (entry.getKey() instanceof JsonScalarNode scalar && key.equals(scalar.asString())) {
+        for (JsonMapEntryNode entry : entriesByKey.values()) {
+            JsonNode kNode = entry.getKey();
+            // Check if the existing key's string value matches the requested key
+            if (kNode instanceof JsonScalarNode scalar && key.equals(scalar.asString())) {
                 entry.setRaw(value);
                 return this;
             }
         }
-        JsonScalarNode keyNode = new JsonScalarNode(0, 0, key, key, QuoteStyle.DOUBLE);
-        entries.add(new JsonMapEntryNode(0, 0, keyNode, value));
+
+        // Only if not found, create the new entry
+        JsonNode keyNode = new JsonScalarNode(0, 0, key, key, QuoteStyle.PLAIN);
+        JsonMapEntryNode entry = new JsonMapEntryNode(0, 0, keyNode, value);
+        entriesByKey.put(entry.getKey(), entry);
         return this;
     }
 
     public boolean containsKey(String key) {
-        for (JsonMapEntryNode entry : entries) {
-            if (entry.getKey() instanceof JsonScalarNode scalar && key.equals(scalar.asString())) {
+        for (JsonNode keyNode : entriesByKey.keySet()) {
+            if (keyNode instanceof JsonScalarNode scalar && key.equals(scalar.asString())) {
                 return true;
             }
         }
@@ -157,14 +227,20 @@ public class JsonMapNode extends JsonNode implements MapAstNode<JsonNode, JsonMa
     public JsonMapNode put(String key, String value) {
         return put(key, new JsonScalarNode(value));
     }
+
     @Override
     public int size() {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'size'");
+        return entriesByKey.size();
     }
+
     @Override
     public boolean isEmpty() {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'isEmpty'");
+        return entriesByKey.isEmpty();
+    }
+
+    /// Returns Iterator instance
+    @Override
+    public Iterator<JsonMapEntryNode> iterator() {
+        return entriesByKey.sequencedValues().iterator();
     }
 }

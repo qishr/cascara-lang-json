@@ -34,8 +34,8 @@ public class JsonSequenceNode extends JsonNode implements SequenceAstNode<JsonNo
         return this;
     }
 
-
     /// Returns Iterator instance
+    @Override
     public Iterator<JsonNode> iterator() {
         return new SequenceIterator<JsonNode>(this);
     }

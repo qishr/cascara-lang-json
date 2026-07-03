@@ -9,7 +9,7 @@ import io.github.qishr.cascara.common.lang.type.Primitive;
 import io.github.qishr.cascara.lang.json.JsonPrimitiveDelegate;
 
 public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> {
-    private static JsonPrimitiveDelegate JSON_PRIMITIVE_DELEGATE = new JsonPrimitiveDelegate();
+    private static final JsonPrimitiveDelegate JSON_PRIMITIVE_DELEGATE = new JsonPrimitiveDelegate();
 
     private String raw;
     private Primitive primitive;
