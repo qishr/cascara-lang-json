@@ -130,7 +130,7 @@ public class JsonEmitter extends AbstractJsonProcessor<JsonEmitter>  implements 
     @Override
     public void emitPropertySeparator() {
         output.append(":");
-        if (options.isInsertSpaces()) {
+        if (options.insertSpaces()) {
             output.append(" ");
         }
     }
@@ -180,7 +180,7 @@ public class JsonEmitter extends AbstractJsonProcessor<JsonEmitter>  implements 
 
     private void writePadding() {
         int spaceCount = indentLevel * options.getIndentSize();
-        if (options.isInsertSpaces()) {
+        if (options.insertSpaces()) {
             output.append(" ".repeat(spaceCount));
         } else {
             output.append("\t".repeat(indentLevel));

@@ -5,6 +5,7 @@ import io.github.qishr.cascara.common.diagnostic.SilentCollectingReporter;
 import io.github.qishr.cascara.common.diagnostic.StandardReporter;
 import io.github.qishr.cascara.common.lang.ast.CommentAstNode;
 import io.github.qishr.cascara.common.lang.util.QuoteStyle;
+import io.github.qishr.cascara.lang.json.JsonOptions;
 import io.github.qishr.cascara.lang.json.ast.*;
 
 import org.junit.jupiter.api.Test;
@@ -24,6 +25,8 @@ class JsonAstParserTest {
               "port": 8080
             }
             """;
+
+        parser.setOptions(JsonOptions.JSON5);
 
         JsonMapNode root = (JsonMapNode) parser.parse(input);
 
@@ -45,6 +48,9 @@ class JsonAstParserTest {
     @Test
     void testJson5UnquotedKeys() {
         String input = "{ user: \"admin\" }";
+
+        parser.setOptions(JsonOptions.JSON5);
+
         JsonMapNode root = (JsonMapNode) parser.parse(input);
 
         JsonMapEntryNode entry = root.getEntries().get(0);
@@ -79,6 +85,8 @@ class JsonAstParserTest {
                 unquoted: true
             }
             """;
+
+        parser.setOptions(JsonOptions.JSON5);
 
         JsonMapNode root = (JsonMapNode) parser.parse(input);
 
@@ -134,6 +142,9 @@ class JsonAstParserTest {
     @Test
     void testCommentTextStripping() {
         String input = "// This is a line comment\n/* This is a block comment */ { }";
+
+        parser.setOptions(JsonOptions.JSON5);
+
         JsonNode root = parser.parse(input);
 
         // 1. Use the interface type for the list
@@ -166,6 +177,8 @@ class JsonAstParserTest {
             }
             """;
 
+        parser.setOptions(JsonOptions.JSON5);
+
         JsonMapNode root = (JsonMapNode) parser.parse(input);
 
         JsonMapNode level1 = root.getMap("level1");
@@ -184,6 +197,9 @@ class JsonAstParserTest {
             */
             { "a": 1 }
             """;
+
+        parser.setOptions(JsonOptions.JSON5);
+
         JsonNode root = parser.parse(input);
 
         CommentAstNode comment = root.getComments().get(0);
@@ -216,6 +232,8 @@ class JsonAstParserTest {
                 "c": 3
             }
             """;
+
+        parser.setOptions(JsonOptions.JSON5);
 
         JsonMapNode root = (JsonMapNode) parser.parse(input);
 

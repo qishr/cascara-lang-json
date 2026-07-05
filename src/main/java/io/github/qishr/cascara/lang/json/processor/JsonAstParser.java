@@ -2,7 +2,9 @@ package io.github.qishr.cascara.lang.json.processor;
 
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import io.github.qishr.cascara.common.diagnostic.code.DiagnosticCode;
 import io.github.qishr.cascara.common.lang.exception.ParserException;
@@ -117,19 +119,25 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
 
             attachComments(map);
 
-            // Track unique string values of keys parsed within this specific map block
-            java.util.Set<String> seenKeys = new java.util.HashSet<>();
-
             if (!check(JsonTokenType.RIGHT_BRACE)) {
+                // Track unique string values of keys parsed within this specific map block
+                Set<String> seenKeys = new HashSet<>();
+
                 do {
                     skipTrivia();
                     if (isAtEnd() || check(JsonTokenType.RIGHT_BRACE)) break; // Safety check
 
                     // JSON5: Handle trailing comma by checking for '}' after a comma
-                    if (check(JsonTokenType.RIGHT_BRACE)) break;
+                    if (options.allowTrailingComma()) {
+                        if (check(JsonTokenType.RIGHT_BRACE)) break;
+                    }
 
                     JsonToken keyTok = consumeKey();
 
+                    // TODO: We must take the data as it comes.
+                    // TODO: This key is getting a quotation style forced on it, which bypass error reporting.
+                    // Only report missing quotes if quotes are actually needed.
+                    // JSON keys must be strings but JSON5 keys don't need quotes.
                     QuoteStyle style = (keyTok.getType() == JsonTokenType.IDENTIFIER)
                             ? QuoteStyle.PLAIN
                             : QuoteStyle.DOUBLE;
@@ -140,13 +148,14 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
                         );
                     key.setToken(keyTok);
 
-                    // The key claims EVERYTHING in the buffer since the last key's value was finished
+                    // This comment is just wrong. Less wrong that it was before, but still wrong.
+                    // The key claims EVERYTHING in the buffer after the end of the last key's value
                     attachComments(key);
 
                     // Check for duplicate keys before moving to the value phase
                     String keyString = key.asString();
                     if (!seenKeys.add(keyString)) {
-                        // Report diagnostic error and throw a ParserException to fail validation structurally
+                        // Report diagnostic error to fail validation structurally
                         error(keyTok, JsonDiagnosticCode.DUPLICATE_KEY, keyString);
                     }
 

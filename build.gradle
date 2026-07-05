@@ -12,7 +12,7 @@ repositories {
 
 dependencies {
     // Cascara
-    implementation(platform("io.github.qishr:cascara-meta-bom:0.1.14"))
+    implementation(platform("io.github.qishr:cascara-meta-bom:0.1.16"))
     implementation "io.github.qishr:cascara-common"
 
     // JUnit
@@ -25,3 +25,13 @@ dependencies {
     testImplementation 'org.mockito:mockito-core'
     testImplementation 'org.mockito:mockito-junit-jupiter'
 }
+
+
+tasks.withType(Test).configureEach {
+    // This is for benchmarking.
+    // Without forkEvery, the new jvmArgs won't do anything.
+
+    forkEvery = 1
+    jvmArgs '-XX:StartFlightRecording=duration=20s,filename=json_profile.jfr'
+}
+
