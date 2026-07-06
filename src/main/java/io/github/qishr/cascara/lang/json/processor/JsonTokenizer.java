@@ -32,6 +32,32 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         WS['\r'] = true;
     }
 
+    // Lookup tables for identifier classification
+    private static final boolean[] IDENT_START = new boolean[128];
+    private static final boolean[] IDENT_PART  = new boolean[128];
+    static {
+        // Letters
+        for (char c = 'a'; c <= 'z'; c++) IDENT_START[c] = IDENT_PART[c] = true;
+        for (char c = 'A'; c <= 'Z'; c++) IDENT_START[c] = IDENT_PART[c] = true;
+
+        // JSON5 identifier extras
+        IDENT_START['_'] = IDENT_PART['_'] = true;
+        IDENT_START['$'] = IDENT_PART['$'] = true;
+
+        // Digits allowed only as IDENT_PART
+        for (char c = '0'; c <= '9'; c++) IDENT_PART[c] = true;
+    }
+
+    // Lookup tables for digits and hex digits
+    private static final boolean[] DIGIT = new boolean[128];
+    private static final boolean[] HEX   = new boolean[128];
+    static {
+        for (char c = '0'; c <= '9'; c++) DIGIT[c] = true;
+        for (char c = '0'; c <= '9'; c++) HEX[c] = true;
+        for (char c = 'a'; c <= 'f'; c++) HEX[c] = true;
+        for (char c = 'A'; c <= 'F'; c++) HEX[c] = true;
+    }
+
     private SourceBuffer buffer;
     private List<JsonToken> tokens;
     private boolean isLegacyMode = false;
@@ -219,23 +245,31 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             // IDENTIFIER FAST‑PATH (letters, $, _)
             //
             case 'a','b','c','d','e','f','g','h','i','j','k','l','m',
-                 'n','o','p','q','r','s','t','u','v','w','x','y','z',
-                 'A','B','C','D','E','F','G','H','I','J','K','L','M',
-                 'N','O','P','Q','R','S','T','U','V','W','X','Y','Z',
-                 '_','$' -> {
+                'n','o','p','q','r','s','t','u','v','w','x','y','z',
+                'A','B','C','D','E','F','G','H','I','J','K','L','M',
+                'N','O','P','Q','R','S','T','U','V','W','X','Y','Z',
+                '_','$' -> {
 
-                while (isIdentifierPart(buffer.peek())) {
-                    buffer.advance();
-                }
-
+                scanIdentifierFast();
                 lexeme = buffer.getTokenWindowLexeme();
 
-                // classify
                 switch (lexeme) {
-                    case "true", "false"   -> type = JsonTokenType.BOOLEAN;
-                    case "null"            -> type = JsonTokenType.NULL;
-                    case "Infinity", "NaN" -> type = JsonTokenType.NUMBER;
-                    default                -> type = JsonTokenType.IDENTIFIER;
+                    case "true", "false"   -> {
+                        type  = JsonTokenType.BOOLEAN;
+                        value = lexeme;
+                    }
+                    case "null"            -> {
+                        type  = JsonTokenType.NULL;
+                        value = lexeme;
+                    }
+                    case "Infinity", "NaN" -> {
+                        type  = JsonTokenType.NUMBER;
+                        value = lexeme;
+                    }
+                    default                -> {
+                        type  = JsonTokenType.IDENTIFIER;
+                        value = lexeme;
+                    }
                 }
             }
 
@@ -280,49 +314,97 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     }
 
     private void scanNumber(char startChar) {
-        // 1. Handle JSON5 signed literal keywords (+Infinity, -Infinity, -NaN, etc.)
+        // 1. JSON5 signed Infinity/NaN
         if (options.allowInfinityAndNaN()) {
-            if ((startChar == '-' || startChar == '+') && isIdentifierStart(buffer.peek())) {
-                while (isIdentifierPart(buffer.peek())) {
-                    buffer.advance();
+            if ((startChar == '-' || startChar == '+')) {
+                char c = buffer.peek();
+                if (c < 128 && IDENT_START[c]) { // fast-path identifier start
+                    while (true) {
+                        c = buffer.peek();
+                        if (c < 128 && IDENT_PART[c]) {
+                            buffer.advance();
+                            continue;
+                        }
+                        break;
+                    }
+                    return;
                 }
-                return;
             }
         }
 
-        // 2. Handle Hexadecimal (0x...)
+        // 2. Hexadecimal 0x...
         if (options.allowHexadecimalNumbers()) {
-            if (startChar == '0' && (buffer.peek() == 'x' || buffer.peek() == 'X')) {
-                buffer.advance(); // consume 'x'
-                while (isHexDigit(buffer.peek())) {
-                    buffer.advance();
+            if (startChar == '0') {
+                char c = buffer.peek();
+                if (c == 'x' || c == 'X') {
+                    buffer.advance(); // consume x/X
+                    while (true) {
+                        c = buffer.peek();
+                        if (c < 128 && HEX[c]) {
+                            buffer.advance();
+                            continue;
+                        }
+                        break;
+                    }
+                    return;
                 }
-                return;
             }
         }
 
-        // 3. Handle Decimal sequence
-        while (isDigit(buffer.peek())) {
-            buffer.advance();
+        // 3. Integer part
+        while (true) {
+            char c = buffer.peek();
+            if (c < 128 && DIGIT[c]) {
+                buffer.advance();
+                continue;
+            }
+            break;
         }
 
-        // 4. Handle Fraction dot component
+        // 4. Fractional part
         if (buffer.peek() == '.') {
-            buffer.advance();
-            while (isDigit(buffer.peek())) {
-                buffer.advance();
+            buffer.advance(); // consume '.'
+            while (true) {
+                char c = buffer.peek();
+                if (c < 128 && DIGIT[c]) {
+                    buffer.advance();
+                    continue;
+                }
+                break;
             }
         }
 
-        // 5. Handle Exponent notation
-        if (buffer.peek() == 'e' || buffer.peek() == 'E') {
-            buffer.advance();
-            if (buffer.peek() == '+' || buffer.peek() == '-') {
-                buffer.advance();
+        // 5. Exponent part
+        char c = buffer.peek();
+        if (c == 'e' || c == 'E') {
+            buffer.advance(); // consume e/E
+
+            c = buffer.peek();
+            if (c == '+' || c == '-') {
+                buffer.advance(); // consume sign
             }
-            while (isDigit(buffer.peek())) {
-                buffer.advance();
+
+            while (true) {
+                c = buffer.peek();
+                if (c < 128 && DIGIT[c]) {
+                    buffer.advance();
+                    continue;
+                }
+                break;
             }
+        }
+    }
+
+
+    private void scanIdentifierFast() {
+        // We already consumed the first character in scanToken()
+        while (true) {
+            char c = buffer.peek();
+            if (c < 128 && IDENT_PART[c]) {
+                buffer.advance();
+                continue;
+            }
+            break;
         }
     }
 
@@ -359,15 +441,15 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     private void advanceWhitespaceAndComments() {
         while (true) {
             char c = buffer.peek();
-            if (c == '\u0000') return;
+            if (c == '\0') return;
 
-            // Fast ASCII whitespace check
+            // Fast ASCII whitespace
             if (c < 128 && WS[c]) {
                 buffer.advance();
                 continue;
             }
 
-            // Comment handling
+            // Comments
             if (c == '/' && options.allowComments()) {
                 char n = buffer.peekNext();
 
@@ -379,7 +461,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
                         String lexeme = buffer.getTokenWindowLexeme();
                         addToken(JsonTokenType.COMMENT, lexeme, value);
                     } else {
-                        scanSingleLineComment(); // skip only
+                        scanSingleLineComment();
                     }
                     continue;
                 }
@@ -392,16 +474,17 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
                         String lexeme = buffer.getTokenWindowLexeme();
                         addToken(JsonTokenType.COMMENT, lexeme, value);
                     } else {
-                        scanMultiLineComment(); // skip only
+                        scanMultiLineComment();
                     }
                     continue;
                 }
             }
 
-            // Non-whitespace, non-comment → stop
-            break;
+            // Non-trivia
+            return;
         }
     }
+
 
     //
     //
@@ -438,20 +521,6 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     //
     //
     //
-
-    private boolean isHexDigit(char c) {
-        return (c >= '0' && c <= '9') ||
-               (c >= 'a' && c <= 'f') ||
-               (c >= 'A' && c <= 'F');
-    }
-
-    private boolean isIdentifierStart(char c) {
-        return Character.isLetter(c) || c == '$' || c == '_';
-    }
-
-    private boolean isIdentifierPart(char c) {
-        return isIdentifierStart(c) || Character.isDigit(c);
-    }
 
     private boolean isDigit(char c) {
         return c >= '0' && c <= '9';

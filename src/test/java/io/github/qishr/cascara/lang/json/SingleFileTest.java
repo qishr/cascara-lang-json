@@ -14,7 +14,7 @@ import io.github.qishr.cascara.lang.json.processor.JsonAstParser;
 class SingleFileTest {
     private JsonAstParser parser = new JsonAstParser();
 
-    // @Disabled
+    @Disabled
     @Test
     void testSingleFileTest() throws IOException {
         InputStream inputStream = getClass().getResourceAsStream("/medium.json");
@@ -22,7 +22,10 @@ class SingleFileTest {
         BufferedReader reader = new BufferedReader(streamReader);
         String content = reader.readAllAsString();
 
-        for (int i = 0; i < 500000; i++) {
+        // 500000
+
+
+        for (int i = 0; i < 2500000; i++) {
             parser = new JsonAstParser();
             parser.parse(content);
         }
