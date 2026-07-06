@@ -143,7 +143,7 @@ class JsonAstParserTest {
     void testCommentTextStripping() {
         String input = "// This is a line comment\n/* This is a block comment */ { }";
 
-        parser.setOptions(JsonOptions.JSON5);
+        parser.setOptions(JsonOptions.JSON5.duplicate().setCaptureComments(true));
 
         JsonNode root = parser.parse(input);
 
@@ -198,7 +198,7 @@ class JsonAstParserTest {
             { "a": 1 }
             """;
 
-        parser.setOptions(JsonOptions.JSON5);
+        parser.setOptions(JsonOptions.JSON5.duplicate().setCaptureComments(true));
 
         JsonNode root = parser.parse(input);
 

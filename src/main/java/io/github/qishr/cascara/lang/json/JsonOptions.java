@@ -27,8 +27,7 @@ public class JsonOptions extends LanguageOptions<JsonOptions> implements Duplica
     private boolean allowUnquotedKeys = false;
     private boolean captureComments = false;
     private boolean insertSpaces = true;
-    private boolean prettyPrint; // TODO: I suspect the emitter always assumes prettyPrint is on
-    private boolean strict;
+    private boolean prettyPrint = false;
 
     public JsonOptions() {}
 
@@ -43,7 +42,6 @@ public class JsonOptions extends LanguageOptions<JsonOptions> implements Duplica
         captureComments = original.captureComments;
         insertSpaces = original.insertSpaces;
         prettyPrint = original.prettyPrint;
-        strict = original.strict;
     }
 
     public boolean allowComments() { return allowComments; }
@@ -55,7 +53,6 @@ public class JsonOptions extends LanguageOptions<JsonOptions> implements Duplica
     public boolean allowUnquotedKeys() { return allowUnquotedKeys; }
     public boolean captureComments() { return captureComments; }
     public boolean insertSpaces() { return insertSpaces; }
-    public boolean isStrict() { return strict; }
     public boolean prettyPrint() { return prettyPrint; }
 
     public JsonOptions setAllowComments(boolean val) {
@@ -98,11 +95,6 @@ public class JsonOptions extends LanguageOptions<JsonOptions> implements Duplica
         return this;
     }
 
-    public JsonOptions setStrict(boolean val) {
-        this.strict = val;
-        return this;
-    }
-
     /// Sets whether to use spaces or tabs for indentation.
     public JsonOptions setInsertSpaces(boolean val) {
         this.insertSpaces = val;
@@ -117,18 +109,6 @@ public class JsonOptions extends LanguageOptions<JsonOptions> implements Duplica
     @Override
     public JsonOptions duplicate() {
         return new JsonOptions(this);
-        // return new JsonOptions()
-        //     .setAllowComments(allowComments)
-        //     .setAllowHexadecimalNumbers(allowHexadecimalNumbers)
-        //     .setAllowSingleQuotedStrings(allowSingleQuotedStrings)
-        //     .setAllowTrailingComma(allowTrailingComma)
-        //     .setAllowUnicode(allowUnicode)
-        //     .setAllowUnquotedKeys(allowUnquotedKeys)
-        //     .setCaptureComments(captureComments)
-        //     .setIndentSize(indentSize)
-        //     .setInsertSpaces(insertSpaces)
-        //     .setPrettyPrint(prettyPrint)
-        //     .setStrict(strict);
     }
 
     public static class ImmutableJsonOptions extends JsonOptions {
@@ -155,7 +135,6 @@ public class JsonOptions extends LanguageOptions<JsonOptions> implements Duplica
             throw new LocalizableRuntimeException(GenericDiagnosticCode.UNSUPPORTED_OPERATION, "setAllowTrailingComma");
         }
 
-        /// Sets whether unicode characters are allowed in scalars.
         public JsonOptions setAllowUnicode(boolean val) {
             throw new LocalizableRuntimeException(GenericDiagnosticCode.UNSUPPORTED_OPERATION, "setAllowComments");
         }
@@ -172,7 +151,6 @@ public class JsonOptions extends LanguageOptions<JsonOptions> implements Duplica
             throw new LocalizableRuntimeException(GenericDiagnosticCode.UNSUPPORTED_OPERATION, "setStrict");
         }
 
-        /// Sets whether to use spaces or tabs for indentation.
         public JsonOptions setInsertSpaces(boolean val) {
             throw new LocalizableRuntimeException(GenericDiagnosticCode.UNSUPPORTED_OPERATION, "setInsertSpaces");
         }

@@ -15,6 +15,8 @@ public class JsonEmitter extends AbstractJsonProcessor<JsonEmitter>  implements 
     private final StringBuilder output = new StringBuilder();
     private int indentLevel = 0;
 
+    // TODO: I suspect the emitter always assumes prettyPrint is on
+
     @Override protected JsonEmitter self() { return this; }
 
     @Override

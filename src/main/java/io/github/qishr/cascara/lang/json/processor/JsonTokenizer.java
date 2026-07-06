@@ -8,15 +8,30 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 
+import io.github.qishr.cascara.common.diagnostic.NoOpReporter;
 import io.github.qishr.cascara.common.lang.processor.Tokenizer;
 import io.github.qishr.cascara.common.lang.util.SourceBuffer;
 import io.github.qishr.cascara.common.lang.util.SourceInputStreamBuffer;
 import io.github.qishr.cascara.common.lang.util.SourceStringBuffer;
-import io.github.qishr.cascara.lang.json.exception.JsonDiagnosticCode;
 import io.github.qishr.cascara.lang.json.token.JsonToken;
 import io.github.qishr.cascara.lang.json.token.JsonTokenType;
 
 public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implements Tokenizer<JsonToken>{
+    private static final String LBRACE = "{";
+    private static final String RBRACE = "}";
+    private static final String LBRACKET = "[";
+    private static final String RBRACKET = "]";
+    private static final String COMMA = ",";
+    private static final String COLON = ":";
+
+    private static final boolean[] WS = new boolean[128];
+    static {
+        WS[' ']  = true;
+        WS['\t'] = true;
+        WS['\n'] = true;
+        WS['\r'] = true;
+    }
+
     private SourceBuffer buffer;
     private List<JsonToken> tokens;
     private boolean isLegacyMode = false;
@@ -106,35 +121,88 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     }
 
     private void scanToken() {
-        trace("scanToken");
+        // I doubt this makes any difference TBH.
+        // trace("scanToken");
+
         char c = buffer.advance();
         JsonTokenType type = null;
-        String lexeme = String.valueOf(c);
+        String lexeme = null;
         String value = null;
 
         switch (c) {
-            case '{' -> type = JsonTokenType.LEFT_BRACE;
-            case '}' -> type = JsonTokenType.RIGHT_BRACE;
-            case '[' -> type = JsonTokenType.LEFT_BRACKET;
-            case ']' -> type = JsonTokenType.RIGHT_BRACKET;
-            case ',' -> type = JsonTokenType.COMMA;
-            case ':' -> type = JsonTokenType.COLON;
 
+            //
+            // FAST‑PATH STRUCTURAL TOKENS (zero allocation)
+            //
+            case '{' -> {
+                type = JsonTokenType.LEFT_BRACE;
+                lexeme = LBRACE;
+                value  = LBRACE;
+            }
+            case '}' -> {
+                type = JsonTokenType.RIGHT_BRACE;
+                lexeme = RBRACE;
+                value  = RBRACE;
+            }
+            case '[' -> {
+                type = JsonTokenType.LEFT_BRACKET;
+                lexeme = LBRACKET;
+                value  = LBRACKET;
+            }
+            case ']' -> {
+                type = JsonTokenType.RIGHT_BRACKET;
+                lexeme = RBRACKET;
+                value  = RBRACKET;
+            }
+            case ',' -> {
+                type = JsonTokenType.COMMA;
+                lexeme = COMMA;
+                value  = COMMA;
+            }
+            case ':' -> {
+                type = JsonTokenType.COLON;
+                lexeme = COLON;
+                value  = COLON;
+            }
+
+            //
+            // STRING
+            //
             case '"', '\'' -> {
+                // If single-quoted strings are disallowed, emit UNKNOWN and return.
+                if (c == '\'' && !options.allowSingleQuotedStrings()) {
+                    // Consume the string anyway so offsets remain correct
+                    scanString(c);
+                    lexeme = buffer.getTokenWindowLexeme();
+
+                    type = JsonTokenType.UNKNOWN;
+                    value = lexeme; // preserve raw content for diagnostics
+                    break;
+                }
+
                 scanString(c);
                 lexeme = buffer.getTokenWindowLexeme();
+
+                // Keep this: parser expects unquoted content
                 value = (lexeme.length() >= 2)
-                    ? lexeme.substring(1, lexeme.length() - 1)
-                    : "";
+                        ? lexeme.substring(1, lexeme.length() - 1)
+                        : "";
+
                 type = JsonTokenType.STRING;
             }
 
-            case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '-', '+' -> {
+            //
+            // NUMBER (including JSON5 +Infinity, -Infinity, NaN)
+            //
+            case '0','1','2','3','4','5','6','7','8','9','-','+' -> {
                 scanNumber(c);
                 lexeme = buffer.getTokenWindowLexeme();
                 type = JsonTokenType.NUMBER;
             }
 
+            //
+            // DOT (either number or standalone)
+            //
             case '.' -> {
                 if (isDigit(buffer.peek())) {
                     scanNumber(c);
@@ -142,49 +210,59 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
                     type = JsonTokenType.NUMBER;
                 } else {
                     type = JsonTokenType.DOT;
+                    lexeme = ".";
+                    value  = ".";
                 }
             }
 
-            case 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
-                'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
-                'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
-                'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '_', '$' -> {
+            //
+            // IDENTIFIER FAST‑PATH (letters, $, _)
+            //
+            case 'a','b','c','d','e','f','g','h','i','j','k','l','m',
+                 'n','o','p','q','r','s','t','u','v','w','x','y','z',
+                 'A','B','C','D','E','F','G','H','I','J','K','L','M',
+                 'N','O','P','Q','R','S','T','U','V','W','X','Y','Z',
+                 '_','$' -> {
 
-                // 1. Consume the entire alphanumeric/identifier word sequence completely
                 while (isIdentifierPart(buffer.peek())) {
                     buffer.advance();
                 }
 
                 lexeme = buffer.getTokenWindowLexeme();
 
-                // 2. Classify the fully-extracted token word string
+                // classify
                 switch (lexeme) {
                     case "true", "false"   -> type = JsonTokenType.BOOLEAN;
                     case "null"            -> type = JsonTokenType.NULL;
-                    case "Infinity", "NaN" -> type = JsonTokenType.NUMBER; // Maps directly to scalar route
+                    case "Infinity", "NaN" -> type = JsonTokenType.NUMBER;
                     default                -> type = JsonTokenType.IDENTIFIER;
                 }
             }
 
+            //
+            // UNKNOWN
+            //
             default -> {
-                if (isIdentifierStart(c)) {
-                    scanIdentifier(c);
-                    lexeme = buffer.getTokenWindowLexeme();
-                    type = JsonTokenType.IDENTIFIER;
-                } else {
-                    type = JsonTokenType.UNKNOWN;
-                }
+                type = JsonTokenType.UNKNOWN;
+                lexeme = String.valueOf(c);
+                value  = lexeme;
             }
         }
 
-        if (value == null) value = lexeme;
+        //
+        // FALLBACKS
+        //
+        if (lexeme == null) {
+            lexeme = buffer.getTokenWindowLexeme();
+        }
+        if (value == null) {
+            value = lexeme;
+        }
+
         addToken(type, lexeme, value);
     }
 
     private void scanString(char quoteChar) {
-        if (quoteChar == '\'' && !options.allowSingleQuotedStrings()) {
-            error(JsonDiagnosticCode.UNEXPECTED_TOKEN, quoteChar);
-        }
         while (!buffer.isAtEnd()) {
             char next = buffer.advance();
             if (next == quoteChar) return;
@@ -248,13 +326,6 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         }
     }
 
-    private void scanIdentifier(char startChar) {
-        trace("scanIdentifier");
-        while (!buffer.isAtEnd() && isIdentifierPart(buffer.peek())) {
-            buffer.advance();
-        }
-    }
-
     private String scanSingleLineComment() {
         trace("scanSingleLineComment");
         buffer.advance(); // `/`
@@ -287,30 +358,47 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
     private void advanceWhitespaceAndComments() {
         while (true) {
-            char nextC = buffer.peek();
-            if (nextC == '\u0000') return;
+            char c = buffer.peek();
+            if (c == '\u0000') return;
 
-            if (Character.isWhitespace(nextC)) {
+            // Fast ASCII whitespace check
+            if (c < 128 && WS[c]) {
                 buffer.advance();
                 continue;
             }
 
-            if (nextC == '/' && options.allowComments()) {
-                char nextNextC = buffer.peekNext();
-                if (nextNextC == '/') {
-                    buffer.startTokenWindow(); // Mark comment start
-                    String value = scanSingleLineComment();
-                    String lexeme = buffer.getTokenWindowLexeme();
-                    addToken(JsonTokenType.COMMENT, lexeme, value);
+            // Comment handling
+            if (c == '/' && options.allowComments()) {
+                char n = buffer.peekNext();
+
+                // Single-line comment
+                if (n == '/') {
+                    buffer.startTokenWindow();
+                    if (options.captureComments()) {
+                        String value = scanSingleLineComment();
+                        String lexeme = buffer.getTokenWindowLexeme();
+                        addToken(JsonTokenType.COMMENT, lexeme, value);
+                    } else {
+                        scanSingleLineComment(); // skip only
+                    }
                     continue;
-                } else if (nextNextC == '*') {
-                    buffer.startTokenWindow(); // Mark comment start
-                    String value = scanMultiLineComment();
-                    String lexeme = buffer.getTokenWindowLexeme();
-                    addToken(JsonTokenType.COMMENT, lexeme, value);
+                }
+
+                // Multi-line comment
+                if (n == '*') {
+                    buffer.startTokenWindow();
+                    if (options.captureComments()) {
+                        String value = scanMultiLineComment();
+                        String lexeme = buffer.getTokenWindowLexeme();
+                        addToken(JsonTokenType.COMMENT, lexeme, value);
+                    } else {
+                        scanMultiLineComment(); // skip only
+                    }
                     continue;
                 }
             }
+
+            // Non-whitespace, non-comment → stop
             break;
         }
     }
@@ -319,26 +407,16 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     //
     //
 
-    private JsonToken addToken(JsonToken token) {
-        trace("addToken");
-        if (token != null) {
-            pendingTokens.add(token); // Queue it up so nextToken() can yield it
-        }
-        return token;
-    }
-
-    private JsonToken addToken(JsonTokenType type, String lexeme, String value) {
-        return addToken(new JsonToken(
+    private void addToken(JsonTokenType type, String lexeme, String content) {
+        JsonToken token = new JsonToken(
             buffer.windowStartLine(),
             buffer.windowStartColumn(),
             buffer.windowStartOffset(),
-            type, lexeme, value
-        ));
-    }
-
-    private JsonToken addToken(JsonTokenType type) {
-        String text = buffer.getTokenWindowLexeme();
-        return addToken(new JsonToken(buffer.windowStartLine(), buffer.windowStartColumn(), buffer.windowStartOffset(), type, text, text));
+            type, lexeme, content
+        );
+        if (token != null) {
+            pendingTokens.add(token); // Queue it up so nextToken() can yield it
+        }
     }
 
     // Small interceptor ensuring that if someone runs the old tokenize() API,
@@ -380,16 +458,11 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     }
 
     //
-    // Errors & Diagnostics
+    // Diagnostics
     //
 
-    private void error(JsonDiagnosticCode msgCode, Object... details) {
-        JsonToken token = addToken(JsonTokenType.ERROR);
-        reporter.errorAt(token, msgCode, details);
-    }
-
     private void trace(String method) {
-        if (reporter == null) return;
+        if (reporter instanceof NoOpReporter) return;
         char currentC = buffer.peek();
         reporter.trace("C=%03d '%s' %03d:%03d %s",
             buffer.offset(), currentChar(currentC), buffer.line(), buffer.column(), method);

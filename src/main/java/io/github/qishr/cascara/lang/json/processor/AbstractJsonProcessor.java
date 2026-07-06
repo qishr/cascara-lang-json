@@ -40,7 +40,7 @@ public abstract class AbstractJsonProcessor<P extends Processor> implements Proc
     /// {@inheritDoc}
     @Override
     public P setReporter(Reporter reporter) {
-        this.reporter = reporter;
+        this.reporter = (reporter == null ? new NoOpReporter() : reporter);
         return self();
     }
 

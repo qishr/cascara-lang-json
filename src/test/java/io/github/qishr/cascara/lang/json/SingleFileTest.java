@@ -9,18 +9,12 @@ import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
-import io.github.qishr.cascara.lang.json.JsonOptions;
 import io.github.qishr.cascara.lang.json.processor.JsonAstParser;
 
 class SingleFileTest {
+    private JsonAstParser parser = new JsonAstParser();
 
-    private final JsonOptions options = new JsonOptions().setStrict(true);
-
-    private JsonAstParser parser = new JsonAstParser()
-            .setOptions(options);
-            // .setReporter(new StandardReporter().setLevel(Level.TRACE));
-
-    @Disabled
+    // @Disabled
     @Test
     void testSingleFileTest() throws IOException {
         InputStream inputStream = getClass().getResourceAsStream("/medium.json");

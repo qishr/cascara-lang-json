@@ -26,10 +26,9 @@ class JsonTestSuite {
     @BeforeEach
     void init() {
         reporter = new StandardReporter().setLevel(Level.TRACE);
-        options = new JsonOptions()
-            .setStrict(true);
+        // options = new JsonOptions();
         parser = new JsonAstParser()
-            .setOptions(options)
+            // .setOptions(options)
             .setReporter(reporter);
     }
 

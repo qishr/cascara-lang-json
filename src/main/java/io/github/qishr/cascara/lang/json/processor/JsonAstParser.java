@@ -6,6 +6,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import io.github.qishr.cascara.common.diagnostic.NoOpReporter;
 import io.github.qishr.cascara.common.diagnostic.code.DiagnosticCode;
 import io.github.qishr.cascara.common.lang.exception.ParserException;
 import io.github.qishr.cascara.common.lang.processor.AstParser;
@@ -302,7 +303,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
     private boolean isAtEnd() { return current >= tokens.size() || peek().getType() == JsonTokenType.EOF; }
 
     private void trace(String methodName) {
-        if (reporter == null) return;
+        if (reporter instanceof NoOpReporter) return;
         String indent = "  ".repeat(Math.max(0, depth));
         reporter.trace("L%3d C%3d %s%s: %s",
             peek().getStartLine(), peek().getStartColumn(), indent, methodName, peek().getType());

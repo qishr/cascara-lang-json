@@ -27,7 +27,7 @@ class Json5TestSuite {
     void init() {
         reporter = new StandardReporter().setLevel(Level.TRACE);
         options = JsonOptions.JSON5.duplicate()
-            .setStrict(true)
+            // .setStrict(true)
             .setCaptureComments(true);
         parser = new JsonAstParser()
             .setOptions(options)
