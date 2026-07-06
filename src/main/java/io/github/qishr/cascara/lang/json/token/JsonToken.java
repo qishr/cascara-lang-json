@@ -1,6 +1,7 @@
 package io.github.qishr.cascara.lang.json.token;
 
 import io.github.qishr.cascara.common.lang.token.Token;
+import io.github.qishr.cascara.common.lang.util.QuoteStyle;
 
 public class JsonToken implements Token {
     private int startLine;
@@ -10,6 +11,8 @@ public class JsonToken implements Token {
     private String lexeme;
     private String content;
 
+    private QuoteStyle quoteStyle;
+
     public JsonToken(int line, int column, int startIndex, JsonTokenType type, String lexeme, String content) {
         this.startLine = line;
         this.startColumn = column;
@@ -17,6 +20,16 @@ public class JsonToken implements Token {
         this.type = type;
         this.lexeme = lexeme;
         this.content = content;
+    }
+
+    public JsonToken(int line, int column, int startIndex, JsonTokenType type, String lexeme, String content, QuoteStyle quoteStyle) {
+        this.startLine = line;
+        this.startColumn = column;
+        this.offset = startIndex;
+        this.type = type;
+        this.lexeme = lexeme;
+        this.content = content;
+        this.quoteStyle = quoteStyle;
     }
 
 
@@ -33,6 +46,10 @@ public class JsonToken implements Token {
     @Override
     public String getContent() {
         return content;
+    }
+
+    public QuoteStyle getQuoteStyle() {
+        return quoteStyle;
     }
 
     @Override

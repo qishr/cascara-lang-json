@@ -34,6 +34,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
     // Note: Keep this in alphabetical order,
     // or it will become time consuming to maintain
     private boolean ALLOW_COMMENTS;
+    private boolean ALLOW_INFINITY_AND_NAN;
     private boolean ALLOW_TRAILING_COMMA;
     private boolean ALLOW_UNQUOTED_KEYS;
     private boolean CAPTURE_COMMENTS;
@@ -53,6 +54,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
         // Note: Keep this in alphabetical order,
         // or it will become time consuming to maintain
         this.ALLOW_COMMENTS         = options.allowComments();
+        this.ALLOW_INFINITY_AND_NAN = options.allowInfinityAndNaN();
         this.ALLOW_TRAILING_COMMA   = options.allowTrailingComma();
         this.ALLOW_UNQUOTED_KEYS    = options.allowUnquotedKeys();
         this.CAPTURE_COMMENTS       = options.captureComments();
@@ -191,7 +193,11 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
                 }
 
                 // ---- Parse key ----
-                JsonScalarNode key = parseScalar();
+                // JsonScalarNode key = parseScalar();
+
+                JsonToken keyTok = advance();
+                JsonScalarNode key = parseKey(keyTok);
+
 
                 // JSON5: unquoted keys allowed only when configured
                 if (!ALLOW_UNQUOTED_KEYS && key.getQuoteStyle() != QuoteStyle.DOUBLE) {
@@ -228,45 +234,45 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
         }
     }
 
-    // private JsonSequenceNode parseSequence() {
-    //     depth++;
-    //     trace("parseSequence");
-    //     try {
-    //         JsonToken start = consume(JsonTokenType.LEFT_BRACKET, JsonDiagnosticCode.EXPECTED_OPEN_BRACKET);
-    //         JsonSequenceNode seq = new JsonSequenceNode(start.getStartLine(), start.getStartColumn());
+    private JsonScalarNode parseKey(JsonToken tok) {
+        JsonScalarNode key;
 
-    //         attachComments(seq);
+        switch (tok.getType()) {
 
-    //         if (!check(JsonTokenType.RIGHT_BRACKET)) {
-    //             do {
-    //                 skipTrivia();
-    //                 if (isAtEnd() || check(JsonTokenType.RIGHT_BRACKET)) break; // Safety check
+            case STRING -> {
+                key = new JsonScalarNode(
+                    tok.getStartLine(),
+                    tok.getStartColumn(),
+                    tok.getLexeme(),
+                    tok.getContent(),
+                    QuoteStyle.DOUBLE
+                );
+            }
 
-    //                 if (ALLOW_TRAILING_COMMA) {
-    //                     if (check(JsonTokenType.RIGHT_BRACE)) break;
-    //                 }
+            case IDENTIFIER -> {
+                if (ALLOW_UNQUOTED_KEYS) {
+                    key = new JsonScalarNode(
+                        tok.getStartLine(),
+                        tok.getStartColumn(),
+                        tok.getLexeme(),
+                        tok.getContent(),
+                        QuoteStyle.PLAIN
+                    );
+                } else {
+                    error(tok, JsonDiagnosticCode.EXPECTED_MAP_KEY);
+                    key = new JsonScalarNode();
+                }
+            }
 
-    //                 // 1. Parse the value
-    //                 JsonNode item = parseValue();
+            default -> {
+                error(tok, JsonDiagnosticCode.EXPECTED_MAP_KEY);
+                key = new JsonScalarNode();
+            }
+        }
 
-    //                 // 2. If it's a structural node (Map/Seq), it hasn't
-    //                 // attached comments yet because parseValue is now "silent".
-    //                 // Scalars handle themselves, but calling attachComments
-    //                 // here is safe for all types.
-    //                 attachComments(item);
-
-    //                 seq.add(item);
-
-    //                 skipTrivia();
-    //             } while (!isAtEnd() && match(JsonTokenType.COMMA));
-    //         }
-
-    //         consume(JsonTokenType.RIGHT_BRACKET, JsonDiagnosticCode.EXPECTED_CLOSE_BRACKET);
-    //         return seq;
-    //     } finally {
-    //         depth--;
-    //     }
-    // }
+        attachComments(key);
+        return key;
+    }
 
     private JsonSequenceNode parseSequence() {
         depth++;
@@ -316,29 +322,95 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
     }
 
     private JsonScalarNode parseScalar() {
-        JsonToken token = advance();
+        depth++;
+        trace("parseScalar");
 
-        // JSON5/Standard logic:
-        // Strings get DOUBLE (or SINGLE in JSON5), everything else is PLAIN
+        try {
+            skipTrivia();
+            JsonToken tok = advance();   // consume the scalar token
+            JsonTokenType type = tok.getType();
 
-        // TODO:
-        // 2026-07-05: Wrong! Strings get what they're given, or error reporting doesn't happen
+            JsonScalarNode node;
 
-        QuoteStyle style = switch (token.getType()) {
-            case STRING -> QuoteStyle.DOUBLE;
-            case IDENTIFIER, NUMBER, BOOLEAN, NULL -> QuoteStyle.PLAIN;
-            default -> QuoteStyle.PLAIN;
-        };
+            switch (type) {
 
-        JsonScalarNode scalar = new JsonScalarNode(
-            token.getStartLine(),
-            token.getStartColumn(),
-            token.getLexeme(),
-            token.getContent(),
-            style
-        );
+                case STRING -> {
+                    node = new JsonScalarNode(
+                        tok.getStartLine(),
+                        tok.getStartColumn(),
+                        tok.getLexeme(),
+                        tok.getContent(),
+                        tok.getQuoteStyle()
+                    );
+                }
 
-        return attachComments(scalar); // Claims leading comments
+                case NUMBER -> {
+                    node = new JsonScalarNode(
+                        tok.getStartLine(),
+                        tok.getStartColumn(),
+                        tok.getLexeme(),
+                        tok.getContent(),
+                        QuoteStyle.PLAIN
+                    );
+                }
+
+                case BOOLEAN -> {
+                    node = new JsonScalarNode(
+                        tok.getStartLine(),
+                        tok.getStartColumn(),
+                        tok.getLexeme(),
+                        tok.getContent(),
+                        QuoteStyle.PLAIN
+                    );
+                }
+
+                case NULL -> {
+                    node = new JsonScalarNode(
+                        tok.getStartLine(),
+                        tok.getStartColumn(),
+                        tok.getLexeme(),
+                        tok.getContent(),
+                        QuoteStyle.PLAIN
+                    );
+                }
+
+                case IDENTIFIER -> {
+                    String ident = tok.getContent();
+
+                    if (ALLOW_INFINITY_AND_NAN &&
+                        ("Infinity".equals(ident) || "NaN".equals(ident))) {
+
+                        node = new JsonScalarNode(
+                            tok.getStartLine(),
+                            tok.getStartColumn(),
+                            tok.getLexeme(),
+                            ident,
+                            QuoteStyle.PLAIN
+                        );
+                    } else {
+                        error(tok, JsonDiagnosticCode.UNEXPECTED_UNQUOTED_STRING_VALUE, ident);
+                        node = new JsonScalarNode();
+                    }
+                }
+
+                default -> {
+                    error(tok, JsonDiagnosticCode.UNEXPECTED_TOKEN, type);
+                    node = new JsonScalarNode(
+                        tok.getStartLine(),
+                        tok.getStartColumn(),
+                        "",
+                        "",
+                        null
+                    );
+                }
+            }
+
+            attachComments(node);
+            return node;
+
+        } finally {
+            depth--;
+        }
     }
 
     private void skipTrivia() {
@@ -370,15 +442,6 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
         }
         pendingComments.clear();
         return node;
-    }
-
-    private JsonToken consumeKey() {
-        if (check(JsonTokenType.STRING) || check(JsonTokenType.IDENTIFIER)) {
-            return advance();
-        }
-        error(peek(), JsonDiagnosticCode.EXPECTED_MAP_KEY);
-        // If we're at EOF or wrong token, return current and let the parser try to recover
-        return advance();
     }
 
     private JsonToken consume(JsonTokenType type, DiagnosticCode code, Object... details) {

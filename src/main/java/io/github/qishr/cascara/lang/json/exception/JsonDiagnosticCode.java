@@ -5,7 +5,7 @@ import io.github.qishr.cascara.common.diagnostic.code.DiagnosticCode;
 public enum JsonDiagnosticCode implements DiagnosticCode {
 
     UNEXPECTED_TOKEN("JSON-101", "Unexpected token: {0}."),
-    UNEXPECTED_UNQUOTED_STRING_VALUE("","Unexpected unquoted string value: {0}."),
+    UNEXPECTED_UNQUOTED_STRING_VALUE("","Unexpected unquoted string value: '{0}'."),
 
     EXPECTED_CLOSE_BRACE("JSON-201", "Expected '}'"),
     EXPECTED_EOS("JSON-203", "Expected end of stream."),
