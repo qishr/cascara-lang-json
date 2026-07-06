@@ -114,54 +114,65 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
     private JsonMapNode parseMap() {
         depth++;
         trace("parseMap");
+
         try {
             JsonToken start = consume(JsonTokenType.LEFT_BRACE, JsonDiagnosticCode.EXPECTED_OPEN_BRACE);
             JsonMapNode map = new JsonMapNode(start.getStartLine(), start.getStartColumn());
 
             attachComments(map);
 
-            if (!check(JsonTokenType.RIGHT_BRACE)) {
-                // Track unique string values of keys parsed within this specific map block
-                Set<String> seenKeys = new HashSet<>();
+            // Fast exit for empty object: {}
+            if (check(JsonTokenType.RIGHT_BRACE)) {
+                consume(JsonTokenType.RIGHT_BRACE, JsonDiagnosticCode.EXPECTED_CLOSE_BRACE);
+                return map;
+            }
 
-                do {
-                    skipTrivia();
-                    if (isAtEnd()) break; // Safety check
+            // Track unique keys
+            Set<String> seenKeys = new HashSet<>();
 
-                    // JSON5: Handle trailing comma by checking for '}' after a comma
-                    if (options.allowTrailingComma()) {
-                        if (check(JsonTokenType.RIGHT_BRACE)) break;
-                    }
+            while (!isAtEnd()) {
 
+                // Consume comments only (skipTrivia is cheap)
+                skipTrivia();
 
+                // JSON5 trailing comma: allow { key: value, }
+                if (options.allowTrailingComma() && check(JsonTokenType.RIGHT_BRACE)) {
+                    break;
+                }
 
-                    JsonScalarNode key = parseScalar();
-                    // TODO: This isn't exactly right...
-                    //     Object keys may be an ECMAScript 5.1 IdentifierName.
-                    //     Strings may be single quoted.
-                    if (!options.allowUnquotedKeys() && key.getQuoteStyle() != QuoteStyle.DOUBLE) {
-                        error(key.getToken(), JsonDiagnosticCode.EXPECTED_MAP_KEY);
-                    }
+                // ---- Parse key ----
+                JsonScalarNode key = parseScalar();
 
+                // JSON5: unquoted keys allowed only when configured
+                if (!options.allowUnquotedKeys() && key.getQuoteStyle() != QuoteStyle.DOUBLE) {
+                    error(key.getToken(), JsonDiagnosticCode.EXPECTED_MAP_KEY);
+                }
 
+                // Duplicate key detection
+                String keyString = key.asString();
+                if (!seenKeys.add(keyString)) {
+                    error(key.getToken(), JsonDiagnosticCode.DUPLICATE_KEY, keyString);
+                }
 
-                    // Check for duplicate keys before moving to the value phase
-                    String keyString = key.asString();
-                    if (!seenKeys.add(keyString)) {
-                        // Report diagnostic error to fail validation structurally
-                        error(key.getToken(), JsonDiagnosticCode.DUPLICATE_KEY, keyString);
-                    }
+                // ---- Parse colon ----
+                consume(JsonTokenType.COLON, JsonDiagnosticCode.EXPECTED_COLON_AFTER_MAP_KEY);
 
-                    consume(JsonTokenType.COLON, JsonDiagnosticCode.EXPECTED_COLON_AFTER_MAP_KEY);
-                    JsonNode value = parseValue(); // parseValue should NOT call attachComments internally
-                    map.put(key, value);
+                // ---- Parse value ----
+                JsonNode value = parseValue();
+                map.put(key, value);
 
-                    skipTrivia();
-                } while (!isAtEnd() && match(JsonTokenType.COMMA));
+                // Consume comments only
+                skipTrivia();
+
+                // ---- Comma or end ----
+                if (!match(JsonTokenType.COMMA)) {
+                    break;
+                }
             }
 
             consume(JsonTokenType.RIGHT_BRACE, JsonDiagnosticCode.EXPECTED_CLOSE_BRACE);
             return map;
+
         } finally {
             depth--;
         }
@@ -234,24 +245,23 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
     }
 
     private void skipTrivia() {
+        if (!options.allowComments()) return;
+
         while (!isAtEnd()) {
-            if (check(JsonTokenType.COMMENT)) {
-                JsonToken tok = advance();
+            if (!check(JsonTokenType.COMMENT)) return;
 
-                // Determine if it's a block comment (/* ... */)
-                // vs a line comment (// ...)
-                boolean isBlock = tok.getLexeme().startsWith("/*");
+            JsonToken tok = advance();
 
-                pendingComments.add(new JsonCommentNode(
-                    tok.getStartLine(),
-                    tok.getStartColumn(),
-                    tok.getLexeme(),
-                    tok.getContent(),
-                    isBlock
-                ));
-                continue;
-            }
-            break;
+            // Avoid startsWith() cost when comment type is already known
+            boolean isBlock = tok.getLexeme().length() > 1 && tok.getLexeme().charAt(1) == '*';
+
+            pendingComments.add(new JsonCommentNode(
+                tok.getStartLine(),
+                tok.getStartColumn(),
+                tok.getLexeme(),
+                tok.getContent(),
+                isBlock
+            ));
         }
     }
 
