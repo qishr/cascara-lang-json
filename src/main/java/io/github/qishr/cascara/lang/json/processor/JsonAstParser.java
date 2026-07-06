@@ -12,6 +12,7 @@ import io.github.qishr.cascara.common.lang.exception.ParserException;
 import io.github.qishr.cascara.common.lang.processor.AstParser;
 import io.github.qishr.cascara.common.lang.processor.Tokenizer;
 import io.github.qishr.cascara.common.lang.util.QuoteStyle;
+import io.github.qishr.cascara.lang.json.JsonOptions;
 import io.github.qishr.cascara.lang.json.ast.JsonCommentNode;
 import io.github.qishr.cascara.lang.json.ast.JsonMapNode;
 import io.github.qishr.cascara.lang.json.ast.JsonNode;
@@ -30,8 +31,32 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
     /// Buffer to hold comments until a data node is created to claim them.
     private final List<JsonCommentNode> pendingComments = new ArrayList<>();
 
+    // Note: Keep this in alphabetical order,
+    // or it will become time consuming to maintain
+    private boolean ALLOW_COMMENTS;
+    private boolean ALLOW_TRAILING_COMMA;
+    private boolean ALLOW_UNQUOTED_KEYS;
+    private boolean CAPTURE_COMMENTS;
+
     /// Default constructor for SPI
-    public JsonAstParser() {}
+    public JsonAstParser() {
+        applyOptions(new JsonOptions());
+    }
+
+    public JsonAstParser setOptions(JsonOptions options) {
+        super.setOptions(options);
+        applyOptions(options);
+        return this;
+    }
+
+    private void applyOptions(JsonOptions options) {
+        // Note: Keep this in alphabetical order,
+        // or it will become time consuming to maintain
+        this.ALLOW_COMMENTS         = options.allowComments();
+        this.ALLOW_TRAILING_COMMA   = options.allowTrailingComma();
+        this.ALLOW_UNQUOTED_KEYS    = options.allowUnquotedKeys();
+        this.CAPTURE_COMMENTS       = options.captureComments();
+    }
 
     @Override protected JsonAstParser self() { return this; }
 
@@ -76,36 +101,61 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
     private JsonNode parseValue() {
         depth++;
         trace("parseValue");
+
         try {
+            // Caller often already skipped trivia, but this is safe and cheap
             skipTrivia();
+
             JsonToken token = peek();
+            JsonTokenType type = token.getType();
 
-            // Just return the node; don't attach yet!
-            return switch (token.getType()) {
-                case LEFT_BRACE -> parseMap();
-                case LEFT_BRACKET -> parseSequence();
-                case STRING, NUMBER, BOOLEAN, NULL -> parseScalar();
-                case IDENTIFIER -> {
-                    String identifier = token.getContent();
-                    if ("Infinity".equals(identifier) || "NaN".equals(identifier)) {
-                        advance(); // Consume the identifier token
-                        yield new JsonScalarNode(
-                            token.getStartLine(),
-                            token.getStartColumn(),
-                            token.getLexeme(),
-                            identifier,            // Unescaped literal text processed by Primitive.fromString()
-                            QuoteStyle.PLAIN
-                        );
-                    }
+            // Structural values
+            if (type == JsonTokenType.LEFT_BRACE) {
+                return parseMap();
+            }
+            if (type == JsonTokenType.LEFT_BRACKET) {
+                return parseSequence();
+            }
 
-                    error(token, JsonDiagnosticCode.UNEXPECTED_UNQUOTED_STRING_VALUE, token.getContent());
-                    yield new JsonScalarNode(); // Default constructor is completely safe here
+            // Primitive values
+            if (type == JsonTokenType.STRING ||
+                type == JsonTokenType.NUMBER ||
+                type == JsonTokenType.BOOLEAN ||
+                type == JsonTokenType.NULL) {
+                return parseScalar();
+            }
+
+            // Identifier values (JSON5: only Infinity/NaN allowed)
+            if (type == JsonTokenType.IDENTIFIER) {
+                String ident = token.getContent();
+
+                // JSON5 Infinity/NaN
+                if ("Infinity".equals(ident) || "NaN".equals(ident)) {
+                    advance();
+                    return new JsonScalarNode(
+                        token.getStartLine(),
+                        token.getStartColumn(),
+                        token.getLexeme(),
+                        ident,
+                        QuoteStyle.PLAIN
+                    );
                 }
-                default -> {
-                    error(token, JsonDiagnosticCode.UNEXPECTED_TOKEN, token.getType());
-                    yield new JsonScalarNode(token.getStartLine(), token.getStartColumn(), "", "", null);
-                }
-            };
+
+                // Everything else is an error
+                error(token, JsonDiagnosticCode.UNEXPECTED_UNQUOTED_STRING_VALUE, ident);
+                return new JsonScalarNode(); // safe empty node
+            }
+
+            // Unexpected token
+            error(token, JsonDiagnosticCode.UNEXPECTED_TOKEN, type);
+            return new JsonScalarNode(
+                token.getStartLine(),
+                token.getStartColumn(),
+                "",
+                "",
+                null
+            );
+
         } finally {
             depth--;
         }
@@ -136,7 +186,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
                 skipTrivia();
 
                 // JSON5 trailing comma: allow { key: value, }
-                if (options.allowTrailingComma() && check(JsonTokenType.RIGHT_BRACE)) {
+                if (ALLOW_TRAILING_COMMA && check(JsonTokenType.RIGHT_BRACE)) {
                     break;
                 }
 
@@ -144,7 +194,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
                 JsonScalarNode key = parseScalar();
 
                 // JSON5: unquoted keys allowed only when configured
-                if (!options.allowUnquotedKeys() && key.getQuoteStyle() != QuoteStyle.DOUBLE) {
+                if (!ALLOW_UNQUOTED_KEYS && key.getQuoteStyle() != QuoteStyle.DOUBLE) {
                     error(key.getToken(), JsonDiagnosticCode.EXPECTED_MAP_KEY);
                 }
 
@@ -178,41 +228,88 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
         }
     }
 
+    // private JsonSequenceNode parseSequence() {
+    //     depth++;
+    //     trace("parseSequence");
+    //     try {
+    //         JsonToken start = consume(JsonTokenType.LEFT_BRACKET, JsonDiagnosticCode.EXPECTED_OPEN_BRACKET);
+    //         JsonSequenceNode seq = new JsonSequenceNode(start.getStartLine(), start.getStartColumn());
+
+    //         attachComments(seq);
+
+    //         if (!check(JsonTokenType.RIGHT_BRACKET)) {
+    //             do {
+    //                 skipTrivia();
+    //                 if (isAtEnd() || check(JsonTokenType.RIGHT_BRACKET)) break; // Safety check
+
+    //                 if (ALLOW_TRAILING_COMMA) {
+    //                     if (check(JsonTokenType.RIGHT_BRACE)) break;
+    //                 }
+
+    //                 // 1. Parse the value
+    //                 JsonNode item = parseValue();
+
+    //                 // 2. If it's a structural node (Map/Seq), it hasn't
+    //                 // attached comments yet because parseValue is now "silent".
+    //                 // Scalars handle themselves, but calling attachComments
+    //                 // here is safe for all types.
+    //                 attachComments(item);
+
+    //                 seq.add(item);
+
+    //                 skipTrivia();
+    //             } while (!isAtEnd() && match(JsonTokenType.COMMA));
+    //         }
+
+    //         consume(JsonTokenType.RIGHT_BRACKET, JsonDiagnosticCode.EXPECTED_CLOSE_BRACKET);
+    //         return seq;
+    //     } finally {
+    //         depth--;
+    //     }
+    // }
+
     private JsonSequenceNode parseSequence() {
         depth++;
         trace("parseSequence");
+
         try {
             JsonToken start = consume(JsonTokenType.LEFT_BRACKET, JsonDiagnosticCode.EXPECTED_OPEN_BRACKET);
             JsonSequenceNode seq = new JsonSequenceNode(start.getStartLine(), start.getStartColumn());
 
             attachComments(seq);
 
-            if (!check(JsonTokenType.RIGHT_BRACKET)) {
-                do {
-                    skipTrivia();
-                    if (isAtEnd() || check(JsonTokenType.RIGHT_BRACKET)) break; // Safety check
+            // Fast exit for empty array: []
+            if (check(JsonTokenType.RIGHT_BRACKET)) {
+                consume(JsonTokenType.RIGHT_BRACKET, JsonDiagnosticCode.EXPECTED_CLOSE_BRACKET);
+                return seq;
+            }
 
-                    if (options.allowTrailingComma()) {
-                        if (check(JsonTokenType.RIGHT_BRACE)) break;
-                    }
+            while (!isAtEnd()) {
 
-                    // 1. Parse the value
-                    JsonNode item = parseValue();
+                // Consume comments only
+                skipTrivia();
 
-                    // 2. If it's a structural node (Map/Seq), it hasn't
-                    // attached comments yet because parseValue is now "silent".
-                    // Scalars handle themselves, but calling attachComments
-                    // here is safe for all types.
-                    attachComments(item);
+                // JSON5 trailing comma: allow [ value, ]
+                if (ALLOW_TRAILING_COMMA && check(JsonTokenType.RIGHT_BRACKET)) {
+                    break;
+                }
 
-                    seq.add(item);
+                // ---- Parse value ----
+                JsonNode value = parseValue();
+                seq.add(value);
 
-                    skipTrivia();
-                } while (!isAtEnd() && match(JsonTokenType.COMMA));
+                // Consume comments only
+                skipTrivia();
+
+                // ---- Comma or end ----
+                if (!match(JsonTokenType.COMMA)) {
+                    break;
+                }
             }
 
             consume(JsonTokenType.RIGHT_BRACKET, JsonDiagnosticCode.EXPECTED_CLOSE_BRACKET);
             return seq;
+
         } finally {
             depth--;
         }
@@ -245,7 +342,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
     }
 
     private void skipTrivia() {
-        if (!options.allowComments()) return;
+        if (!ALLOW_COMMENTS) return;
 
         while (!isAtEnd()) {
             if (!check(JsonTokenType.COMMENT)) return;
@@ -267,7 +364,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
 
     private <T extends JsonNode> T attachComments(T node) {
         if (node == null) return null;
-        if (!(options.allowComments() && options.captureComments())) return node;
+        if (!(ALLOW_COMMENTS && CAPTURE_COMMENTS)) return node;
         for (JsonCommentNode comment : pendingComments) {
             node.addComment(comment);
         }

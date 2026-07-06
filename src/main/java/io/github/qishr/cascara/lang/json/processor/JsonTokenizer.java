@@ -10,9 +10,11 @@ import java.util.Set;
 
 import io.github.qishr.cascara.common.diagnostic.NoOpReporter;
 import io.github.qishr.cascara.common.lang.processor.Tokenizer;
+import io.github.qishr.cascara.common.lang.util.LanguageOptions;
 import io.github.qishr.cascara.common.lang.util.SourceBuffer;
 import io.github.qishr.cascara.common.lang.util.SourceInputStreamBuffer;
 import io.github.qishr.cascara.common.lang.util.SourceStringBuffer;
+import io.github.qishr.cascara.lang.json.JsonOptions;
 import io.github.qishr.cascara.lang.json.token.JsonToken;
 import io.github.qishr.cascara.lang.json.token.JsonTokenType;
 
@@ -58,14 +60,49 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         for (char c = 'A'; c <= 'F'; c++) HEX[c] = true;
     }
 
+    // Note: Keep this in alphabetical order,
+    // or it will become time consuming to maintain
+    private boolean ALLOW_COMMENTS;
+    private boolean ALLOW_HEXADECIMAL_NUMBERS;
+    private boolean ALLOW_INFINITY_AND_NAN;
+    private boolean ALLOW_SINGLE_QUOTED_STRINGS;
+    private boolean ALLOW_UNICODE;
+    private boolean CAPTURE_COMMENTS;
+
+    private final Deque<JsonToken> pendingTokens = new ArrayDeque<>();
+
     private SourceBuffer buffer;
     private List<JsonToken> tokens;
     private boolean isLegacyMode = false;
-    private final Deque<JsonToken> pendingTokens = new ArrayDeque<>();
     private boolean streamEnded = false;
 
     /// Default constructor for SPI
-    public JsonTokenizer() {}
+    public JsonTokenizer() {
+        // SPI will call this
+        // Default is strict JSON
+        applyOptions(new JsonOptions());
+    }
+
+    @Override
+    public JsonTokenizer setOptions(LanguageOptions<?> options) {
+        super.setOptions(options);
+        if (!(options instanceof JsonOptions jsonOptions)) {
+            throw new IllegalArgumentException("JsonTokenizer requires JsonOptions");
+        }
+        applyOptions(jsonOptions);
+        return this;
+    }
+
+    private void applyOptions(JsonOptions options) {
+        // Note: Keep this in alphabetical order,
+        // or it will become time consuming to maintain
+        this.ALLOW_COMMENTS              = options.allowComments();
+        this.ALLOW_HEXADECIMAL_NUMBERS   = options.allowHexadecimalNumbers();
+        this.ALLOW_INFINITY_AND_NAN      = options.allowInfinityAndNaN();
+        this.ALLOW_SINGLE_QUOTED_STRINGS = options.allowSingleQuotedStrings();
+        this.ALLOW_UNICODE               = options.allowUnicode();
+        this.CAPTURE_COMMENTS            = options.captureComments();
+    }
 
     @Override protected JsonTokenizer self() { return this; }
 
@@ -151,9 +188,25 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         // trace("scanToken");
 
         char c = buffer.advance();
+
         JsonTokenType type = null;
         String lexeme = null;
         String value = null;
+
+        if (c > 127) {
+            if (!ALLOW_UNICODE) {
+                // Raw unicode not allowed in strict mode
+                type = JsonTokenType.UNKNOWN;
+                lexeme = Character.toString(c);
+                value  = lexeme;
+                addToken(type, lexeme, value);
+                return;
+            }
+
+            // Unicode allowed → treat as identifier start or UNKNOWN
+            handleUnicodeChar(c);
+            return;
+        }
 
         switch (c) {
 
@@ -196,7 +249,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             //
             case '"', '\'' -> {
                 // If single-quoted strings are disallowed, emit UNKNOWN and return.
-                if (c == '\'' && !options.allowSingleQuotedStrings()) {
+                if (c == '\'' && !ALLOW_SINGLE_QUOTED_STRINGS) {
                     // Consume the string anyway so offsets remain correct
                     scanString(c);
                     lexeme = buffer.getTokenWindowLexeme();
@@ -206,7 +259,12 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
                     break;
                 }
 
-                scanString(c);
+                // scanString(c);
+                if (!scanString(c)) {
+                    type = JsonTokenType.UNKNOWN;
+                    break;
+                }
+
                 lexeme = buffer.getTokenWindowLexeme();
 
                 // Keep this: parser expects unquoted content
@@ -296,10 +354,16 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         addToken(type, lexeme, value);
     }
 
-    private void scanString(char quoteChar) {
+    private boolean scanString(char quoteChar) {
+        boolean isInvalidUnicodeString = false;
         while (!buffer.isAtEnd()) {
             char next = buffer.advance();
-            if (next == quoteChar) return;
+            if (next == quoteChar) return true;
+
+            if (!ALLOW_UNICODE && next > 127) {
+                // mark string as UNKNOWN
+                isInvalidUnicodeString = true;
+            }
 
             if (next == '\\' && !buffer.isAtEnd()) {
                 char escaped = buffer.advance();
@@ -311,11 +375,12 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
                 }
             }
         }
+        return isInvalidUnicodeString;
     }
 
     private void scanNumber(char startChar) {
         // 1. JSON5 signed Infinity/NaN
-        if (options.allowInfinityAndNaN()) {
+        if (ALLOW_INFINITY_AND_NAN) {
             if ((startChar == '-' || startChar == '+')) {
                 char c = buffer.peek();
                 if (c < 128 && IDENT_START[c]) { // fast-path identifier start
@@ -333,7 +398,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         }
 
         // 2. Hexadecimal 0x...
-        if (options.allowHexadecimalNumbers()) {
+        if (ALLOW_HEXADECIMAL_NUMBERS) {
             if (startChar == '0') {
                 char c = buffer.peek();
                 if (c == 'x' || c == 'X') {
@@ -395,7 +460,6 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         }
     }
 
-
     private void scanIdentifierFast() {
         // We already consumed the first character in scanToken()
         while (true) {
@@ -449,14 +513,24 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
                 continue;
             }
 
+            if (c > 127 && !ALLOW_UNICODE) {
+                // strict JSON: unicode whitespace not allowed
+                return;
+            }
+
+            if (c > 127 && Character.isWhitespace(c)) {
+                buffer.advance();
+                continue;
+            }
+
             // Comments
-            if (c == '/' && options.allowComments()) {
+            if (c == '/' && ALLOW_COMMENTS) {
                 char n = buffer.peekNext();
 
                 // Single-line comment
                 if (n == '/') {
                     buffer.startTokenWindow();
-                    if (options.captureComments()) {
+                    if (CAPTURE_COMMENTS) {
                         String value = scanSingleLineComment();
                         String lexeme = buffer.getTokenWindowLexeme();
                         addToken(JsonTokenType.COMMENT, lexeme, value);
@@ -469,7 +543,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
                 // Multi-line comment
                 if (n == '*') {
                     buffer.startTokenWindow();
-                    if (options.captureComments()) {
+                    if (CAPTURE_COMMENTS) {
                         String value = scanMultiLineComment();
                         String lexeme = buffer.getTokenWindowLexeme();
                         addToken(JsonTokenType.COMMENT, lexeme, value);
@@ -484,6 +558,96 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             return;
         }
     }
+
+    //
+    // Unicode
+    //
+
+    private void handleUnicodeChar(char c) {
+        // Unicode whitespace (JSON5)
+        if (Character.isWhitespace(c)) {
+            // skip it
+            return;
+        }
+
+        // Unicode identifier start (JSON5)
+        if (Character.isUnicodeIdentifierStart(c)) {
+            scanUnicodeIdentifier();
+            String lexeme = buffer.getTokenWindowLexeme();
+            addToken(JsonTokenType.IDENTIFIER, lexeme, lexeme);
+            return;
+        }
+
+        // Unicode identifier part (rare case)
+        if (Character.isUnicodeIdentifierPart(c)) {
+            scanUnicodeIdentifier();
+            String lexeme = buffer.getTokenWindowLexeme();
+            addToken(JsonTokenType.IDENTIFIER, lexeme, lexeme);
+            return;
+        }
+
+        // Unicode digit (JSON5)
+        if (Character.isDigit(c)) {
+            scanUnicodeNumber(c);
+            String lexeme = buffer.getTokenWindowLexeme();
+            addToken(JsonTokenType.NUMBER, lexeme, lexeme);
+            return;
+        }
+
+        // Otherwise → UNKNOWN
+        addToken(JsonTokenType.UNKNOWN, Character.toString(c), Character.toString(c));
+    }
+
+    private void scanUnicodeIdentifier() {
+        while (!buffer.isAtEnd()) {
+            char c = buffer.peek();
+            if (c <= 127) {
+                if (c < 128 && IDENT_PART[c]) {
+                    buffer.advance();
+                    continue;
+                }
+                break;
+            }
+            if (Character.isUnicodeIdentifierPart(c)) {
+                buffer.advance();
+                continue;
+            }
+            break;
+        }
+    }
+
+    private void scanUnicodeNumber(char startChar) {
+        // integer part
+        while (!buffer.isAtEnd()) {
+            char c = buffer.peek();
+            if (Character.isDigit(c)) {
+                buffer.advance();
+                continue;
+            }
+            break;
+        }
+
+        // fractional part
+        if (buffer.peek() == '.') {
+            buffer.advance();
+            while (!buffer.isAtEnd() && Character.isDigit(buffer.peek())) {
+                buffer.advance();
+            }
+        }
+
+        // exponent part
+        char c = buffer.peek();
+        if (c == 'e' || c == 'E') {
+            buffer.advance();
+            c = buffer.peek();
+            if (c == '+' || c == '-') buffer.advance();
+            while (!buffer.isAtEnd() && Character.isDigit(buffer.peek())) {
+                buffer.advance();
+            }
+        }
+    }
+
+
 
 
     //
