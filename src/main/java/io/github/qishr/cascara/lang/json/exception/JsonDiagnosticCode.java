@@ -14,7 +14,7 @@ public enum JsonDiagnosticCode implements DiagnosticCode {
     EXPECTED_OPEN_BRACE("YAML-206", "Expected '{'."),
     EXPECTED_CLOSE_BRACKET("JSON-207", "Expected ']'."),
     EXPECTED_OPEN_BRACKET("JSON-208", "Expected '['."),
-    EXPECTED_COLON_MAP_KEY("JSON-209", "Expected ':' after key."),
+    EXPECTED_COLON_AFTER_MAP_KEY("JSON-209", "Expected ':' after key."),
     EXPECTED_MAP_KEY("JSON-210", "Expected key (string or identifier)"),
 
     MAP_KEY_INDENTATION("JSON-302", "Inconsistent indentation for map key."),

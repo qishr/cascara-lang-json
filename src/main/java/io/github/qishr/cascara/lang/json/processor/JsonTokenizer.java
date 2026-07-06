@@ -12,6 +12,7 @@ import io.github.qishr.cascara.common.lang.processor.Tokenizer;
 import io.github.qishr.cascara.common.lang.util.SourceBuffer;
 import io.github.qishr.cascara.common.lang.util.SourceInputStreamBuffer;
 import io.github.qishr.cascara.common.lang.util.SourceStringBuffer;
+import io.github.qishr.cascara.lang.json.exception.JsonDiagnosticCode;
 import io.github.qishr.cascara.lang.json.token.JsonToken;
 import io.github.qishr.cascara.lang.json.token.JsonTokenType;
 
@@ -181,6 +182,9 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     }
 
     private void scanString(char quoteChar) {
+        if (quoteChar == '\'' && !options.allowSingleQuotedStrings()) {
+            error(JsonDiagnosticCode.UNEXPECTED_TOKEN, quoteChar);
+        }
         while (!buffer.isAtEnd()) {
             char next = buffer.advance();
             if (next == quoteChar) return;
@@ -199,20 +203,24 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
     private void scanNumber(char startChar) {
         // 1. Handle JSON5 signed literal keywords (+Infinity, -Infinity, -NaN, etc.)
-        if ((startChar == '-' || startChar == '+') && isIdentifierStart(buffer.peek())) {
-            while (isIdentifierPart(buffer.peek())) {
-                buffer.advance();
+        if (options.allowInfinityAndNaN()) {
+            if ((startChar == '-' || startChar == '+') && isIdentifierStart(buffer.peek())) {
+                while (isIdentifierPart(buffer.peek())) {
+                    buffer.advance();
+                }
+                return;
             }
-            return;
         }
 
         // 2. Handle Hexadecimal (0x...)
-        if (startChar == '0' && (buffer.peek() == 'x' || buffer.peek() == 'X')) {
-            buffer.advance(); // consume 'x'
-            while (isHexDigit(buffer.peek())) {
-                buffer.advance();
+        if (options.allowHexadecimalNumbers()) {
+            if (startChar == '0' && (buffer.peek() == 'x' || buffer.peek() == 'X')) {
+                buffer.advance(); // consume 'x'
+                while (isHexDigit(buffer.peek())) {
+                    buffer.advance();
+                }
+                return;
             }
-            return;
         }
 
         // 3. Handle Decimal sequence
@@ -287,7 +295,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
                 continue;
             }
 
-            if (nextC == '/') {
+            if (nextC == '/' && options.allowComments()) {
                 char nextNextC = buffer.peekNext();
                 if (nextNextC == '/') {
                     buffer.startTokenWindow(); // Mark comment start
@@ -311,14 +319,26 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     //
     //
 
-    private void addToken(JsonTokenType type, String lexeme, String value) {
-        JsonToken t = new JsonToken(
+    private JsonToken addToken(JsonToken token) {
+        trace("addToken");
+        if (token != null) {
+            pendingTokens.add(token); // Queue it up so nextToken() can yield it
+        }
+        return token;
+    }
+
+    private JsonToken addToken(JsonTokenType type, String lexeme, String value) {
+        return addToken(new JsonToken(
             buffer.windowStartLine(),
             buffer.windowStartColumn(),
             buffer.windowStartOffset(),
             type, lexeme, value
-        );
-        pendingTokens.add(t); // Pushes directly into the streaming line!
+        ));
+    }
+
+    private JsonToken addToken(JsonTokenType type) {
+        String text = buffer.getTokenWindowLexeme();
+        return addToken(new JsonToken(buffer.windowStartLine(), buffer.windowStartColumn(), buffer.windowStartOffset(), type, text, text));
     }
 
     // Small interceptor ensuring that if someone runs the old tokenize() API,
@@ -360,8 +380,13 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     }
 
     //
-    // Diagnostics
+    // Errors & Diagnostics
     //
+
+    private void error(JsonDiagnosticCode msgCode, Object... details) {
+        JsonToken token = addToken(JsonTokenType.ERROR);
+        reporter.errorAt(token, msgCode, details);
+    }
 
     private void trace(String method) {
         if (reporter == null) return;

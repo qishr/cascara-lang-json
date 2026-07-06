@@ -125,41 +125,33 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
 
                 do {
                     skipTrivia();
-                    if (isAtEnd() || check(JsonTokenType.RIGHT_BRACE)) break; // Safety check
+                    if (isAtEnd()) break; // Safety check
 
                     // JSON5: Handle trailing comma by checking for '}' after a comma
                     if (options.allowTrailingComma()) {
                         if (check(JsonTokenType.RIGHT_BRACE)) break;
                     }
 
-                    JsonToken keyTok = consumeKey();
 
-                    // TODO: We must take the data as it comes.
-                    // TODO: This key is getting a quotation style forced on it, which bypass error reporting.
-                    // Only report missing quotes if quotes are actually needed.
-                    // JSON keys must be strings but JSON5 keys don't need quotes.
-                    QuoteStyle style = (keyTok.getType() == JsonTokenType.IDENTIFIER)
-                            ? QuoteStyle.PLAIN
-                            : QuoteStyle.DOUBLE;
 
-                    JsonScalarNode key = new JsonScalarNode(
-                            keyTok.getStartLine(), keyTok.getStartColumn(),
-                            keyTok.getLexeme(), keyTok.getContent(), style
-                        );
-                    key.setToken(keyTok);
+                    JsonScalarNode key = parseScalar();
+                    // TODO: This isn't exactly right...
+                    //     Object keys may be an ECMAScript 5.1 IdentifierName.
+                    //     Strings may be single quoted.
+                    if (!options.allowUnquotedKeys() && key.getQuoteStyle() != QuoteStyle.DOUBLE) {
+                        error(key.getToken(), JsonDiagnosticCode.EXPECTED_MAP_KEY);
+                    }
 
-                    // This comment is just wrong. Less wrong that it was before, but still wrong.
-                    // The key claims EVERYTHING in the buffer after the end of the last key's value
-                    attachComments(key);
+
 
                     // Check for duplicate keys before moving to the value phase
                     String keyString = key.asString();
                     if (!seenKeys.add(keyString)) {
                         // Report diagnostic error to fail validation structurally
-                        error(keyTok, JsonDiagnosticCode.DUPLICATE_KEY, keyString);
+                        error(key.getToken(), JsonDiagnosticCode.DUPLICATE_KEY, keyString);
                     }
 
-                    consume(JsonTokenType.COLON, JsonDiagnosticCode.EXPECTED_COLON_MAP_KEY);
+                    consume(JsonTokenType.COLON, JsonDiagnosticCode.EXPECTED_COLON_AFTER_MAP_KEY);
                     JsonNode value = parseValue(); // parseValue should NOT call attachComments internally
                     map.put(key, value);
 
@@ -188,12 +180,14 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
                     skipTrivia();
                     if (isAtEnd() || check(JsonTokenType.RIGHT_BRACKET)) break; // Safety check
 
-                    if (check(JsonTokenType.RIGHT_BRACKET)) break;
+                    if (options.allowTrailingComma()) {
+                        if (check(JsonTokenType.RIGHT_BRACE)) break;
+                    }
 
                     // 1. Parse the value
                     JsonNode item = parseValue();
 
-                    // 2. FIX: If it's a structural node (Map/Seq), it hasn't
+                    // 2. If it's a structural node (Map/Seq), it hasn't
                     // attached comments yet because parseValue is now "silent".
                     // Scalars handle themselves, but calling attachComments
                     // here is safe for all types.
@@ -217,6 +211,10 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
 
         // JSON5/Standard logic:
         // Strings get DOUBLE (or SINGLE in JSON5), everything else is PLAIN
+
+        // TODO:
+        // 2026-07-05: Wrong! Strings get what they're given, or error reporting doesn't happen
+
         QuoteStyle style = switch (token.getType()) {
             case STRING -> QuoteStyle.DOUBLE;
             case IDENTIFIER, NUMBER, BOOLEAN, NULL -> QuoteStyle.PLAIN;
@@ -258,6 +256,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
 
     private <T extends JsonNode> T attachComments(T node) {
         if (node == null) return null;
+        if (!(options.allowComments() && options.captureComments())) return node;
         for (JsonCommentNode comment : pendingComments) {
             node.addComment(comment);
         }

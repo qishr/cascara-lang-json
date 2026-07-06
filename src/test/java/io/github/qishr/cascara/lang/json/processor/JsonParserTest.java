@@ -26,7 +26,7 @@ class JsonAstParserTest {
             }
             """;
 
-        parser.setOptions(JsonOptions.JSON5);
+        parser.setOptions(JsonOptions.JSON5.duplicate().setCaptureComments(true));
 
         JsonMapNode root = (JsonMapNode) parser.parse(input);
 
@@ -86,7 +86,7 @@ class JsonAstParserTest {
             }
             """;
 
-        parser.setOptions(JsonOptions.JSON5);
+        parser.setOptions(JsonOptions.JSON5.duplicate().setCaptureComments(true));
 
         JsonMapNode root = (JsonMapNode) parser.parse(input);
 
@@ -212,6 +212,8 @@ class JsonAstParserTest {
 
     @Test
     void testJson5NumericVariations() {
+        parser.setOptions(JsonOptions.JSON5.duplicate().setCaptureComments(true));
+
         // JSON5 allows: +.5, -.5, 0x123, 1.
         String input = "[ +.5, 0x123, 1. ]";
         JsonSequenceNode seq = (JsonSequenceNode) parser.parse(input);
@@ -233,7 +235,7 @@ class JsonAstParserTest {
             }
             """;
 
-        parser.setOptions(JsonOptions.JSON5);
+        parser.setOptions(JsonOptions.JSON5.duplicate().setCaptureComments(true));
 
         JsonMapNode root = (JsonMapNode) parser.parse(input);
 

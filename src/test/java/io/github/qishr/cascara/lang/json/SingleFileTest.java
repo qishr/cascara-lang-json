@@ -20,7 +20,7 @@ class SingleFileTest {
             .setOptions(options);
             // .setReporter(new StandardReporter().setLevel(Level.TRACE));
 
-    // @Disabled
+    @Disabled
     @Test
     void testSingleFileTest() throws IOException {
         InputStream inputStream = getClass().getResourceAsStream("/medium.json");

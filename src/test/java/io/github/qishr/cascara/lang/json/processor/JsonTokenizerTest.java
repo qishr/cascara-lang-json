@@ -2,15 +2,24 @@ package io.github.qishr.cascara.lang.json.processor;
 
 import io.github.qishr.cascara.common.diagnostic.StandardReporter;
 import io.github.qishr.cascara.common.diagnostic.Diagnostic.Level;
+import io.github.qishr.cascara.lang.json.JsonOptions;
 import io.github.qishr.cascara.lang.json.token.JsonToken;
 import io.github.qishr.cascara.lang.json.token.JsonTokenType;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 class JsonTokenizerTest {
-    private final JsonTokenizer tokenizer = new JsonTokenizer().setReporter(new StandardReporter().setLevel(Level.TRACE));
+    private JsonTokenizer tokenizer;
+
+    @BeforeEach
+    void setup() {
+        tokenizer = new JsonTokenizer()
+            .setReporter(new StandardReporter().setLevel(Level.TRACE))
+            .setOptions(JsonOptions.JSON5.duplicate().setCaptureComments(true));
+    }
 
     @Test
     void testBasicTokens() {
@@ -46,6 +55,7 @@ class JsonTokenizerTest {
         String input = "[ +.5, 0x123, 1. ]";
 
         // JsonTokenizer tokenizer = new JsonTokenizer();
+
         List<JsonToken> tokens = tokenizer.tokenize(input);
 
         // We expect: [ (LEFT_BRACKET), NUMBER, (COMMA), NUMBER, (COMMA), NUMBER, ] (RIGHT_BRACKET)
@@ -67,7 +77,6 @@ class JsonTokenizerTest {
     void testCommentValueStripping() {
         String input = "// Line comment\n/* Block\ncomment */";
 
-        JsonTokenizer tokenizer = new JsonTokenizer();
         List<JsonToken> tokens = tokenizer.tokenize(input);
 
         // tokens.get(0) is the // Line comment
@@ -86,15 +95,13 @@ class JsonTokenizerTest {
     @Test
     void testCommentValueStripping2() {
         String input = "// Line comment";
-        JsonTokenizer tokenizer = new JsonTokenizer();
+
         List<JsonToken> tokens = tokenizer.tokenize(input);
 
         JsonToken comment = tokens.get(0);
 
-        // This passes currently
         assertEquals("// Line comment", comment.getLexeme());
 
-        // THIS WILL FAIL: expected: [ Line comment] but was: [// Line comment]
         assertEquals(" Line comment", comment.getContent(),
             "The token 'value' should have markers stripped, while 'lexeme' keeps them.");
     }

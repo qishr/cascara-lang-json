@@ -19,6 +19,7 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
     /// Used when reading raw text from a file stream.
     /// Takes a String and triggers full lexical dialect type inference.
     public JsonScalarNode(int line, int column, String raw, String unescapedContent, QuoteStyle quoteStyle) {
+        // TODO: This should not take quoteChar, or caller must ensure it matches the source exactly.
         super(line, column);
         this.raw = raw;
         // fromString treats the input as text content to be parsed

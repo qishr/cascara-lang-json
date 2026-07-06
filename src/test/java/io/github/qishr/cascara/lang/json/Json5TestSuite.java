@@ -17,7 +17,7 @@ import io.github.qishr.cascara.lang.json.ast.JsonNode;
 import io.github.qishr.cascara.lang.json.processor.JsonEmitter;
 import io.github.qishr.cascara.lang.json.processor.JsonAstParser;
 
-class JsonDirectoryTestSuite {
+class Json5TestSuite {
 
     private JsonOptions options;
     private JsonAstParser parser;
@@ -26,7 +26,9 @@ class JsonDirectoryTestSuite {
     @BeforeEach
     void init() {
         reporter = new StandardReporter().setLevel(Level.TRACE);
-        options = new JsonOptions().setStrict(true);
+        options = JsonOptions.JSON5.duplicate()
+            .setStrict(true)
+            .setCaptureComments(true);
         parser = new JsonAstParser()
             .setOptions(options)
             .setReporter(reporter);
@@ -45,11 +47,11 @@ class JsonDirectoryTestSuite {
     }
 
     static Stream<Arguments> getValidFiles() throws Exception {
-        return scanFolder("src/test/resources/json-suite/valid");
+        return scanFolder("src/test/resources/json5-suite/valid");
     }
 
     static Stream<Arguments> getInvalidFiles() throws Exception {
-        return scanFolder("src/test/resources/json-suite/invalid");
+        return scanFolder("src/test/resources/json5-suite/invalid");
     }
 
     private static Stream<Arguments> scanFolder(String pathStr) throws Exception {
