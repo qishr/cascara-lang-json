@@ -32,48 +32,50 @@ public class JsonPrimitiveDelegate implements PrimitiveDelegate {
     /// Handles strict JSON string unescaping mechanics for double-quoted strings.
     @Override
     public String unescapeQuotedString(String text, QuoteStyle style) {
-        if (style != QuoteStyle.DOUBLE || text == null || text.isEmpty()) {
-            return text;
-        }
+        return JsonStringUnescaper.unescape(text, style);
 
-        StringBuilder sb = new StringBuilder();
-        int len = text.length();
+        // if (style != QuoteStyle.DOUBLE || text == null || text.isEmpty()) {
+        //     return text;
+        // }
 
-        for (int i = 0; i < len; i++) {
-            char ch = text.charAt(i);
-            if (ch == '\\' && i + 1 < len) {
-                char next = text.charAt(i + 1);
-                switch (next) {
-                    case '"'  -> { sb.append('"'); i++; }
-                    case '\\' -> { sb.append('\\'); i++; }
-                    case '/'  -> { sb.append('/'); i++; }
-                    case 'b'  -> { sb.append('\b'); i++; }
-                    case 'f'  -> { sb.append('\f'); i++; }
-                    case 'n'  -> { sb.append('\n'); i++; }
-                    case 'r'  -> { sb.append('\r'); i++; }
-                    case 't'  -> { sb.append('\t'); i++; }
-                    case 'u'  -> {
-                        // Handle standard JSON 4-hex-character Unicode escape (\\uXXXX)
-                        if (i + 5 < len) {
-                            try {
-                                String hex = text.substring(i + 2, i + 6);
-                                int codePoint = Integer.parseInt(hex, 16);
-                                sb.append((char) codePoint);
-                                i += 5;
-                            } catch (NumberFormatException e) {
-                                // Fallback if hex sequence is malformed
-                                sb.append(ch);
-                            }
-                        } else {
-                            sb.append(ch);
-                        }
-                    }
-                    default -> sb.append(ch);
-                }
-            } else {
-                sb.append(ch);
-            }
-        }
-        return sb.toString();
+        // StringBuilder sb = new StringBuilder();
+        // int len = text.length();
+
+        // for (int i = 0; i < len; i++) {
+        //     char ch = text.charAt(i);
+        //     if (ch == '\\' && i + 1 < len) {
+        //         char next = text.charAt(i + 1);
+        //         switch (next) {
+        //             case '"'  -> { sb.append('"'); i++; }
+        //             case '\\' -> { sb.append('\\'); i++; }
+        //             case '/'  -> { sb.append('/'); i++; }
+        //             case 'b'  -> { sb.append('\b'); i++; }
+        //             case 'f'  -> { sb.append('\f'); i++; }
+        //             case 'n'  -> { sb.append('\n'); i++; }
+        //             case 'r'  -> { sb.append('\r'); i++; }
+        //             case 't'  -> { sb.append('\t'); i++; }
+        //             case 'u'  -> {
+        //                 // Handle standard JSON 4-hex-character Unicode escape (\\uXXXX)
+        //                 if (i + 5 < len) {
+        //                     try {
+        //                         String hex = text.substring(i + 2, i + 6);
+        //                         int codePoint = Integer.parseInt(hex, 16);
+        //                         sb.append((char) codePoint);
+        //                         i += 5;
+        //                     } catch (NumberFormatException e) {
+        //                         // Fallback if hex sequence is malformed
+        //                         sb.append(ch);
+        //                     }
+        //                 } else {
+        //                     sb.append(ch);
+        //                 }
+        //             }
+        //             default -> sb.append(ch);
+        //         }
+        //     } else {
+        //         sb.append(ch);
+        //     }
+        // }
+        // return sb.toString();
     }
 }

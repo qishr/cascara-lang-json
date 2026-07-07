@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import io.github.qishr.cascara.lang.json.processor.JsonAstParser;
+import io.github.qishr.cascara.lang.json.processor.JsonTokenizer;
 
 class SingleFileTest {
     private JsonAstParser parser = new JsonAstParser();
@@ -28,6 +29,25 @@ class SingleFileTest {
         for (int i = 0; i < 2500000; i++) {
             parser = new JsonAstParser();
             parser.parse(content);
+        }
+    }
+
+
+    @Disabled
+    @Test
+    void testSingleFileTokenizerTest() throws IOException {
+        InputStream inputStream = getClass().getResourceAsStream("/medium.json");
+        InputStreamReader streamReader = new InputStreamReader(inputStream, StandardCharsets.UTF_8);
+        BufferedReader reader = new BufferedReader(streamReader);
+        String content = reader.readAllAsString();
+
+        // 500000
+
+        JsonTokenizer tokenizer;
+
+        for (int i = 0; i < 2500000; i++) {
+            tokenizer = new JsonTokenizer();
+            tokenizer.tokenize(content);
         }
     }
 }

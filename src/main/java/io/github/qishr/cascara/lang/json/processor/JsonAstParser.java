@@ -105,13 +105,12 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
         trace("parseValue");
 
         try {
-            // Caller often already skipped trivia, but this is safe and cheap
             skipTrivia();
 
             JsonToken token = peek();
             JsonTokenType type = token.getType();
 
-            // Structural values
+            // Structural values first (most common in real JSON)
             if (type == JsonTokenType.LEFT_BRACE) {
                 return parseMap();
             }
@@ -119,7 +118,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
                 return parseSequence();
             }
 
-            // Primitive values
+            // Primitive values (second most common)
             if (type == JsonTokenType.STRING ||
                 type == JsonTokenType.NUMBER ||
                 type == JsonTokenType.BOOLEAN ||
@@ -127,20 +126,21 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
                 return parseScalar();
             }
 
-            // Identifier values (JSON5: only Infinity/NaN allowed)
+            // JSON5 identifiers (Infinity/NaN only)
             if (type == JsonTokenType.IDENTIFIER) {
                 String ident = token.getContent();
 
-                // JSON5 Infinity/NaN
                 if ("Infinity".equals(ident) || "NaN".equals(ident)) {
                     advance();
-                    return new JsonScalarNode(
+                    JsonScalarNode node = new JsonScalarNode(
                         token.getStartLine(),
                         token.getStartColumn(),
                         token.getLexeme(),
                         ident,
                         QuoteStyle.PLAIN
                     );
+                    attachComments(node);
+                    return node;
                 }
 
                 // Everything else is an error

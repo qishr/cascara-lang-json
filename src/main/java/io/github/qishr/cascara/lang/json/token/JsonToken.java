@@ -13,13 +13,13 @@ public class JsonToken implements Token {
 
     private QuoteStyle quoteStyle;
 
-    public JsonToken(int line, int column, int startIndex, JsonTokenType type, String lexeme, String content) {
-        this.startLine = line;
-        this.startColumn = column;
-        this.offset = startIndex;
-        this.type = type;
-        this.lexeme = lexeme;
-        this.content = content;
+    public JsonToken() {
+        // this.startLine = line;
+        // this.startColumn = column;
+        // this.offset = startIndex;
+        // this.type = type;
+        // this.lexeme = lexeme;
+        // this.content = content;
     }
 
     public JsonToken(int line, int column, int startIndex, JsonTokenType type, String lexeme, String content, QuoteStyle quoteStyle) {
@@ -79,6 +79,4 @@ public class JsonToken implements Token {
             startLine,
             startColumn);
     }
-
-
 }

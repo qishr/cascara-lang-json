@@ -11,11 +11,13 @@ import java.util.Set;
 import io.github.qishr.cascara.common.diagnostic.NoOpReporter;
 import io.github.qishr.cascara.common.lang.processor.Tokenizer;
 import io.github.qishr.cascara.common.lang.util.LanguageOptions;
+import io.github.qishr.cascara.common.lang.util.LexemeProvider;
 import io.github.qishr.cascara.common.lang.util.QuoteStyle;
 import io.github.qishr.cascara.common.lang.util.SourceBuffer;
 import io.github.qishr.cascara.common.lang.util.SourceInputStreamBuffer;
 import io.github.qishr.cascara.common.lang.util.SourceStringBuffer;
 import io.github.qishr.cascara.lang.json.JsonOptions;
+import io.github.qishr.cascara.lang.json.token.JsonBufferBackedToken;
 import io.github.qishr.cascara.lang.json.token.JsonToken;
 import io.github.qishr.cascara.lang.json.token.JsonTokenType;
 
@@ -128,6 +130,8 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             return List.of();
         }
 
+        // TODO: this preallocation kills performance for small files
+        // this.tokens = new ArrayList<>(4096);
         this.tokens = new ArrayList<>();
         this.streamEnded = false;
 
@@ -177,7 +181,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         // 3. Handle standard EOF termination without stream lifecycle markers
         if (buffer.isAtEnd()) {
             streamEnded = true;
-            JsonToken eof = new JsonToken(buffer.line(), buffer.column(), buffer.offset(), JsonTokenType.EOF, "", null);
+            JsonToken eof = new JsonToken(buffer.line(), buffer.column(), buffer.offset(), JsonTokenType.EOF, "", null, QuoteStyle.PLAIN);
             return queueToken(eof);
         }
 
@@ -355,70 +359,77 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     }
 
     private boolean scanString(char quoteChar) {
-        boolean isInvalidUnicodeString = false;
+        boolean invalidUnicode = false;
+
         while (!buffer.isAtEnd()) {
             char next = buffer.advance();
-            if (next == quoteChar) return true;
 
-            if (!ALLOW_UNICODE && next > 127) {
-                // mark string as UNKNOWN
-                isInvalidUnicodeString = true;
+            // Normal termination
+            if (next == quoteChar) {
+                // Return true = “string terminated normally”
+                return !invalidUnicode;
             }
 
+            // Raw unicode check
+            if (!ALLOW_UNICODE && next > 127) {
+                invalidUnicode = true;
+            }
+
+            // Escape sequence
             if (next == '\\' && !buffer.isAtEnd()) {
                 char escaped = buffer.advance();
                 if (escaped == 'u' || escaped == 'x') {
-                    int count = (escaped == 'u' ? 4 : 2);
+                    int count = (escaped == 'u') ? 4 : 2;
                     for (int i = 0; i < count && !buffer.isAtEnd(); i++) {
                         buffer.advance();
                     }
                 }
             }
         }
-        return isInvalidUnicodeString;
+
+        // EOF before closing quote → invalid string
+        return false;
     }
 
     private void scanNumber(char startChar) {
+
         // 1. JSON5 signed Infinity/NaN
-        if (ALLOW_INFINITY_AND_NAN) {
-            if ((startChar == '-' || startChar == '+')) {
-                char c = buffer.peek();
-                if (c < 128 && IDENT_START[c]) { // fast-path identifier start
-                    while (true) {
-                        c = buffer.peek();
-                        if (c < 128 && IDENT_PART[c]) {
-                            buffer.advance();
-                            continue;
-                        }
-                        break;
-                    }
-                    return;
-                }
+        if (ALLOW_INFINITY_AND_NAN && (startChar == '-' || startChar == '+')) {
+            char c = buffer.peek();
+            if (c < 128 && IDENT_START[c]) {
+                // Consume identifier characters
+                do {
+                    buffer.advance();
+                    c = buffer.peek();
+                } while (c < 128 && IDENT_PART[c]);
+                return;
             }
         }
 
         // 2. Hexadecimal 0x...
-        if (ALLOW_HEXADECIMAL_NUMBERS) {
-            if (startChar == '0') {
-                char c = buffer.peek();
-                if (c == 'x' || c == 'X') {
-                    buffer.advance(); // consume x/X
-                    while (true) {
-                        c = buffer.peek();
-                        if (c < 128 && HEX[c]) {
-                            buffer.advance();
-                            continue;
-                        }
-                        break;
+        if (ALLOW_HEXADECIMAL_NUMBERS && startChar == '0') {
+            char c = buffer.peek();
+            if (c == 'x' || c == 'X') {
+                buffer.advance(); // consume x/X
+
+                // Consume hex digits
+                do {
+                    c = buffer.peek();
+                    if (c < 128 && HEX[c]) {
+                        buffer.advance();
+                        continue;
                     }
-                    return;
-                }
+                    break;
+                } while (true);
+
+                return;
             }
         }
 
         // 3. Integer part
+        char c;
         while (true) {
-            char c = buffer.peek();
+            c = buffer.peek();
             if (c < 128 && DIGIT[c]) {
                 buffer.advance();
                 continue;
@@ -429,8 +440,9 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         // 4. Fractional part
         if (buffer.peek() == '.') {
             buffer.advance(); // consume '.'
+
             while (true) {
-                char c = buffer.peek();
+                c = buffer.peek();
                 if (c < 128 && DIGIT[c]) {
                     buffer.advance();
                     continue;
@@ -440,7 +452,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         }
 
         // 5. Exponent part
-        char c = buffer.peek();
+        c = buffer.peek();
         if (c == 'e' || c == 'E') {
             buffer.advance(); // consume e/E
 
@@ -503,6 +515,10 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     }
 
     private void advanceWhitespaceAndComments() {
+        final boolean allowComments = ALLOW_COMMENTS;
+        final boolean capture = CAPTURE_COMMENTS;
+        final boolean allowUnicode = ALLOW_UNICODE;
+
         while (true) {
             char c = buffer.peek();
             if (c == '\0') return;
@@ -513,42 +529,37 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
                 continue;
             }
 
-            if (c > 127 && !ALLOW_UNICODE) {
-                // strict JSON: unicode whitespace not allowed
-                return;
-            }
-
-            if (c > 127 && Character.isWhitespace(c)) {
-                buffer.advance();
-                continue;
+            // Unicode whitespace (only if allowed)
+            if (c > 127) {
+                if (!allowUnicode) return;
+                if (Character.isWhitespace(c)) {
+                    buffer.advance();
+                    continue;
+                }
             }
 
             // Comments
-            if (c == '/' && ALLOW_COMMENTS) {
+            if (allowComments && c == '/') {
                 char n = buffer.peekNext();
 
                 // Single-line comment
                 if (n == '/') {
-                    buffer.startTokenWindow();
-                    if (CAPTURE_COMMENTS) {
-                        String value = scanSingleLineComment();
+                    if (capture) buffer.startTokenWindow();
+                    String value = scanSingleLineComment();
+                    if (capture) {
                         String lexeme = buffer.getTokenWindowLexeme();
                         addToken(JsonTokenType.COMMENT, lexeme, value, QuoteStyle.PLAIN);
-                    } else {
-                        scanSingleLineComment();
                     }
                     continue;
                 }
 
                 // Multi-line comment
                 if (n == '*') {
-                    buffer.startTokenWindow();
-                    if (CAPTURE_COMMENTS) {
-                        String value = scanMultiLineComment();
+                    if (capture) buffer.startTokenWindow();
+                    String value = scanMultiLineComment();
+                    if (capture) {
                         String lexeme = buffer.getTokenWindowLexeme();
                         addToken(JsonTokenType.COMMENT, lexeme, value, QuoteStyle.PLAIN);
-                    } else {
-                        scanMultiLineComment();
                     }
                     continue;
                 }
@@ -647,23 +658,30 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         }
     }
 
-
-
-
     //
     //
     //
 
     private void addToken(JsonTokenType type, String lexeme, String content, QuoteStyle quoteStyle) {
-        JsonToken token = new JsonToken(
-            buffer.windowStartLine(),
-            buffer.windowStartColumn(),
-            buffer.windowStartOffset(),
-            type, lexeme, content, quoteStyle
-        );
-        if (token != null) {
-            pendingTokens.add(token); // Queue it up so nextToken() can yield it
+        JsonToken token;
+        if (buffer instanceof LexemeProvider lp) {
+            token = new JsonBufferBackedToken(
+                lp,
+                buffer.windowStartOffset(),
+                buffer.offset(),
+                buffer.windowStartLine(),
+                buffer.windowStartColumn(),
+                type, content, quoteStyle
+            );
+        } else {
+            token = new JsonToken(
+                buffer.windowStartLine(),
+                buffer.windowStartColumn(),
+                buffer.windowStartOffset(),
+                type, lexeme, content, quoteStyle
+            );
         }
+        pendingTokens.add(token); // Queue it up so nextToken() can yield it
     }
 
     // Small interceptor ensuring that if someone runs the old tokenize() API,
@@ -681,10 +699,6 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             buffer.advance();
         }
     }
-
-    //
-    //
-    //
 
     private boolean isDigit(char c) {
         return c >= '0' && c <= '9';
