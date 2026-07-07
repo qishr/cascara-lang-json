@@ -205,7 +205,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
                 }
 
                 // Duplicate key detection
-                String keyString = key.asString();
+                String keyString = key.getContent();
                 if (!seenKeys.add(keyString)) {
                     error(key.getToken(), JsonDiagnosticCode.DUPLICATE_KEY, keyString);
                 }

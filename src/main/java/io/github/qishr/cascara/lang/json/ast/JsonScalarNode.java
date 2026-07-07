@@ -12,8 +12,10 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
     private static final JsonPrimitiveDelegate JSON_PRIMITIVE_DELEGATE = new JsonPrimitiveDelegate();
 
     private String raw;
+    private String content;
     private Primitive primitive;
     private QuoteStyle quoteStyle = QuoteStyle.PLAIN;
+    private String keyStringCache;
 
     /// Constructor for use in parsers.
     /// Used when reading raw text from a file stream.
@@ -25,6 +27,7 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
         // fromString treats the input as text content to be parsed
         this.primitive = Primitive.fromString(unescapedContent, quoteStyle)
             .setDelegate(JSON_PRIMITIVE_DELEGATE);
+        this.content = unescapedContent;
         this.quoteStyle = quoteStyle;
     }
 
@@ -92,10 +95,27 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
         return this;
     }
 
+    public String getKeyString() {
+        if (keyStringCache != null) return keyStringCache;
+
+        // For quoted keys, rawInput is already the unescaped content
+        if (this.getQuoteStyle() == QuoteStyle.DOUBLE) {
+            keyStringCache = content; // already unescaped by tokenizer
+            return keyStringCache;
+        }
+
+        // For JSON5 unquoted keys, content is already correct
+        keyStringCache = content;
+        return keyStringCache;
+    }
 
     @Override
     public String getRaw() {
         return raw;
+    }
+
+    public String getContent() {
+        return content;
     }
 
     @Override
@@ -103,12 +123,17 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
         return primitive.unwrap();
     }
 
+    // TODO: Why do we have setPrimitive?
+    // Where is it used?
+    // Should JsonScalarNode be immutable?
     @Override
     public JsonScalarNode setPrimitive(Object value) {
         this.primitive = Primitive.of(value)
             .setDelegate(JSON_PRIMITIVE_DELEGATE)
             .setQuoteStyle(this.quoteStyle);
         this.raw = null;
+        keyStringCache = null;
+        content = (value == null ? null : String.valueOf(value));
         return this;
     }
 

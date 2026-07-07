@@ -96,6 +96,8 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         return this;
     }
 
+    // TODO: This makes zero performance difference if the methods
+    // using these values have to set a local final variable anyway.
     private void applyOptions(JsonOptions options) {
         // Note: Keep this in alphabetical order,
         // or it will become time consuming to maintain
@@ -683,6 +685,55 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         }
         pendingTokens.add(token); // Queue it up so nextToken() can yield it
     }
+
+    // private void addStructuralToken(JsonTokenType type) {
+    //     JsonToken token;
+    //     if (buffer instanceof LexemeProvider lp) {
+    //         token = new JsonBufferBackedToken(
+    //             lp,
+    //             buffer.windowStartOffset(),
+    //             buffer.offset(),
+    //             buffer.windowStartLine(),
+    //             buffer.windowStartColumn(),
+    //             type,
+    //             null,          // no content for structural
+    //             QuoteStyle.PLAIN
+    //         );
+    //     } else {
+    //         token = new JsonToken(
+    //             buffer.windowStartLine(),
+    //             buffer.windowStartColumn(),
+    //             buffer.windowStartOffset(),
+    //             type,
+    //             null,          // no lexeme needed for structural
+    //             null,
+    //             QuoteStyle.PLAIN
+    //         );
+    //     }
+    //     pendingTokens.add(token);
+    // }
+
+    // private void addScalarToken(JsonTokenType type, String lexeme, String content, QuoteStyle quoteStyle) {
+    //     JsonToken token;
+    //     if (buffer instanceof LexemeProvider lp) {
+    //         token = new JsonBufferBackedToken(
+    //             lp,
+    //             buffer.windowStartOffset(),
+    //             buffer.offset(),
+    //             buffer.windowStartLine(),
+    //             buffer.windowStartColumn(),
+    //             type, content, quoteStyle
+    //         );
+    //     } else {
+    //         token = new JsonToken(
+    //             buffer.windowStartLine(),
+    //             buffer.windowStartColumn(),
+    //             buffer.windowStartOffset(),
+    //             type, lexeme, content, quoteStyle
+    //         );
+    //     }
+    //     pendingTokens.add(token);
+    // }
 
     // Small interceptor ensuring that if someone runs the old tokenize() API,
     // tokens get copied to the collection output array correctly.
