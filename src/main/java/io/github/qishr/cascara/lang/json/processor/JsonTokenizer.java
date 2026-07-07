@@ -1,9 +1,7 @@
 package io.github.qishr.cascara.lang.json.processor;
 
 import java.io.InputStream;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Deque;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
@@ -18,10 +16,14 @@ import io.github.qishr.cascara.common.lang.util.SourceInputStreamBuffer;
 import io.github.qishr.cascara.common.lang.util.SourceStringBuffer;
 import io.github.qishr.cascara.lang.json.JsonOptions;
 import io.github.qishr.cascara.lang.json.token.JsonBufferBackedToken;
+import io.github.qishr.cascara.lang.json.token.JsonComment;
 import io.github.qishr.cascara.lang.json.token.JsonToken;
 import io.github.qishr.cascara.lang.json.token.JsonTokenType;
 
 public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implements Tokenizer<JsonToken>{
+
+    // TODO: WHy are these not being used after the refactor?
+    // Either they never did any good, or a regression has been made.
     private static final String LBRACE = "{";
     private static final String RBRACE = "}";
     private static final String LBRACKET = "[";
@@ -68,16 +70,17 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     private boolean ALLOW_COMMENTS;
     private boolean ALLOW_HEXADECIMAL_NUMBERS;
     private boolean ALLOW_INFINITY_AND_NAN;
-    private boolean ALLOW_SINGLE_QUOTED_STRINGS;
+    private boolean ALLOW_SINGLE_QUOTED_STRINGS; // TODO:L Why is this not used after the refactor?
     private boolean ALLOW_UNICODE;
     private boolean CAPTURE_COMMENTS;
 
-    private final Deque<JsonToken> pendingTokens = new ArrayDeque<>();
+    // private final Deque<JsonToken> pendingTokens = new ArrayDeque<>();
 
     private SourceBuffer buffer;
     private List<JsonToken> tokens;
     private boolean isLegacyMode = false;
-    private boolean streamEnded = false;
+    private boolean streamEnded = false; // TODO: If this is no longer needed, remove it.
+    private final List<JsonComment> pendingComments = new ArrayList<>();
 
     /// Default constructor for SPI
     public JsonTokenizer() {
@@ -126,27 +129,66 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         resetCommonState();
     }
 
+    // public void tokenize() {
+    //     // legacy compatibility: drain tokens
+    //     while (true) {
+    //         JsonToken tok = nextToken();
+    //         if (tok.type() == JsonTokenType.EOF) {
+    //             return;
+    //         }
+    //     }
+    // }
+
+
+    // @Override
+    // public List<JsonToken> tokenize(String source) {
+    //     if (source == null || source.isEmpty()) {
+    //         return List.of();
+    //     }
+
+    //     this.tokens = new ArrayList<>();
+    //     this.streamEnded = false;
+
+    //     open(source);
+    //     this.isLegacyMode = true;
+
+    //     // Drain the stream using the sequential nextToken logic
+    //     JsonToken token;
+    //     while ((token = nextToken()).getType() != JsonTokenType.EOF) {
+    //         if (token.getType() == JsonTokenType.EOF) {
+    //             break;
+    //         }
+    //     }
+    //     return this.tokens;
+    // }
+
     @Override
     public List<JsonToken> tokenize(String source) {
         if (source == null || source.isEmpty()) {
             return List.of();
         }
 
-        // TODO: this preallocation kills performance for small files
-        // this.tokens = new ArrayList<>(4096);
         this.tokens = new ArrayList<>();
         this.streamEnded = false;
 
         open(source);
         this.isLegacyMode = true;
 
-        // Drain the stream using the sequential nextToken logic
         JsonToken token;
-        while ((token = nextToken()) != null) {
-            if (token.getType() == JsonTokenType.EOF) {
-                break;
-            }
+        while ((token = nextToken()).getType() != JsonTokenType.EOF) {
+            this.tokens.add(token);
         }
+
+        tokens.add(new JsonToken(
+            buffer.line(),
+            buffer.column(),
+            buffer.offset(),
+            JsonTokenType.EOF,
+            "",
+            "",
+            QuoteStyle.PLAIN
+        ));
+
         return this.tokens;
     }
 
@@ -155,210 +197,721 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         return EnumSet.allOf(JsonTokenType.class);
     }
 
-    @Override
+    // @Override
+    // public JsonToken nextToken() {
+    //     if (!pendingTokens.isEmpty()) {
+    //         return queueToken(pendingTokens.pollFirst());
+    //     }
+
+    //     if (streamEnded) {
+    //         return null;
+    //     }
+
+    //     // 1. Loop until we either parse a token or drain the stream buffer
+    //     while (!buffer.isAtEnd() && pendingTokens.isEmpty()) {
+    //         advanceWhitespaceAndComments();
+
+    //         if (buffer.isAtEnd()) break;
+
+    //         buffer.startTokenWindow();
+    //         scanToken();
+    //     }
+
+    //     // 2. If scanning populated tokens, return the first one
+    //     if (!pendingTokens.isEmpty()) {
+    //         return queueToken(pendingTokens.pollFirst());
+    //     }
+
+    //     // 3. Handle standard EOF termination without stream lifecycle markers
+    //     if (buffer.isAtEnd()) {
+    //         streamEnded = true;
+    //         JsonToken eof = new JsonToken(buffer.line(), buffer.column(), buffer.offset(), JsonTokenType.EOF, "", null, QuoteStyle.PLAIN);
+    //         return queueToken(eof);
+    //     }
+
+    //     return null;
+    // }
+
     public JsonToken nextToken() {
-        if (!pendingTokens.isEmpty()) {
-            return queueToken(pendingTokens.pollFirst());
+
+        // reporter.debug("nextToken");
+
+        if (!pendingComments.isEmpty()) {
+            // reporter.debug("calling toCommentToken");
+            return toCommentToken(pendingComments.remove(0));
         }
 
-        if (streamEnded) {
-            return null;
+        advanceWhitespaceAndComments();
+
+        if (!pendingComments.isEmpty()) {
+            // reporter.debug("calling toCommentToken (post)");
+            return toCommentToken(pendingComments.remove(0));
         }
 
-        // 1. Loop until we either parse a token or drain the stream buffer
-        while (!buffer.isAtEnd() && pendingTokens.isEmpty()) {
-            advanceWhitespaceAndComments();
-
-            if (buffer.isAtEnd()) break;
-
-            buffer.startTokenWindow();
-            scanToken();
-        }
-
-        // 2. If scanning populated tokens, return the first one
-        if (!pendingTokens.isEmpty()) {
-            return queueToken(pendingTokens.pollFirst());
-        }
-
-        // 3. Handle standard EOF termination without stream lifecycle markers
         if (buffer.isAtEnd()) {
-            streamEnded = true;
-            JsonToken eof = new JsonToken(buffer.line(), buffer.column(), buffer.offset(), JsonTokenType.EOF, "", null, QuoteStyle.PLAIN);
-            return queueToken(eof);
+            JsonToken tok = new JsonToken(
+                buffer.windowStartLine(),
+                buffer.windowStartColumn(),
+                buffer.windowStartOffset(),
+                JsonTokenType.EOF,
+                null,
+                null,
+                QuoteStyle.PLAIN
+            );
+
+            if (!pendingComments.isEmpty()) {
+                tok.attachComments(pendingComments);
+                pendingComments.clear();
+            }
+
+            return tok;
         }
 
-        return null;
-    }
+        char c = buffer.peek();
+        JsonToken tok;
 
-    private void scanToken() {
-        // I doubt this makes any difference TBH.
-        // trace("scanToken");
-
-        char c = buffer.advance();
-
-        JsonTokenType type = null;
-        String lexeme = null;
-        String value = null;
-        QuoteStyle quoteStyle = QuoteStyle.PLAIN;
-
+        // Unicode path
         if (c > 127) {
-            if (!ALLOW_UNICODE) {
-                // Raw unicode not allowed in strict mode
-                type = JsonTokenType.UNKNOWN;
-                lexeme = Character.toString(c);
-                value  = lexeme;
-                addToken(type, lexeme, value, QuoteStyle.PLAIN);
-                return;
+            tok = handleUnicodeChar(c);
+            if (tok == null) {
+                // whitespace or skipped unicode trivia
+                return nextToken();
             }
+        } else {
+            // ASCII path
+            switch (c) {
+                case '{': tok = structural(JsonTokenType.LEFT_BRACE); break;
+                case '}': tok = structural(JsonTokenType.RIGHT_BRACE); break;
+                case '[': tok = structural(JsonTokenType.LEFT_BRACKET); break;
+                case ']': tok = structural(JsonTokenType.RIGHT_BRACKET); break;
+                case ':': tok = structural(JsonTokenType.COLON); break;
+                case ',': tok = structural(JsonTokenType.COMMA); break;
 
-            // Unicode allowed → treat as identifier start or UNKNOWN
-            handleUnicodeChar(c);
-            return;
-        }
-
-        switch (c) {
-
-            //
-            // FAST‑PATH STRUCTURAL TOKENS (zero allocation)
-            //
-            case '{' -> {
-                addToken(JsonTokenType.LEFT_BRACE, LBRACE, LBRACE, QuoteStyle.PLAIN);
-                return;
-            }
-            case '}' -> {
-                addToken(JsonTokenType.RIGHT_BRACE, RBRACE, RBRACE, QuoteStyle.PLAIN);
-                return;
-            }
-            case '[' -> {
-                addToken(JsonTokenType.LEFT_BRACKET, LBRACKET, LBRACKET, QuoteStyle.PLAIN);
-                return;
-            }
-            case ']' -> {
-                addToken(JsonTokenType.RIGHT_BRACKET, RBRACKET, RBRACKET, QuoteStyle.PLAIN);
-                return;
-            }
-            case ',' -> {
-                addToken(JsonTokenType.COMMA, COMMA, COMMA, QuoteStyle.PLAIN);
-                return;
-            }
-            case ':' -> {
-                addToken(JsonTokenType.COLON, COLON, COLON, QuoteStyle.PLAIN);
-                return;
-            }
-
-            //
-            // STRING
-            //
-            case '"', '\'' -> {
-                // If single-quoted strings are disallowed, emit UNKNOWN and return.
-                if (c == '\'') {
-                    if (!ALLOW_SINGLE_QUOTED_STRINGS) {
-                        // Consume the string anyway so offsets remain correct
-                        scanString(c);
-                        lexeme = buffer.getTokenWindowLexeme();
-
-                        type = JsonTokenType.UNKNOWN;
-                        value = lexeme; // preserve raw content for diagnostics
-                        break;
-                    }
-                    quoteStyle = QuoteStyle.SINGLE;
-                } else {
-                    quoteStyle = QuoteStyle.DOUBLE;
-                }
-
-                if (!scanString(c)) {
-                    type = JsonTokenType.UNKNOWN;
+                case '"':
+                case '\'':
+                    tok = scanStringToken(c);
                     break;
-                }
 
-                lexeme = buffer.getTokenWindowLexeme();
-
-                // Keep this: parser expects unquoted content
-                value = (lexeme.length() >= 2)
-                        ? lexeme.substring(1, lexeme.length() - 1)
-                        : "";
-
-                type = JsonTokenType.STRING;
-            }
-
-            //
-            // NUMBER (including JSON5 +Infinity, -Infinity, NaN)
-            //
-            case '0','1','2','3','4','5','6','7','8','9','-','+' -> {
-                scanNumber(c);
-                lexeme = buffer.getTokenWindowLexeme();
-                type = JsonTokenType.NUMBER;
-            }
-
-            //
-            // DOT (either number or standalone)
-            //
-            case '.' -> {
-                if (isDigit(buffer.peek())) {
-                    scanNumber(c);
-                    lexeme = buffer.getTokenWindowLexeme();
-                    type = JsonTokenType.NUMBER;
-                } else {
-                    type = JsonTokenType.DOT;
-                    lexeme = ".";
-                    value  = ".";
-                }
-            }
-
-            //
-            // IDENTIFIER FAST‑PATH (letters, $, _)
-            //
-            case 'a','b','c','d','e','f','g','h','i','j','k','l','m',
-                'n','o','p','q','r','s','t','u','v','w','x','y','z',
-                'A','B','C','D','E','F','G','H','I','J','K','L','M',
-                'N','O','P','Q','R','S','T','U','V','W','X','Y','Z',
-                '_','$' -> {
-
-                scanIdentifierFast();
-                lexeme = buffer.getTokenWindowLexeme();
-
-                switch (lexeme) {
-                    case "true", "false"   -> {
-                        type  = JsonTokenType.BOOLEAN;
-                        value = lexeme;
-                    }
-                    case "null"            -> {
-                        type  = JsonTokenType.NULL;
-                        value = lexeme;
-                    }
-                    case "Infinity", "NaN" -> {
-                        type  = JsonTokenType.NUMBER;
-                        value = lexeme;
-                    }
-                    default                -> {
-                        type  = JsonTokenType.IDENTIFIER;
-                        value = lexeme;
-                    }
-                }
-            }
-
-            //
-            // UNKNOWN
-            //
-            default -> {
-                type = JsonTokenType.UNKNOWN;
-                lexeme = String.valueOf(c);
-                value  = lexeme;
+                default:
+                    tok = scanNumberOrIdentifierOrError(c);
+                    break;
             }
         }
 
-        //
-        // FALLBACKS
-        //
-        if (lexeme == null) {
-            lexeme = buffer.getTokenWindowLexeme();
-        }
-        if (value == null) {
-            value = lexeme;
+        // Attach any captured comments
+        if (!pendingComments.isEmpty()) {
+            tok.attachComments(pendingComments);
+            pendingComments.clear();
         }
 
-        addToken(type, lexeme, value, quoteStyle);
+        if (!(reporter instanceof NoOpReporter)) {
+            reporter.trace("TOKEN: " + tok.getType() +
+                           " [" + tok.getStartLine() + ":" + tok.getStartColumn() + "] " +
+                           (tok.getLexeme() != null ? tok.getLexeme() : ""));
+        }
+
+        return tok;
     }
+
+    private JsonToken toCommentToken(JsonComment c) {
+        return new JsonToken(
+            c.getLine(),
+            c.getColumn(),
+            /* offset */ 0,              // or a better offset if you track it
+            JsonTokenType.COMMENT,
+            c.getLexeme(),
+            c.getValue(),
+            QuoteStyle.PLAIN
+        );
+    }
+
+    // private JsonToken toCommentToken(JsonComment c) {
+    //     return new JsonToken(
+    //         c.line,
+    //         c.column,
+    //         /* startOffset */ 0,          // You can improve this later if needed
+    //         JsonTokenType.COMMENT,
+    //         c.lexeme,
+    //         c.value,
+    //         QuoteStyle.PLAIN
+    //     );
+    // }
+
+
+    // private JsonToken structural(JsonTokenType type) {
+    //     if (buffer instanceof LexemeProvider lp) {
+    //         return new JsonBufferBackedToken(
+    //             lp,
+    //             buffer.windowStartOffset(),
+    //             buffer.offset(),
+    //             buffer.windowStartLine(),
+    //             buffer.windowStartColumn(),
+    //             type,
+    //             null,
+    //             QuoteStyle.PLAIN
+    //         );
+    //     }
+
+    //     return new JsonToken(
+    //         buffer.windowStartLine(),
+    //         buffer.windowStartColumn(),
+    //         buffer.windowStartOffset(),
+    //         type,
+    //         null,
+    //         null,
+    //         QuoteStyle.PLAIN
+    //     );
+    // }
+
+    private JsonToken structural(JsonTokenType type) {
+        int startOffset = buffer.offset();
+        int startLine   = buffer.line();
+        int startColumn = buffer.column();
+
+        buffer.advance();
+
+        if (buffer instanceof LexemeProvider lp) {
+            return new JsonBufferBackedToken(
+                lp,
+                startOffset,
+                buffer.offset(),
+                startLine,
+                startColumn,
+                type,
+                null,
+                QuoteStyle.PLAIN
+            );
+        }
+
+        return new JsonToken(
+            startLine,
+            startColumn,
+            startOffset,
+            type,
+            null,
+            null,
+            QuoteStyle.PLAIN
+        );
+    }
+
+    private JsonToken scanStringToken(char quoteChar) {
+        int startOffset = buffer.offset(); // actual position of the quote
+        int startLine   = buffer.line();
+        int startColumn = buffer.column();
+
+        buffer.startTokenWindow();
+        buffer.advance(); // consume opening quote
+
+        boolean ok = scanString(quoteChar);   // your existing method
+
+        String lexeme = buffer.getTokenWindowLexeme();   // now correct
+        String content = lexeme.substring(1, lexeme.length() - 1);
+
+        QuoteStyle qs = (quoteChar == '"')
+            ? QuoteStyle.DOUBLE
+            : QuoteStyle.SINGLE;
+
+        if (qs == QuoteStyle.SINGLE && !options.allowSingleQuotedStrings()) {
+            return errorToken("Single-quoted strings are not allowed in strict JSON", startLine, startColumn);
+        }
+
+        if (!ok) {
+            return errorToken("Unterminated string literal", startLine, startColumn);
+        }
+
+        return makeStringToken(startOffset, startLine, startColumn, lexeme, content, qs);
+    }
+
+    private JsonToken errorToken(String message, int line, int column) {
+        return new JsonToken(
+            line,
+            column,
+            buffer.windowStartOffset(),
+            JsonTokenType.ERROR,
+            message,
+            null,
+            QuoteStyle.PLAIN
+        );
+    }
+
+    private JsonToken makeStringToken(
+        int startOffset, int line, int column,
+        String lexeme, String content, QuoteStyle qs
+    ) {
+        if (buffer instanceof LexemeProvider lp) {
+            return new JsonBufferBackedToken(
+                lp,
+                startOffset,
+                buffer.offset(),
+                line,
+                column,
+                JsonTokenType.STRING,
+                content,
+                qs
+            );
+        }
+
+        return new JsonToken(
+            line,
+            column,
+            startOffset,
+            JsonTokenType.STRING,
+            lexeme,
+            content,
+            qs
+        );
+    }
+
+    // private JsonToken scanNumberOrIdentifierOrError(char startChar) {
+    //     int startOffset = buffer.windowStartOffset();
+    //     int startLine   = buffer.windowStartLine();
+    //     int startColumn = buffer.windowStartColumn();
+
+    //     // NUMBER?
+    //     if (isDigit(startChar) || startChar == '-' || startChar == '+') {
+    //         scanNumber(startChar); // your existing method
+
+    //         String lexeme  = buffer.getTokenWindowLexeme();
+    //         String content = lexeme; // numbers use lexeme as content
+
+    //         return makeNumberToken(startOffset, startLine, startColumn, lexeme, content);
+    //     }
+
+    //     // IDENTIFIER?
+    //     if (startChar < 128 && IDENT_START[startChar]) {
+    //         scanIdentifierFast(); // your existing method
+
+    //         String lexeme  = buffer.getTokenWindowLexeme();
+    //         String content = lexeme; // identifiers use lexeme as content
+
+    //         return makeIdentifierToken(startOffset, startLine, startColumn, lexeme, content);
+    //     }
+
+    //     // ERROR: invalid starting character
+    //     return errorToken(
+    //         "Unexpected character '" + startChar + "'",
+    //         startLine,
+    //         startColumn
+    //     );
+    // }
+
+    // 2nd attempt...
+
+    // private JsonToken scanNumberOrIdentifierOrError(char startChar) {
+    //     // Capture current position for the token
+    //     int startOffset = buffer.offset();
+    //     int startLine   = buffer.line();
+    //     int startColumn = buffer.column();
+
+    //     // Start a fresh token window here
+    //     buffer.startTokenWindow();
+
+    //     // NUMBER?
+    //     if (isDigit(startChar) || startChar == '-' || startChar == '+') {
+    //         scanNumber(startChar); // advances buffer over the full number
+
+    //         String lexeme  = buffer.getTokenWindowLexeme();
+    //         String content = lexeme; // numbers use lexeme as content
+
+    //         return makeNumberToken(startOffset, startLine, startColumn, lexeme, content);
+    //     }
+
+    //     // IDENTIFIER?
+    //     if (startChar < 128 && IDENT_START[startChar]) {
+    //         scanIdentifierFast(); // advances buffer over the identifier
+
+    //         String lexeme  = buffer.getTokenWindowLexeme();
+    //         String content = lexeme; // identifiers use lexeme as content
+
+    //         return makeIdentifierToken(startOffset, startLine, startColumn, lexeme, content);
+    //     }
+
+    //     // ERROR: invalid starting character — must consume it
+    //     buffer.advance(); // consume the offending char so we can make progress
+
+    //     return errorToken(
+    //         "Unexpected character '" + startChar + "'",
+    //         startLine,
+    //         startColumn
+    //     );
+    // }
+
+    // 3rd attempt...
+
+    // private JsonToken scanNumberOrIdentifierOrError(char startChar) {
+    //     // Capture the actual current position
+    //     int startOffset = buffer.offset();
+    //     int startLine   = buffer.line();
+    //     int startColumn = buffer.column();
+
+    //     // Start a fresh token window for this token
+    //     buffer.startTokenWindow();
+
+    //     // NUMBER?
+    //     if (isDigit(startChar) || startChar == '-' || startChar == '+') {
+    //         scanNumber(startChar); // must advance over the full number
+
+    //         String lexeme  = buffer.getTokenWindowLexeme();
+    //         String content = lexeme;
+
+    //         return makeNumberToken(startOffset, startLine, startColumn, lexeme, content);
+    //     }
+
+    //     // IDENTIFIER?
+    //     if (startChar < 128 && IDENT_START[startChar]) {
+    //         scanIdentifierFast(); // must advance over the identifier
+
+    //         String lexeme  = buffer.getTokenWindowLexeme();
+    //         String content = lexeme;
+
+    //         return makeIdentifierToken(startOffset, startLine, startColumn, lexeme, content);
+    //     }
+
+    //     // ERROR: invalid starting character — consume it so we make progress
+    //     buffer.advance();
+
+    //     return errorToken(
+    //         "Unexpected character '" + startChar + "'",
+    //         startLine,
+    //         startColumn
+    //     );
+    // }
+
+    // 4th attempt...
+
+    // private JsonToken scanNumberOrIdentifierOrError(char startChar) {
+    //     int startOffset = buffer.offset();
+    //     int startLine   = buffer.line();
+    //     int startColumn = buffer.column();
+
+    //     buffer.startTokenWindow();
+
+    //     String lexeme;
+    //     String content;
+
+    //     // NUMBER?
+    //     if (isDigit(startChar) || startChar == '-' || startChar == '+') {
+    //         scanNumber(startChar);   // consumes at least one char
+    //         lexeme  = buffer.getTokenWindowLexeme();
+    //         content = lexeme;
+    //         return classifyIdentifierOrKeywordOrNumber(
+    //             startOffset, startLine, startColumn, lexeme, content
+    //         );
+    //     }
+
+    //     // IDENTIFIER?
+    //     if (startChar < 128 && IDENT_START[startChar]) {
+    //         scanIdentifierFast();    // consumes identifier chars
+    //         lexeme  = buffer.getTokenWindowLexeme();
+    //         content = lexeme;
+    //         return classifyIdentifierOrKeywordOrNumber(
+    //             startOffset, startLine, startColumn, lexeme, content
+    //         );
+    //     }
+
+    //     // ERROR: invalid starting character
+    //     buffer.advance();
+    //     return errorToken(
+    //         "Unexpected character '" + startChar + "'",
+    //         startLine,
+    //         startColumn
+    //     );
+    // }
+
+    // 5th attempt...
+
+    private JsonToken scanNumberOrIdentifierOrError(char startChar) {
+        int startOffset = buffer.offset();
+        int startLine   = buffer.line();
+        int startColumn = buffer.column();
+
+        buffer.startTokenWindow();
+
+        // NUMBER?
+        if (isDigit(startChar) || startChar == '-' || startChar == '+' || startChar == '.') {
+            scanNumber(startChar);
+            String lexeme  = buffer.getTokenWindowLexeme();
+            return makeNumberToken(startOffset, startLine, startColumn, lexeme, lexeme);
+        }
+
+        // IDENTIFIER?
+        if (startChar < 128 && IDENT_START[startChar]) {
+            scanIdentifierFast();
+            String lexeme  = buffer.getTokenWindowLexeme();
+            return classifyLexeme(startOffset, startLine, startColumn, lexeme, lexeme);
+        }
+
+        // ERROR
+        buffer.advance();
+        return errorToken(
+            "Unexpected character '" + startChar + "'",
+            startLine,
+            startColumn
+        );
+    }
+
+    private JsonToken classifyLexeme(
+        int startOffset, int line, int column,
+        String lexeme, String content
+    ) {
+        switch (lexeme) {
+            case "true":
+            case "false":
+                return new JsonToken(
+                    line, column, startOffset,
+                    JsonTokenType.BOOLEAN,
+                    lexeme,
+                    lexeme,
+                    QuoteStyle.PLAIN
+                );
+
+            case "null":
+                return new JsonToken(
+                    line, column, startOffset,
+                    JsonTokenType.NULL,
+                    lexeme,
+                    lexeme,
+                    QuoteStyle.PLAIN
+                );
+
+            case "Infinity":
+            case "NaN":
+                return makeNumberToken(startOffset, line, column, lexeme, lexeme);
+
+            default:
+                return makeIdentifierToken(startOffset, line, column, lexeme, content);
+        }
+    }
+
+
+
+    private JsonToken makeNumberToken(
+        int startOffset, int line, int column,
+        String lexeme, String content
+    ) {
+        if (buffer instanceof LexemeProvider lp) {
+            return new JsonBufferBackedToken(
+                lp,
+                startOffset,
+                buffer.offset(),
+                line,
+                column,
+                JsonTokenType.NUMBER,
+                content,
+                QuoteStyle.PLAIN
+            );
+        }
+
+        return new JsonToken(
+            line,
+            column,
+            startOffset,
+            JsonTokenType.NUMBER,
+            lexeme,
+            content,
+            QuoteStyle.PLAIN
+        );
+    }
+
+    private JsonToken makeIdentifierToken(
+        int startOffset, int line, int column,
+        String lexeme, String content
+    ) {
+        if (buffer instanceof LexemeProvider lp) {
+            return new JsonBufferBackedToken(
+                lp,
+                startOffset,
+                buffer.offset(),
+                line,
+                column,
+                JsonTokenType.IDENTIFIER,
+                content,
+                QuoteStyle.PLAIN
+            );
+        }
+
+        return new JsonToken(
+            line,
+            column,
+            startOffset,
+            JsonTokenType.IDENTIFIER,
+            lexeme,
+            content,
+            QuoteStyle.PLAIN
+        );
+    }
+
+
+
+    // private void scanToken() {
+    //     // I doubt this makes any difference TBH.
+    //     // trace("scanToken");
+
+    //     char c = buffer.advance();
+
+    //     JsonTokenType type = null;
+    //     String lexeme = null;
+    //     String value = null;
+    //     QuoteStyle quoteStyle = QuoteStyle.PLAIN;
+
+    //     if (c > 127) {
+    //         if (!ALLOW_UNICODE) {
+    //             // Raw unicode not allowed in strict mode
+    //             type = JsonTokenType.UNKNOWN;
+    //             lexeme = Character.toString(c);
+    //             value  = lexeme;
+    //             addToken(type, lexeme, value, QuoteStyle.PLAIN);
+    //             return;
+    //         }
+
+    //         // Unicode allowed → treat as identifier start or UNKNOWN
+    //         handleUnicodeChar(c);
+    //         return;
+    //     }
+
+    //     switch (c) {
+
+    //         //
+    //         // FAST‑PATH STRUCTURAL TOKENS (zero allocation)
+    //         //
+    //         case '{' -> {
+    //             addToken(JsonTokenType.LEFT_BRACE, LBRACE, LBRACE, QuoteStyle.PLAIN);
+    //             return;
+    //         }
+    //         case '}' -> {
+    //             addToken(JsonTokenType.RIGHT_BRACE, RBRACE, RBRACE, QuoteStyle.PLAIN);
+    //             return;
+    //         }
+    //         case '[' -> {
+    //             addToken(JsonTokenType.LEFT_BRACKET, LBRACKET, LBRACKET, QuoteStyle.PLAIN);
+    //             return;
+    //         }
+    //         case ']' -> {
+    //             addToken(JsonTokenType.RIGHT_BRACKET, RBRACKET, RBRACKET, QuoteStyle.PLAIN);
+    //             return;
+    //         }
+    //         case ',' -> {
+    //             addToken(JsonTokenType.COMMA, COMMA, COMMA, QuoteStyle.PLAIN);
+    //             return;
+    //         }
+    //         case ':' -> {
+    //             addToken(JsonTokenType.COLON, COLON, COLON, QuoteStyle.PLAIN);
+    //             return;
+    //         }
+
+    //         //
+    //         // STRING
+    //         //
+    //         case '"', '\'' -> {
+    //             // If single-quoted strings are disallowed, emit UNKNOWN and return.
+    //             if (c == '\'') {
+    //                 if (!ALLOW_SINGLE_QUOTED_STRINGS) {
+    //                     // Consume the string anyway so offsets remain correct
+    //                     scanString(c);
+    //                     lexeme = buffer.getTokenWindowLexeme();
+
+    //                     type = JsonTokenType.UNKNOWN;
+    //                     value = lexeme; // preserve raw content for diagnostics
+    //                     break;
+    //                 }
+    //                 quoteStyle = QuoteStyle.SINGLE;
+    //             } else {
+    //                 quoteStyle = QuoteStyle.DOUBLE;
+    //             }
+
+    //             if (!scanString(c)) {
+    //                 type = JsonTokenType.UNKNOWN;
+    //                 break;
+    //             }
+
+    //             lexeme = buffer.getTokenWindowLexeme();
+
+    //             // Keep this: parser expects unquoted content
+    //             value = (lexeme.length() >= 2)
+    //                     ? lexeme.substring(1, lexeme.length() - 1)
+    //                     : "";
+
+    //             type = JsonTokenType.STRING;
+    //         }
+
+    //         //
+    //         // NUMBER (including JSON5 +Infinity, -Infinity, NaN)
+    //         //
+    //         case '0','1','2','3','4','5','6','7','8','9','-','+' -> {
+    //             scanNumber(c);
+    //             lexeme = buffer.getTokenWindowLexeme();
+    //             type = JsonTokenType.NUMBER;
+    //         }
+
+    //         //
+    //         // DOT (either number or standalone)
+    //         //
+    //         case '.' -> {
+    //             if (isDigit(buffer.peek())) {
+    //                 scanNumber(c);
+    //                 lexeme = buffer.getTokenWindowLexeme();
+    //                 type = JsonTokenType.NUMBER;
+    //             } else {
+    //                 type = JsonTokenType.DOT;
+    //                 lexeme = ".";
+    //                 value  = ".";
+    //             }
+    //         }
+
+    //         //
+    //         // IDENTIFIER FAST‑PATH (letters, $, _)
+    //         //
+    //         case 'a','b','c','d','e','f','g','h','i','j','k','l','m',
+    //             'n','o','p','q','r','s','t','u','v','w','x','y','z',
+    //             'A','B','C','D','E','F','G','H','I','J','K','L','M',
+    //             'N','O','P','Q','R','S','T','U','V','W','X','Y','Z',
+    //             '_','$' -> {
+
+    //             scanIdentifierFast();
+    //             lexeme = buffer.getTokenWindowLexeme();
+
+    //             switch (lexeme) {
+    //                 case "true", "false"   -> {
+    //                     type  = JsonTokenType.BOOLEAN;
+    //                     value = lexeme;
+    //                 }
+    //                 case "null"            -> {
+    //                     type  = JsonTokenType.NULL;
+    //                     value = lexeme;
+    //                 }
+    //                 case "Infinity", "NaN" -> {
+    //                     type  = JsonTokenType.NUMBER;
+    //                     value = lexeme;
+    //                 }
+    //                 default                -> {
+    //                     type  = JsonTokenType.IDENTIFIER;
+    //                     value = lexeme;
+    //                 }
+    //             }
+    //         }
+
+    //         //
+    //         // UNKNOWN
+    //         //
+    //         default -> {
+    //             type = JsonTokenType.UNKNOWN;
+    //             lexeme = String.valueOf(c);
+    //             value  = lexeme;
+    //         }
+    //     }
+
+    //     //
+    //     // FALLBACKS
+    //     //
+    //     if (lexeme == null) {
+    //         lexeme = buffer.getTokenWindowLexeme();
+    //     }
+    //     if (value == null) {
+    //         value = lexeme;
+    //     }
+
+    //     addToken(type, lexeme, value, quoteStyle);
+    // }
 
     private boolean scanString(char quoteChar) {
         boolean invalidUnicode = false;
@@ -393,13 +946,95 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         return false;
     }
 
+    // private void scanNumber(char startChar) {
+
+    //     // 1. JSON5 signed Infinity/NaN
+    //     if (ALLOW_INFINITY_AND_NAN && (startChar == '-' || startChar == '+')) {
+    //         char c = buffer.peek();
+    //         if (c < 128 && IDENT_START[c]) {
+    //             // Consume identifier characters
+    //             do {
+    //                 buffer.advance();
+    //                 c = buffer.peek();
+    //             } while (c < 128 && IDENT_PART[c]);
+    //             return;
+    //         }
+    //     }
+
+    //     // 2. Hexadecimal 0x...
+    //     if (ALLOW_HEXADECIMAL_NUMBERS && startChar == '0') {
+    //         char c = buffer.peek();
+    //         if (c == 'x' || c == 'X') {
+    //             buffer.advance(); // consume x/X
+
+    //             // Consume hex digits
+    //             do {
+    //                 c = buffer.peek();
+    //                 if (c < 128 && HEX[c]) {
+    //                     buffer.advance();
+    //                     continue;
+    //                 }
+    //                 break;
+    //             } while (true);
+
+    //             return;
+    //         }
+    //     }
+
+    //     // 3. Integer part
+    //     char c;
+    //     while (true) {
+    //         c = buffer.peek();
+    //         if (c < 128 && DIGIT[c]) {
+    //             buffer.advance();
+    //             continue;
+    //         }
+    //         break;
+    //     }
+
+    //     // 4. Fractional part
+    //     if (buffer.peek() == '.') {
+    //         buffer.advance(); // consume '.'
+
+    //         while (true) {
+    //             c = buffer.peek();
+    //             if (c < 128 && DIGIT[c]) {
+    //                 buffer.advance();
+    //                 continue;
+    //             }
+    //             break;
+    //         }
+    //     }
+
+    //     // 5. Exponent part
+    //     c = buffer.peek();
+    //     if (c == 'e' || c == 'E') {
+    //         buffer.advance(); // consume e/E
+
+    //         c = buffer.peek();
+    //         if (c == '+' || c == '-') {
+    //             buffer.advance(); // consume sign
+    //         }
+
+    //         while (true) {
+    //             c = buffer.peek();
+    //             if (c < 128 && DIGIT[c]) {
+    //                 buffer.advance();
+    //                 continue;
+    //             }
+    //             break;
+    //         }
+    //     }
+    // }
+
     private void scanNumber(char startChar) {
+        // Always consume the starting character first
+        buffer.advance();
 
         // 1. JSON5 signed Infinity/NaN
         if (ALLOW_INFINITY_AND_NAN && (startChar == '-' || startChar == '+')) {
             char c = buffer.peek();
             if (c < 128 && IDENT_START[c]) {
-                // Consume identifier characters
                 do {
                     buffer.advance();
                     c = buffer.peek();
@@ -413,8 +1048,6 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             char c = buffer.peek();
             if (c == 'x' || c == 'X') {
                 buffer.advance(); // consume x/X
-
-                // Consume hex digits
                 do {
                     c = buffer.peek();
                     if (c < 128 && HEX[c]) {
@@ -423,7 +1056,6 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
                     }
                     break;
                 } while (true);
-
                 return;
             }
         }
@@ -441,8 +1073,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
         // 4. Fractional part
         if (buffer.peek() == '.') {
-            buffer.advance(); // consume '.'
-
+            buffer.advance();
             while (true) {
                 c = buffer.peek();
                 if (c < 128 && DIGIT[c]) {
@@ -456,13 +1087,11 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         // 5. Exponent part
         c = buffer.peek();
         if (c == 'e' || c == 'E') {
-            buffer.advance(); // consume e/E
-
+            buffer.advance();
             c = buffer.peek();
             if (c == '+' || c == '-') {
-                buffer.advance(); // consume sign
+                buffer.advance();
             }
-
             while (true) {
                 c = buffer.peek();
                 if (c < 128 && DIGIT[c]) {
@@ -486,40 +1115,189 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         }
     }
 
+    // private String scanSingleLineComment() {
+    //     trace("scanSingleLineComment");
+    //     buffer.advance(); // `/`
+    //     buffer.advance(); // `/`
+
+    //     // Use a window or lookahead to capture the text inside
+    //     StringBuilder valueBuilder = new StringBuilder();
+    //     while (!buffer.isAtEnd() && buffer.peek() != '\n' && buffer.peek() != '\r') {
+    //         valueBuilder.append(buffer.advance());
+    //     }
+    //     return valueBuilder.toString();
+    // }
+
+    // private String scanSingleLineComment() {
+    //     buffer.advance(); // consume first '/'
+    //     buffer.advance(); // consume second '/'
+    //     System.out.println("SLC consumed until offset: " + buffer.offset());
+
+    //     while (true) {
+    //         char c = buffer.peek();
+    //         if (c == '\n' || c == '\r' || c == '\0') {
+    //             break;
+    //         }
+    //         buffer.advance();
+    //     }
+
+    //     // ⭐ THIS WAS MISSING — MUST CONSUME NEWLINE
+    //     if (buffer.peek() == '\n' || buffer.peek() == '\r') {
+    //         buffer.advance();
+    //     }
+
+    //     return buffer.getTokenWindowLexeme();
+    // }
+
     private String scanSingleLineComment() {
-        trace("scanSingleLineComment");
-        buffer.advance(); // `/`
-        buffer.advance(); // `/`
+        buffer.advance(); // '/'
+        buffer.advance(); // '/'
+        // System.out.println("SLC consumed until offset: " + buffer.offset());
 
-        // Use a window or lookahead to capture the text inside
-        StringBuilder valueBuilder = new StringBuilder();
-        while (!buffer.isAtEnd() && buffer.peek() != '\n' && buffer.peek() != '\r') {
-            valueBuilder.append(buffer.advance());
-        }
-        return valueBuilder.toString();
-    }
-
-    private String scanMultiLineComment() {
-        trace("scanMultiLineComment");
-        buffer.advance(); // `/`
-        buffer.advance(); // `*`
-
-        StringBuilder valueBuilder = new StringBuilder();
-        while (!buffer.isAtEnd()) {
-            if (buffer.peek() == '*' && buffer.peekNext() == '/') {
-                buffer.advance(); // `*`
-                buffer.advance(); // `/`
+        while (true) {
+            char c = buffer.peek();
+            if (c == '\n' || c == '\r' || c == '\0') {
                 break;
             }
-            valueBuilder.append(buffer.advance());
+            buffer.advance();
         }
-        return valueBuilder.toString();
+
+        if (buffer.peek() == '\n' || buffer.peek() == '\r') {
+            buffer.advance();
+        }
+
+        // Full lexeme, including slashes
+        // String lexeme = buffer.getTokenWindowLexeme();
+        // Value: strip the leading "//"
+        // return lexeme.length() >= 2 ? lexeme.substring(2) : "";
+
+        String lexeme = buffer.getTokenWindowLexeme();
+        String value = lexeme.length() >= 2 ? lexeme.substring(2) : "";
+
+        // remove trailing newline from value
+        if (value.endsWith("\n")) value = value.substring(0, value.length() - 1);
+        if (value.endsWith("\r")) value = value.substring(0, value.length() - 1);
+
+        return value;
+
     }
+
+    // private String scanMultiLineComment() {
+    //     trace("scanMultiLineComment");
+    //     buffer.advance(); // `/`
+    //     buffer.advance(); // `*`
+    //     System.out.println("AWC after SLC, peek=" + buffer.peek());
+
+    //     StringBuilder valueBuilder = new StringBuilder();
+    //     while (!buffer.isAtEnd()) {
+    //         if (buffer.peek() == '*' && buffer.peekNext() == '/') {
+    //             buffer.advance(); // `*`
+    //             buffer.advance(); // `/`
+    //             break;
+    //         }
+    //         valueBuilder.append(buffer.advance());
+    //     }
+    //     return valueBuilder.toString();
+    // }
+
+    private String scanMultiLineComment() {
+        // Consume the initial "/*"
+        buffer.advance(); // '/'
+        buffer.advance(); // '*'
+        // System.out.println("MLC consumed until offset: " + buffer.offset());
+
+        int start = buffer.offset();
+
+        while (!buffer.isAtEnd()) {
+            char c = buffer.peek();
+            char n = buffer.peekNext();
+
+            // End of comment: "*/"
+            if (c == '*' && n == '/') {
+                buffer.advance(); // '*'
+                buffer.advance(); // '/'
+                break;
+            }
+
+            buffer.advance();
+        }
+
+        // Extract inner text: everything between "/*" and "*/"
+        String lexeme = buffer.getTokenWindowLexeme();
+        if (lexeme.length() >= 4) {
+            // strip leading "/*" and trailing "*/"
+            return lexeme.substring(2, lexeme.length() - 2);
+        }
+
+        return "";
+    }
+
+    // private void advanceWhitespaceAndComments() {
+    //     final boolean allowComments = ALLOW_COMMENTS;
+    //     final boolean capture = CAPTURE_COMMENTS;
+    //     final boolean allowUnicode = ALLOW_UNICODE;
+
+    //     while (true) {
+    //         char c = buffer.peek();
+    //         if (c == '\0') return;
+
+    //         // Fast ASCII whitespace
+    //         if (c < 128 && WS[c]) {
+    //             buffer.advance();
+    //             continue;
+    //         }
+
+    //         // Unicode whitespace (only if allowed)
+    //         if (c > 127) {
+    //             if (!allowUnicode) return;
+    //             if (Character.isWhitespace(c)) {
+    //                 buffer.advance();
+    //                 continue;
+    //             }
+    //         }
+
+    //         // Comments
+    //         if (allowComments && c == '/') {
+    //             char n = buffer.peekNext();
+
+    //             // Single-line comment
+    //             if (n == '/') {
+    //                 if (capture) buffer.startTokenWindow();
+    //                 String value = scanSingleLineComment();
+    //                 if (capture) {
+    //                     String lexeme = buffer.getTokenWindowLexeme();
+    //                     addToken(JsonTokenType.COMMENT, lexeme, value, QuoteStyle.PLAIN);
+    //                 }
+    //                 continue;
+    //             }
+
+    //             // Multi-line comment
+    //             if (n == '*') {
+    //                 if (capture) buffer.startTokenWindow();
+    //                 String value = scanMultiLineComment();
+    //                 if (capture) {
+    //                     String lexeme = buffer.getTokenWindowLexeme();
+    //                     addToken(JsonTokenType.COMMENT, lexeme, value, QuoteStyle.PLAIN);
+    //                 }
+    //                 continue;
+    //             }
+    //         }
+
+    //         // Non-trivia
+    //         return;
+    //     }
+    // }
+
+
 
     private void advanceWhitespaceAndComments() {
         final boolean allowComments = ALLOW_COMMENTS;
         final boolean capture = CAPTURE_COMMENTS;
         final boolean allowUnicode = ALLOW_UNICODE;
+
+        // if (CAPTURE_COMMENTS) {
+        //     buffer.startTokenWindow();
+        // }
 
         while (true) {
             char c = buffer.peek();
@@ -546,22 +1324,40 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
                 // Single-line comment
                 if (n == '/') {
+                    int line = buffer.windowStartLine();
+                    int col  = buffer.windowStartColumn();
+
                     if (capture) buffer.startTokenWindow();
                     String value = scanSingleLineComment();
                     if (capture) {
                         String lexeme = buffer.getTokenWindowLexeme();
-                        addToken(JsonTokenType.COMMENT, lexeme, value, QuoteStyle.PLAIN);
+
+                        // TODO: I expect this to go wrong.
+                        // And it's using 2 substring calls in the hot path!!!
+                        // Well done, Copilot!
+                        if (lexeme.endsWith("\n")) lexeme = lexeme.substring(0, lexeme.length() - 1);
+                        if (lexeme.endsWith("\r")) lexeme = lexeme.substring(0, lexeme.length() - 1);
+
+                        pendingComments.add(new JsonComment(lexeme, value, line, col));
                     }
                     continue;
                 }
 
                 // Multi-line comment
                 if (n == '*') {
+                    int line = buffer.windowStartLine();
+                    int col  = buffer.windowStartColumn();
+
                     if (capture) buffer.startTokenWindow();
                     String value = scanMultiLineComment();
                     if (capture) {
                         String lexeme = buffer.getTokenWindowLexeme();
-                        addToken(JsonTokenType.COMMENT, lexeme, value, QuoteStyle.PLAIN);
+
+                        // See above comment ^^
+                        if (lexeme.endsWith("\n")) lexeme = lexeme.substring(0, lexeme.length() - 1);
+                        if (lexeme.endsWith("\r")) lexeme = lexeme.substring(0, lexeme.length() - 1);
+
+                        pendingComments.add(new JsonComment(lexeme, value, line, col));
                     }
                     continue;
                 }
@@ -572,43 +1368,87 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         }
     }
 
+
+
+
+
+
     //
     // Unicode
     //
 
-    private void handleUnicodeChar(char c) {
+    // private void handleUnicodeChar(char c) {
+    //     // Unicode whitespace (JSON5)
+    //     if (Character.isWhitespace(c)) {
+    //         // skip it
+    //         return;
+    //     }
+
+    //     // Unicode identifier start (JSON5)
+    //     if (Character.isUnicodeIdentifierStart(c)) {
+    //         scanUnicodeIdentifier();
+    //         String lexeme = buffer.getTokenWindowLexeme();
+    //         addToken(JsonTokenType.IDENTIFIER, lexeme, lexeme, QuoteStyle.PLAIN);
+    //         return;
+    //     }
+
+    //     // Unicode identifier part (rare case)
+    //     if (Character.isUnicodeIdentifierPart(c)) {
+    //         scanUnicodeIdentifier();
+    //         String lexeme = buffer.getTokenWindowLexeme();
+    //         addToken(JsonTokenType.IDENTIFIER, lexeme, lexeme, QuoteStyle.PLAIN);
+    //         return;
+    //     }
+
+    //     // Unicode digit (JSON5)
+    //     if (Character.isDigit(c)) {
+    //         scanUnicodeNumber(c);
+    //         String lexeme = buffer.getTokenWindowLexeme();
+    //         addToken(JsonTokenType.NUMBER, lexeme, lexeme, QuoteStyle.PLAIN);
+    //         return;
+    //     }
+
+    //     // Otherwise → UNKNOWN
+    //     addToken(JsonTokenType.UNKNOWN, Character.toString(c), Character.toString(c), QuoteStyle.PLAIN);
+    // }
+
+    private JsonToken handleUnicodeChar(char c) {
+        int startOffset = buffer.windowStartOffset();
+        int line        = buffer.windowStartLine();
+        int column      = buffer.windowStartColumn();
+
         // Unicode whitespace (JSON5)
         if (Character.isWhitespace(c)) {
             // skip it
-            return;
+            buffer.advance();
+            return null; // caller will continue skipping trivia
         }
 
         // Unicode identifier start (JSON5)
         if (Character.isUnicodeIdentifierStart(c)) {
             scanUnicodeIdentifier();
             String lexeme = buffer.getTokenWindowLexeme();
-            addToken(JsonTokenType.IDENTIFIER, lexeme, lexeme, QuoteStyle.PLAIN);
-            return;
+            return makeIdentifierToken(startOffset, line, column, lexeme, lexeme);
         }
 
         // Unicode identifier part (rare case)
         if (Character.isUnicodeIdentifierPart(c)) {
             scanUnicodeIdentifier();
             String lexeme = buffer.getTokenWindowLexeme();
-            addToken(JsonTokenType.IDENTIFIER, lexeme, lexeme, QuoteStyle.PLAIN);
-            return;
+            return makeIdentifierToken(startOffset, line, column, lexeme, lexeme);
         }
 
         // Unicode digit (JSON5)
         if (Character.isDigit(c)) {
             scanUnicodeNumber(c);
             String lexeme = buffer.getTokenWindowLexeme();
-            addToken(JsonTokenType.NUMBER, lexeme, lexeme, QuoteStyle.PLAIN);
-            return;
+            return makeNumberToken(startOffset, line, column, lexeme, lexeme);
         }
 
         // Otherwise → UNKNOWN
-        addToken(JsonTokenType.UNKNOWN, Character.toString(c), Character.toString(c), QuoteStyle.PLAIN);
+        String lexeme = Character.toString(c);
+        buffer.advance();
+        return errorToken("Unexpected character '" + c + "'", line, column);
     }
 
     private void scanUnicodeIdentifier() {
@@ -664,56 +1504,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     //
     //
 
-    private void addToken(JsonTokenType type, String lexeme, String content, QuoteStyle quoteStyle) {
-        JsonToken token;
-        if (buffer instanceof LexemeProvider lp) {
-            token = new JsonBufferBackedToken(
-                lp,
-                buffer.windowStartOffset(),
-                buffer.offset(),
-                buffer.windowStartLine(),
-                buffer.windowStartColumn(),
-                type, content, quoteStyle
-            );
-        } else {
-            token = new JsonToken(
-                buffer.windowStartLine(),
-                buffer.windowStartColumn(),
-                buffer.windowStartOffset(),
-                type, lexeme, content, quoteStyle
-            );
-        }
-        pendingTokens.add(token); // Queue it up so nextToken() can yield it
-    }
-
-    // private void addStructuralToken(JsonTokenType type) {
-    //     JsonToken token;
-    //     if (buffer instanceof LexemeProvider lp) {
-    //         token = new JsonBufferBackedToken(
-    //             lp,
-    //             buffer.windowStartOffset(),
-    //             buffer.offset(),
-    //             buffer.windowStartLine(),
-    //             buffer.windowStartColumn(),
-    //             type,
-    //             null,          // no content for structural
-    //             QuoteStyle.PLAIN
-    //         );
-    //     } else {
-    //         token = new JsonToken(
-    //             buffer.windowStartLine(),
-    //             buffer.windowStartColumn(),
-    //             buffer.windowStartOffset(),
-    //             type,
-    //             null,          // no lexeme needed for structural
-    //             null,
-    //             QuoteStyle.PLAIN
-    //         );
-    //     }
-    //     pendingTokens.add(token);
-    // }
-
-    // private void addScalarToken(JsonTokenType type, String lexeme, String content, QuoteStyle quoteStyle) {
+    // private void addToken(JsonTokenType type, String lexeme, String content, QuoteStyle quoteStyle) {
     //     JsonToken token;
     //     if (buffer instanceof LexemeProvider lp) {
     //         token = new JsonBufferBackedToken(
@@ -732,8 +1523,10 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     //             type, lexeme, content, quoteStyle
     //         );
     //     }
-    //     pendingTokens.add(token);
+    //     pendingTokens.add(token); // Queue it up so nextToken() can yield it
     // }
+
+
 
     // Small interceptor ensuring that if someone runs the old tokenize() API,
     // tokens get copied to the collection output array correctly.
@@ -774,4 +1567,22 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             default -> Character.toString(c);
         };
     }
+
+    // //
+    // //
+    // //
+
+    // private static final class JsonComment {
+    //     final String lexeme;
+    //     final String value;
+    //     final int line;
+    //     final int column;
+
+    //     JsonComment(String lexeme, String value, int line, int column) {
+    //         this.lexeme = lexeme;
+    //         this.value = value;
+    //         this.line = line;
+    //         this.column = column;
+    //     }
+    // }
 }

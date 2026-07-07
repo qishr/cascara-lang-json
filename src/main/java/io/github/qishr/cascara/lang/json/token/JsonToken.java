@@ -1,5 +1,8 @@
 package io.github.qishr.cascara.lang.json.token;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import io.github.qishr.cascara.common.lang.token.Token;
 import io.github.qishr.cascara.common.lang.util.QuoteStyle;
 
@@ -11,6 +14,8 @@ public class JsonToken implements Token {
     protected String lexeme;
     protected String content;
     protected QuoteStyle quoteStyle;
+    private List<JsonComment> comments;
+
 
     // public JsonToken(int line, int column, int startOffset, JsonTokenType type) {
     //     this.startLine = line;
@@ -63,6 +68,16 @@ public class JsonToken implements Token {
     public int getStartColumn() {
         return startColumn;
     }
+
+    public List<JsonComment> getComments() {
+        return comments;
+    }
+
+    public void attachComments(List<JsonComment> list) {
+        if (list == null || list.isEmpty()) return;
+        this.comments = new ArrayList<>(list);
+    }
+
 
     @Override
     public String toString() {
