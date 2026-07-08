@@ -17,9 +17,34 @@ import io.github.qishr.cascara.lang.json.ast.JsonScalarNode;
 import io.github.qishr.cascara.lang.json.ast.JsonSequenceNode;
 
 public class JsonConverterTest {
-    @Disabled
     @Test
-    void test_Converter() {
+    void test_convertString() {
+        ReferenceScalarNode root = new ReferenceScalarNode("testStr");
+        JsonConverter converter = new JsonConverter();
+        JsonNode jsonRoot = converter.fromAst(root);
+        assertInstanceOf(JsonScalarNode.class, jsonRoot);
+        JsonScalarNode scalar = (JsonScalarNode)jsonRoot;
+        assertEquals(QuoteStyle.DOUBLE, scalar);
+        // TODO: Assert PrimitiveType
+    }
+
+    @Test
+    void test_convertBoolean() {
+        ReferenceScalarNode root = new ReferenceScalarNode(true);
+        JsonConverter converter = new JsonConverter();
+        JsonNode jsonRoot = converter.fromAst(root);
+        assertInstanceOf(JsonScalarNode.class, jsonRoot);
+        JsonScalarNode scalar = (JsonScalarNode)jsonRoot;
+        assertEquals(QuoteStyle.PLAIN, scalar);
+        // TODO: Assert PrimitiveType
+    }
+
+    @Test
+    void test_convertSimpleMap() {
+    }
+
+    @Test
+    void test_convertMap() {
 
         // TODO:
         // - MapNode.put overloads that take bool, int, long, float, etc

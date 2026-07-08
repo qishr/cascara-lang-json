@@ -15,14 +15,31 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
     // - Merge its functionality into JsonScalarNode (and other scalar nodes)
     // - Have a PrimitiveType enum
     //
-    // At the point of creation we need to know:
+    // At the point of JsonScalarNode creation we need to know:
     // - what type the scalar represents
     // - the preferred quote style
-    // At the point of use we need to know:
+    //
+    // At the point of use (eg in a converter or serializer) we need to know:
     // - required quote style, taking into account:
     //   - type
     //   - value
     //   - is it a key
+    //
+    // Other things that rely on what Primitive currently provides:
+    // - ScalarDescriptor (TypeDescriptor)
+    // - AbstractSerializer
+    // - AstConverter
+    // - Tables (sorting columns)
+    //
+    // What Primitive currently provides:
+    // - takes unescaped text OR Object input
+    // - retains original quote style
+    // - determines:
+    //   - primitive type
+    //   - required quote style
+    // - methods to convert to JVM types (String, Double, etc)
+    // - unescaping
+    // - unwrapping
 
     private String raw;
     private String content;
