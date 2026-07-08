@@ -50,4 +50,12 @@ public abstract class AbstractJsonProcessor<P extends Processor> implements Proc
         this.options = (JsonOptions) options;
         return self();
     }
+
+    public JsonOptions getOptions() {
+        return options;
+    }
+
+    public Reporter getReporter() {
+        return reporter;
+    }
 }

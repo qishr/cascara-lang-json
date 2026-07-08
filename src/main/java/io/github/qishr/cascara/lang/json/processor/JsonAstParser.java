@@ -7,11 +7,15 @@ import java.util.List;
 import java.util.Set;
 
 import io.github.qishr.cascara.common.diagnostic.NoOpReporter;
+import io.github.qishr.cascara.common.diagnostic.Reporter;
 import io.github.qishr.cascara.common.diagnostic.code.DiagnosticCode;
 import io.github.qishr.cascara.common.lang.exception.ParserException;
 import io.github.qishr.cascara.common.lang.processor.AstParser;
 import io.github.qishr.cascara.common.lang.processor.Tokenizer;
+import io.github.qishr.cascara.common.lang.util.LanguageOptions;
 import io.github.qishr.cascara.common.lang.util.QuoteStyle;
+import io.github.qishr.cascara.common.util.ContentType;
+import io.github.qishr.cascara.common.util.Properties;
 import io.github.qishr.cascara.lang.json.JsonOptions;
 import io.github.qishr.cascara.lang.json.JsonPrimitiveDescriptor;
 import io.github.qishr.cascara.lang.json.ast.JsonCommentNode;
@@ -24,10 +28,8 @@ import io.github.qishr.cascara.lang.json.token.JsonToken;
 import io.github.qishr.cascara.lang.json.token.JsonTokenType;
 
 /// A recursive descent parser for JSON/JSON5.
-public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implements AstParser<JsonNode, JsonToken> {
-    private List<JsonToken> tokens;
-    private int current = 0;
-    private int depth = 0;
+public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
+        implements AstParser<JsonNode, JsonToken> {
 
     private JsonPrimitiveDescriptor descriptor;
 
@@ -41,6 +43,14 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
     private boolean ALLOW_TRAILING_COMMA;
     private boolean ALLOW_UNQUOTED_KEYS;
     private boolean CAPTURE_COMMENTS;
+
+    private JsonTokenizer tokenizer;
+    private int depth = 0;
+
+    private JsonToken currentToken;
+    private JsonToken lookaheadToken;
+
+
 
     /// Default constructor for SPI
     public JsonAstParser() {
@@ -64,14 +74,20 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
         this.CAPTURE_COMMENTS       = options.captureComments();
     }
 
-    @Override protected JsonAstParser self() { return this; }
+    @Override
+    protected JsonAstParser self() { return this; }
+
+    // ---------------------------------------------------------------------
+    // High-level API: String / InputStream
+    // ---------------------------------------------------------------------
 
     @Override
     public JsonNode parse(String text) {
         JsonTokenizer tokenizer = new JsonTokenizer();
         tokenizer.setOptions(options);
         tokenizer.setReporter(reporter);
-        return parse(tokenizer.tokenize(text));
+        tokenizer.open(text);
+        return parse(tokenizer);
     }
 
     @Override
@@ -79,13 +95,29 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
         JsonTokenizer tokenizer = new JsonTokenizer();
         tokenizer.setOptions(options);
         tokenizer.setReporter(reporter);
-        return parse(tokenizer.tokenize(is));
+        tokenizer.open(is);
+        return parse(tokenizer);
     }
+
+    // ---------------------------------------------------------------------
+    // Eager API: List<JsonToken> (adapter to streaming)
+    // ---------------------------------------------------------------------
 
     @Override
     public JsonNode parse(List<JsonToken> tokens) {
-        this.tokens = tokens;
-        this.current = 0;
+        return parse(new ListBackedJsonTokenizer(tokens));
+    }
+
+    // ---------------------------------------------------------------------
+    // Streaming API: Tokenizer<JsonToken>
+    // ---------------------------------------------------------------------
+
+    @Override
+    public JsonNode parse(Tokenizer<JsonToken> tokenizer) {
+        this.tokenizer = (JsonTokenizer) tokenizer;
+        this.currentToken = null;
+        this.depth = 0;
+        pendingComments.clear();
 
         // Headers and structural trivia
         skipTrivia();
@@ -98,11 +130,17 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
         skipTrivia();
 
         // Header comments stay in the document
-        root.getComments().addAll(pendingComments);
+        if (root != null) {
+            root.getComments().addAll(pendingComments);
+        }
         pendingComments.clear();
 
         return root;
     }
+
+    // ---------------------------------------------------------------------
+    // Core parsing
+    // ---------------------------------------------------------------------
 
     private JsonNode parseValue() {
         depth++;
@@ -201,11 +239,8 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
                 }
 
                 // ---- Parse key ----
-                // JsonScalarNode key = parseScalar();
-
                 JsonToken keyTok = advance();
                 JsonScalarNode key = parseKey(keyTok);
-
 
                 // JSON5: unquoted keys allowed only when configured
                 if (!ALLOW_UNQUOTED_KEYS && key.getQuoteStyle() != QuoteStyle.DOUBLE) {
@@ -213,7 +248,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
                 }
 
                 // Duplicate key detection
-                String keyString = key.getContent();
+                String keyString = key.getKeyString();
                 if (!seenKeys.add(keyString)) {
                     error(key.getToken(), JsonDiagnosticCode.DUPLICATE_KEY, keyString);
                 }
@@ -437,12 +472,14 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
         }
     }
 
+    // ---------------------------------------------------------------------
+    // Trivia / comments
+    // ---------------------------------------------------------------------
+
     private void skipTrivia() {
         if (!ALLOW_COMMENTS) return;
 
-        while (!isAtEnd()) {
-            if (!check(JsonTokenType.COMMENT)) return;
-
+        while (peek().getType() == JsonTokenType.COMMENT) {
             JsonToken tok = advance();
 
             // Avoid startsWith() cost when comment type is already known
@@ -468,6 +505,53 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
         return node;
     }
 
+    // ---------------------------------------------------------------------
+    // Token navigation (streaming)
+    // ---------------------------------------------------------------------
+
+    private JsonToken peek() {
+        if (currentToken == null) {
+            if (lookaheadToken != null) {
+                currentToken = lookaheadToken;
+                lookaheadToken = null;
+            } else {
+                currentToken = tokenizer.nextToken();
+            }
+        }
+        return currentToken;
+    }
+
+    private JsonToken advance() {
+        JsonToken prev = peek();
+        currentToken = null;
+        return prev;
+    }
+
+    private JsonToken lookahead() {
+        if (lookaheadToken == null) {
+            lookaheadToken = tokenizer.nextToken();
+        }
+        return lookaheadToken;
+    }
+
+    private boolean isAtEnd() {
+        return peek().getType() == JsonTokenType.EOF;
+    }
+
+    private boolean check(JsonTokenType type) {
+        return peek().getType() == type;
+    }
+
+    private boolean match(JsonTokenType... types) {
+        for (JsonTokenType type : types) {
+            if (check(type)) {
+                advance();
+                return true;
+            }
+        }
+        return false;
+    }
+
     private JsonToken consume(JsonTokenType type, DiagnosticCode code, Object... details) {
         if (check(type)) return advance();
 
@@ -479,28 +563,16 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
         return peek();
     }
 
-    private boolean check(JsonTokenType type) {
-        if (isAtEnd()) return false;
-        return peek().getType() == type;
-    }
-
-    private boolean match(JsonTokenType... types) {
-        for (JsonTokenType type : types) {
-            if (check(type)) { advance(); return true; }
-        }
-        return false;
-    }
-
-    private JsonToken advance() { if (!isAtEnd()) current++; return previous(); }
-    private JsonToken peek() { return tokens.get(current); }
-    private JsonToken previous() { return tokens.get(current - 1); }
-    private boolean isAtEnd() { return current >= tokens.size() || peek().getType() == JsonTokenType.EOF; }
+    // ---------------------------------------------------------------------
+    // Diagnostics
+    // ---------------------------------------------------------------------
 
     private void trace(String methodName) {
         if (reporter instanceof NoOpReporter) return;
+        JsonToken tok = peek();
         String indent = "  ".repeat(Math.max(0, depth));
         reporter.trace("L%3d C%3d %s%s: %s",
-            peek().getStartLine(), peek().getStartColumn(), indent, methodName, peek().getType());
+            tok.getStartLine(), tok.getStartColumn(), indent, methodName, tok.getType());
     }
 
     private void error(JsonToken token, DiagnosticCode code, Object... details) {
@@ -510,9 +582,80 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
         }
     }
 
-    @Override
-    public JsonNode parse(Tokenizer<JsonToken> tokenizer) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'parse'");
+    // ---------------------------------------------------------------------
+    // Adapter: List<JsonToken> → Tokenizer<JsonToken>
+    // ---------------------------------------------------------------------
+
+    private static final class ListBackedJsonTokenizer implements Tokenizer<JsonToken> {
+
+        private final List<JsonToken> tokens;
+        private int index = 0;
+
+        // Required fields for Processor
+        private Reporter reporter = new NoOpReporter();
+        private LanguageOptions<?> options = null;
+
+        ListBackedJsonTokenizer(List<JsonToken> tokens) {
+            this.tokens = tokens;
+        }
+
+        // ---------------------------------------------------------------------
+        // Tokenizer API
+        // ---------------------------------------------------------------------
+
+        @Override
+        public void open(String text) {
+            throw new UnsupportedOperationException("List-backed tokenizer does not support open(String)");
+        }
+
+        @Override
+        public void open(InputStream is) {
+            throw new UnsupportedOperationException("List-backed tokenizer does not support open(InputStream)");
+        }
+
+        @Override
+        public JsonToken nextToken() {
+            if (index >= tokens.size()) {
+                // Return last token (EOF) repeatedly
+                return tokens.get(tokens.size() - 1);
+            }
+            return tokens.get(index++);
+        }
+
+        @Override
+        public Set<? extends JsonTokenType> getTokenTypes() {
+            return Set.of(JsonTokenType.values());
+        }
+
+        // ---------------------------------------------------------------------
+        // Processor API (inherited)
+        // ---------------------------------------------------------------------
+
+        @Override
+        public ListBackedJsonTokenizer setReporter(Reporter reporter) {
+            this.reporter = (reporter != null) ? reporter : new NoOpReporter();
+            return this;
+        }
+
+        @Override
+        public ListBackedJsonTokenizer setOptions(LanguageOptions<?> options) {
+            this.options = options;
+            return this;
+        }
+
+        // ---------------------------------------------------------------------
+        // ServiceProvider API (inherited)
+        // ---------------------------------------------------------------------
+
+        @Override
+        public Properties getServiceProperties() {
+            return new Properties(); // no properties needed
+        }
+
+        @Override
+        public ContentType getContentType() {
+            return null; // safe default
+        }
     }
+
 }

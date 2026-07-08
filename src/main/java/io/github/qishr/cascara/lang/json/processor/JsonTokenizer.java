@@ -114,6 +114,14 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
     @Override protected JsonTokenizer self() { return this; }
 
+    public int getLine() {
+        return buffer.line();
+    }
+
+    public int getColumn() {
+        return buffer.column();
+    }
+
 
     @Override
     public void open(String text) {
@@ -296,9 +304,9 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         buffer.startTokenWindow();
         buffer.advance(); // consume opening quote
 
-        boolean ok = scanString(quoteChar);   // your existing method
+        boolean ok = scanString(quoteChar);
 
-        String lexeme = buffer.getTokenWindowLexeme();   // now correct
+        String lexeme = buffer.getTokenWindowLexeme();
         String content = lexeme.substring(1, lexeme.length() - 1);
 
         QuoteStyle qs = (quoteChar == '"')
@@ -332,6 +340,9 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         int startOffset, int line, int column,
         String lexeme, String content, QuoteStyle qs
     ) {
+
+        // reporter.debug("New string token with content: " + content);
+
         if (buffer instanceof LexemeProvider lp) {
             return new JsonBufferBackedToken(
                 lp,

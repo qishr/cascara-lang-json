@@ -16,14 +16,6 @@ public class JsonToken implements Token {
     protected QuoteStyle quoteStyle;
     private List<JsonComment> comments;
 
-
-    // public JsonToken(int line, int column, int startOffset, JsonTokenType type) {
-    //     this.startLine = line;
-    //     this.startColumn = column;
-    //     this.startOffset = startOffset;
-    //     this.type = type;
-    // }
-
     public JsonToken(int line, int column, int startOffset, JsonTokenType type, String lexeme, String content, QuoteStyle quoteStyle) {
         this.startLine = line;
         this.startColumn = column;

@@ -135,7 +135,6 @@ class JsonAstParserTest {
         SilentCollectingReporter reporter = new SilentCollectingReporter();
         parser.setReporter(reporter);
         parser.parse(input);
-        // Assuming your reporter has a way to check error counts:
         assertTrue(reporter.hasErrors());
     }
 

@@ -22,6 +22,9 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
     private Object nativeValue;
     private boolean nativeValueCached;
 
+    private String stringValue;
+    private boolean stringValueCached;
+
     // key/value context
     private final boolean isKey;
 
@@ -43,6 +46,7 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
         this.quoteStyle = quoteStyle;
         this.descriptor = descriptor;
         this.isKey = isKey;
+        // System.out.println("** TOKEN UNESCAPED: " + unescapedContent);
     }
 
     public JsonScalarNode(
@@ -134,7 +138,7 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
                 true
             );
         } else if (content != null) {
-            // descriptor-less node with lexical content (like your test lookup key)
+            // descriptor-less node with lexical content
             keyStringCache = content;
         } else {
             // pure programmatic node: fall back to nativeValue
@@ -173,6 +177,8 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
         // Use content, which is already de-quoted and unescaped by the tokenizer
         String source = (content != null) ? content : raw;
 
+        // System.out.println("Calling parse with: " + source);
+
         nativeValue = descriptor.parse(source, quoteStyle, isKey);
         nativeValueCached = true;
         return nativeValue;
@@ -181,9 +187,20 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
     /// Returns the logical clean text value, stripped of outer formatting and escape markers.
     @Override
     public String asString() {
+        if (stringValueCached) {
+            return stringValue;
+        }
         Object v = getPrimitive();
-        return (v == null) ? null : String.valueOf(v);
+        stringValue = (v == null) ? null : String.valueOf(v);
+        stringValueCached = true;
+        return stringValue;
     }
+
+    // @Override
+    // public String asString() {
+    //     Object v = getPrimitive();
+    //     return (v == null) ? null : String.valueOf(v);
+    // }
 
     @Override
     public int asInteger() {
