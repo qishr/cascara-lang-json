@@ -37,7 +37,7 @@ public class JsonMapNode extends JsonNode implements MapAstNode<JsonNode, JsonMa
     public JsonMapEntryNode getEntry(JsonNode key) {
         if (key == null) return null;
         String lookup = (key instanceof JsonScalarNode s)
-            ? s.getContent()
+            ? s.getKeyString()
             : key.toString();
         return entriesByKey.get(lookup);
     }
@@ -72,7 +72,7 @@ public class JsonMapNode extends JsonNode implements MapAstNode<JsonNode, JsonMa
     }
 
     public JsonMapNode put(JsonScalarNode keyNode, JsonNode value) {
-        String key = keyNode.getContent();
+        String key = keyNode.getKeyString();
         JsonMapEntryNode entry = entriesByKey.get(key);
         if (entry == null) {
             entry = new JsonMapEntryNode(0, 0, keyNode, value);

@@ -31,7 +31,7 @@ class JsonAstParserTest {
         JsonMapNode root = (JsonMapNode) parser.parse(input);
 
         // 1. Get the Entry so we can see the Key
-        JsonMapEntryNode entry = root.getEntry(new JsonScalarNode(0, 0, "\"port\"", "port", QuoteStyle.DOUBLE, null, false));
+        JsonMapEntryNode entry = root.getEntry(new JsonScalarNode(0, 0, "\"port\"", "port", QuoteStyle.DOUBLE, null, true));
         assertNotNull(entry, "Entry for 'port' should exist");
 
         JsonNode keyNode = entry.getKey();

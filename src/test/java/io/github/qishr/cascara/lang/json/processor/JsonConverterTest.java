@@ -112,23 +112,5 @@ public class JsonConverterTest {
         assertInstanceOf(JsonScalarNode.class, item3);
         JsonScalarNode item3scalar = (JsonScalarNode)item3;
         assertEquals(3, item3scalar.asInteger());
-
-        String jsonText = converter.toText(root);
-        // String json = """
-        //     {
-        //         "status": true
-        //     }
-        //     """;
-
-
-
-        // JsonNode doc = new JsonAstParser().parse(json);
-        // if (doc instanceof JsonMapNode map) {
-        //     if (map.get("status") instanceof JsonScalarNode status) {
-        //         Object o = status.getPrimitive();
-        //         assertInstanceOf(Boolean.class, o);
-        //     }
-        // }
-
     }
 }

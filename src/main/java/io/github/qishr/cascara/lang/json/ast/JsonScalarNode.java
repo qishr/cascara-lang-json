@@ -124,17 +124,22 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
     }
 
     public String getKeyString() {
-        if (!isKey) return content;
         if (keyStringCache != null) return keyStringCache;
 
         if (descriptor != null) {
+            // parser-constructed node: use descriptor + raw/content
             keyStringCache = descriptor.unescape(
                 content != null ? content : raw,
                 quoteStyle,
                 true
             );
-        } else {
+        } else if (content != null) {
+            // descriptor-less node with lexical content (like your test lookup key)
             keyStringCache = content;
+        } else {
+            // pure programmatic node: fall back to nativeValue
+            Object v = nativeValue;
+            keyStringCache = (v == null) ? "" : String.valueOf(v);
         }
 
         return keyStringCache;

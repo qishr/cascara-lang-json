@@ -27,23 +27,27 @@ public class JsonConverter extends AbstractJsonProcessor<JsonConverter> implemen
         return emitter.emit(jsonNode);
     }
 
-    public JsonNode fromAst(AstNode ast) {
-        if (ast instanceof MapAstNode astMap) {
+    public JsonNode fromAst(AstNode from) {
+        System.out.println("fromAst");
+        if (from instanceof MapAstNode fromMap) {
+            System.out.println("  map");
             JsonMapNode map = new JsonMapNode();
-            for (Object entry : astMap.getEntries()) {
-                if (entry instanceof MapEntryAstNode astMapEntry) {
-                    AstNode astKey = astMapEntry.getKey();
-                    AstNode astValue = astMapEntry.getValue();
+            for (Object entry : fromMap.getEntries()) {
+                if (entry instanceof MapEntryAstNode fromMapEntry) {
+                    AstNode astKey = fromMapEntry.getKey();
+                    AstNode astValue = fromMapEntry.getValue();
                     if (astKey instanceof ScalarAstNode) {
                         if (fromAst(astKey) instanceof JsonScalarNode jsonKey) {
-                            JsonNode yamlValue = fromAst(astValue);
-                            map.put(jsonKey, yamlValue);
+                            System.out.println("    scalar key " + jsonKey);
+                            JsonNode jsonValue = fromAst(astValue);
+                            map.put(jsonKey, jsonValue);
                         }
                     }
                 }
             }
             return map;
-        } else if (ast instanceof SequenceAstNode astSeq) {
+        } else if (from instanceof SequenceAstNode astSeq) {
+            System.out.println("  seq");
             JsonSequenceNode sequence = new JsonSequenceNode();
             for (Object element : astSeq.getElements()) {
                 if (element instanceof AstNode astElement) {
@@ -51,7 +55,8 @@ public class JsonConverter extends AbstractJsonProcessor<JsonConverter> implemen
                 }
             }
             return sequence;
-        } else if (ast instanceof ScalarAstNode astScalar) {
+        } else if (from instanceof ScalarAstNode astScalar) {
+            System.out.println("  sca " + astScalar.asString());
 
             // TODO: Tests for this
 
