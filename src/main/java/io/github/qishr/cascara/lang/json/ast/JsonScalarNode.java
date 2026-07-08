@@ -11,6 +11,19 @@ import io.github.qishr.cascara.lang.json.JsonPrimitiveDelegate;
 public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> {
     private static final JsonPrimitiveDelegate JSON_PRIMITIVE_DELEGATE = new JsonPrimitiveDelegate();
 
+    // TODO: Perhaps instead of having a Primitive object here:
+    // - Merge its functionality into JsonScalarNode (and other scalar nodes)
+    // - Have a PrimitiveType enum
+    //
+    // At the point of creation we need to know:
+    // - what type the scalar represents
+    // - the preferred quote style
+    // At the point of use we need to know:
+    // - required quote style, taking into account:
+    //   - type
+    //   - value
+    //   - is it a key
+
     private String raw;
     private String content;
     private Primitive primitive;

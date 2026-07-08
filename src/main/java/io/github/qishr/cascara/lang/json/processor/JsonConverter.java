@@ -52,8 +52,11 @@ public class JsonConverter extends AbstractJsonProcessor<JsonConverter> implemen
             }
             return sequence;
         } else if (ast instanceof ScalarAstNode astScalar) {
-            JsonScalarNode scalar = new JsonScalarNode();
-            scalar.setPrimitive(astScalar.getPrimitive());
+
+            // TODO: Tests for this
+
+            JsonScalarNode scalar = new JsonScalarNode(astScalar.getPrimitive(), false);
+            // scalar.setPrimitive(astScalar.getPrimitive());
             // scalar.setRaw(astScalar.getString());
             Object value = scalar.getPrimitive();
             if (value == null
@@ -66,6 +69,8 @@ public class JsonConverter extends AbstractJsonProcessor<JsonConverter> implemen
                 scalar.setQuoteStyle(QuoteStyle.DOUBLE);
             }
             return scalar;
+
+
         } else {
             System.err.println("Unknown AST node");
             return null;
