@@ -24,7 +24,8 @@ public class JsonConverterTest {
         JsonNode jsonRoot = converter.fromAst(root);
         assertInstanceOf(JsonScalarNode.class, jsonRoot);
         JsonScalarNode scalar = (JsonScalarNode)jsonRoot;
-        assertEquals(QuoteStyle.DOUBLE, scalar);
+        assertEquals("testStr", scalar.asString());
+        assertEquals(QuoteStyle.DOUBLE, scalar.getQuoteStyle());
         // TODO: Assert PrimitiveType
     }
 
@@ -35,7 +36,8 @@ public class JsonConverterTest {
         JsonNode jsonRoot = converter.fromAst(root);
         assertInstanceOf(JsonScalarNode.class, jsonRoot);
         JsonScalarNode scalar = (JsonScalarNode)jsonRoot;
-        assertEquals(QuoteStyle.PLAIN, scalar);
+        assertEquals(true, scalar.asBoolean());
+        assertEquals(QuoteStyle.PLAIN, scalar.getQuoteStyle());
         // TODO: Assert PrimitiveType
     }
 

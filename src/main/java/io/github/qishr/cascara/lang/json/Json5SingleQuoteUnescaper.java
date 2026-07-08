@@ -2,7 +2,7 @@ package io.github.qishr.cascara.lang.json;
 
 import io.github.qishr.cascara.common.lang.util.QuoteStyle;
 
-public class JsonStringUnescaper {
+public class Json5SingleQuoteUnescaper {
     public static String unescape(String text) {
         // , QuoteStyle style) {
         // if (style != QuoteStyle.DOUBLE || text == null || text.isEmpty()) {

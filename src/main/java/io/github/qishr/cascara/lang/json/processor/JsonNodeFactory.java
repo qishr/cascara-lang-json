@@ -2,7 +2,9 @@ package io.github.qishr.cascara.lang.json.processor;
 
 import io.github.qishr.cascara.common.lang.ast.AstNodeFactory;
 import io.github.qishr.cascara.common.lang.util.QuoteStyle;
-import io.github.qishr.cascara.common.lang.type.Primitive;
+import io.github.qishr.cascara.common.lang.type.PrimitiveDescriptor;
+import io.github.qishr.cascara.common.lang.type.PrimitiveType;
+import io.github.qishr.cascara.lang.json.JsonPrimitiveDescriptor;
 import io.github.qishr.cascara.lang.json.ast.JsonMapEntryNode;
 import io.github.qishr.cascara.lang.json.ast.JsonMapNode;
 import io.github.qishr.cascara.lang.json.ast.JsonNode;
@@ -22,16 +24,22 @@ public class JsonNodeFactory implements AstNodeFactory<JsonNode,JsonScalarNode,J
     }
 
     @Override
-    public JsonScalarNode createScalarNode(Object key, QuoteStyle quoteStyle) {
-        System.out.println("createScalarNode " + key + " " + quoteStyle);
-        return new JsonScalarNode(key, quoteStyle);
+    public JsonScalarNode createScalarNode(Object primitiveValue, QuoteStyle quoteStyle) {
+        System.out.println("createScalarNode " + primitiveValue + " " + quoteStyle);
+        return new JsonScalarNode(primitiveValue, quoteStyle);
     }
 
-    @Override
-    public JsonScalarNode createScalarNode(Primitive primitive) {
-        System.out.println("createScalarNode primitive: " + primitive);
-        return JsonScalarNode.fromPrimitive(primitive);
-    }
+    // @Override
+    // public JsonScalarNode createScalarNode(Primitive primitive) {
+    //     System.out.println("createScalarNode primitive: " + primitive);
+    //     return JsonScalarNode.fromPrimitive(primitive);
+    // }
+
+	@Override
+	public JsonScalarNode createScalarNode(Object primitiveValue, PrimitiveType type, QuoteStyle quoteStyle, PrimitiveDescriptor descriptor) {
+        System.out.println("createScalarNode descriptor: " + descriptor);
+        return new JsonScalarNode(primitiveValue, type, quoteStyle, (JsonPrimitiveDescriptor)descriptor);
+	}
 
     @Override
     public JsonScalarNode createScalarKeyNode(Object key) {

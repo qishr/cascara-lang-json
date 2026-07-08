@@ -32,7 +32,9 @@ public class JsonPrimitiveDelegate implements PrimitiveDelegate {
     /// Handles strict JSON string unescaping mechanics for double-quoted strings.
     @Override
     public String unescapeQuotedString(String text, QuoteStyle style) {
-        return JsonStringUnescaper.unescape(text, style);
+        // return JsonStringUnescaper.unescape(text, style);
+
+        return JsonStringUnescaper.unescape(text);
 
         // if (style != QuoteStyle.DOUBLE || text == null || text.isEmpty()) {
         //     return text;

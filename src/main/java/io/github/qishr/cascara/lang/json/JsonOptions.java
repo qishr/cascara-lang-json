@@ -18,6 +18,7 @@ public class JsonOptions extends LanguageOptions<JsonOptions> implements Duplica
             .setAllowUnquotedKeys(true)
     );
 
+    private boolean allowBooleanKeys = false;
     private boolean allowComments = false;
     private boolean allowHexadecimalNumbers = false;
     private boolean allowInfinityAndNaN = false;
@@ -32,6 +33,7 @@ public class JsonOptions extends LanguageOptions<JsonOptions> implements Duplica
     public JsonOptions() {}
 
     public JsonOptions(JsonOptions original) {
+        allowBooleanKeys = original.allowBooleanKeys;
         allowComments = original.allowComments;
         allowHexadecimalNumbers = original.allowHexadecimalNumbers;
         allowInfinityAndNaN = original.allowInfinityAndNaN;
@@ -44,6 +46,7 @@ public class JsonOptions extends LanguageOptions<JsonOptions> implements Duplica
         prettyPrint = original.prettyPrint;
     }
 
+    // public boolean allowBooleanKeys() { return allowBooleanKeys; }
     public boolean allowComments() { return allowComments; }
     public boolean allowHexadecimalNumbers() { return allowHexadecimalNumbers; }
     public boolean allowInfinityAndNaN() { return allowInfinityAndNaN; }
@@ -54,6 +57,11 @@ public class JsonOptions extends LanguageOptions<JsonOptions> implements Duplica
     public boolean captureComments() { return captureComments; }
     public boolean insertSpaces() { return insertSpaces; }
     public boolean prettyPrint() { return prettyPrint; }
+
+    public JsonOptions setAllowBooleanKeys(boolean val) {
+        this.allowBooleanKeys = val;
+        return this;
+    }
 
     public JsonOptions setAllowComments(boolean val) {
         this.allowComments = val;

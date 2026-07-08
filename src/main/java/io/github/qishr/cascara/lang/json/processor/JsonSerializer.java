@@ -12,6 +12,7 @@ import io.github.qishr.cascara.common.lang.processor.AstParser;
 import io.github.qishr.cascara.common.util.ContentType;
 import io.github.qishr.cascara.lang.json.JsonOptions;
 import io.github.qishr.cascara.lang.json.JsonPrimitiveDelegate;
+import io.github.qishr.cascara.lang.json.JsonPrimitiveDescriptor;
 import io.github.qishr.cascara.lang.json.ast.JsonMapEntryNode;
 import io.github.qishr.cascara.lang.json.ast.JsonMapNode;
 import io.github.qishr.cascara.lang.json.ast.JsonNode;
@@ -26,7 +27,12 @@ public class JsonSerializer extends AbstractSerializer<JsonSerializer,JsonNode,J
     private Reporter reporter = new NoOpReporter();
 
     public JsonSerializer() {
-        super(AbstractJsonProcessor.JSON_CONTENT_TYPE_STRING, new JsonNodeFactory(), new JsonPrimitiveDelegate());
+        // super(AbstractJsonProcessor.JSON_CONTENT_TYPE_STRING, new JsonNodeFactory(), new JsonPrimitiveDelegate());
+
+        // TODO: Don't create a JsonPrimitiveDescriptor with defult options.
+        // AbstractSerializer needs its setOptions to work.
+        // This constructor is for SPI and cannot take a parameter.
+        super(AbstractJsonProcessor.JSON_CONTENT_TYPE_STRING, new JsonNodeFactory(), new JsonPrimitiveDescriptor(new JsonOptions()));
     }
 
     @Override

@@ -82,11 +82,11 @@ public class JsonCommentNode extends JsonNode implements ScalarAstNode<JsonNode>
         return null;
     }
 
-    @Override
-    public JsonCommentNode setPrimitive(Object value) {
-        this.value = String.valueOf(value);
-        return this;
-    }
+    // @Override
+    // public JsonCommentNode setPrimitive(Object value) {
+    //     this.value = String.valueOf(value);
+    //     return this;
+    // }
 
     @Override
     public String asString() {

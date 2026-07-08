@@ -13,6 +13,7 @@ import io.github.qishr.cascara.common.lang.processor.AstParser;
 import io.github.qishr.cascara.common.lang.processor.Tokenizer;
 import io.github.qishr.cascara.common.lang.util.QuoteStyle;
 import io.github.qishr.cascara.lang.json.JsonOptions;
+import io.github.qishr.cascara.lang.json.JsonPrimitiveDescriptor;
 import io.github.qishr.cascara.lang.json.ast.JsonCommentNode;
 import io.github.qishr.cascara.lang.json.ast.JsonMapNode;
 import io.github.qishr.cascara.lang.json.ast.JsonNode;
@@ -27,6 +28,8 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
     private List<JsonToken> tokens;
     private int current = 0;
     private int depth = 0;
+
+    private JsonPrimitiveDescriptor descriptor;
 
     /// Buffer to hold comments until a data node is created to claim them.
     private final List<JsonCommentNode> pendingComments = new ArrayList<>();
@@ -51,6 +54,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
     }
 
     private void applyOptions(JsonOptions options) {
+        descriptor = new JsonPrimitiveDescriptor(options);
         // Note: Keep this in alphabetical order,
         // or it will become time consuming to maintain
         this.ALLOW_COMMENTS         = options.allowComments();
@@ -137,7 +141,9 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
                         token.getStartColumn(),
                         token.getLexeme(),
                         ident,
-                        QuoteStyle.PLAIN
+                        QuoteStyle.PLAIN,
+                        descriptor,
+                        false
                     );
                     attachComments(node);
                     return node;
@@ -155,7 +161,9 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
                 token.getStartColumn(),
                 "",
                 "",
-                null
+                null,
+                descriptor,
+                false
             );
 
         } finally {
@@ -245,7 +253,9 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
                     tok.getStartColumn(),
                     tok.getLexeme(),
                     tok.getContent(),
-                    QuoteStyle.DOUBLE
+                    QuoteStyle.DOUBLE,
+                    descriptor,
+                    true
                 );
             }
 
@@ -256,7 +266,9 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
                         tok.getStartColumn(),
                         tok.getLexeme(),
                         tok.getContent(),
-                        QuoteStyle.PLAIN
+                        QuoteStyle.PLAIN,
+                        descriptor,
+                        true
                     );
                 } else {
                     error(tok, JsonDiagnosticCode.EXPECTED_MAP_KEY);
@@ -340,7 +352,9 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
                         tok.getStartColumn(),
                         tok.getLexeme(),
                         tok.getContent(),
-                        tok.getQuoteStyle()
+                        tok.getQuoteStyle(),
+                        descriptor,
+                        false
                     );
                 }
 
@@ -350,7 +364,9 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
                         tok.getStartColumn(),
                         tok.getLexeme(),
                         tok.getContent(),
-                        QuoteStyle.PLAIN
+                        QuoteStyle.PLAIN,
+                        descriptor,
+                        false
                     );
                 }
 
@@ -360,7 +376,9 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
                         tok.getStartColumn(),
                         tok.getLexeme(),
                         tok.getContent(),
-                        QuoteStyle.PLAIN
+                        QuoteStyle.PLAIN,
+                        descriptor,
+                        false
                     );
                 }
 
@@ -370,7 +388,9 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
                         tok.getStartColumn(),
                         tok.getLexeme(),
                         tok.getContent(),
-                        QuoteStyle.PLAIN
+                        QuoteStyle.PLAIN,
+                        descriptor,
+                        false
                     );
                 }
 
@@ -385,7 +405,9 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
                             tok.getStartColumn(),
                             tok.getLexeme(),
                             ident,
-                            QuoteStyle.PLAIN
+                            QuoteStyle.PLAIN,
+                            descriptor,
+                            false
                         );
                     } else {
                         error(tok, JsonDiagnosticCode.UNEXPECTED_UNQUOTED_STRING_VALUE, ident);
@@ -400,7 +422,9 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser> implemen
                         tok.getStartColumn(),
                         "",
                         "",
-                        null
+                        null,
+                        descriptor,
+                        false
                     );
                 }
             }
