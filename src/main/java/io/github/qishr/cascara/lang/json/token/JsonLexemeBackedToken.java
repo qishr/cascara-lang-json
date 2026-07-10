@@ -6,6 +6,12 @@ import java.util.List;
 import io.github.qishr.cascara.common.lang.util.QuoteStyle;
 
 public class JsonLexemeBackedToken implements JsonToken {
+    private static final String TRUE = "true";
+    private static final String FALSE = "false";
+    private static final String NULL = "null";
+    private static final String INFINITY = "Infinity";
+    private static final String NAN = "NaN";
+
     protected final int startLine;
     protected final int startColumn;
     protected final int startOffset;
@@ -38,7 +44,17 @@ public class JsonLexemeBackedToken implements JsonToken {
         this.literal = literal;
 
         this.lexeme = null;
-        this.content = null;
+
+
+        this.content = switch (literal) {
+            case TRUE -> TRUE;
+            case FALSE -> FALSE;
+            case NULL -> NULL;
+            case INFINITY -> INFINITY;
+            case NAN -> NAN;
+        };
+
+
         this.quoteStyle = QuoteStyle.PLAIN;
     }
 

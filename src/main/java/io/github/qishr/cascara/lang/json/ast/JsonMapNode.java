@@ -167,7 +167,10 @@ public class JsonMapNode extends JsonNode implements MapAstNode<JsonNode, JsonMa
 
         // TODO: Where does JsonPrimitiveDesciptor come from?
         // Since we're passing null in as the descriptor, the node needs to be able to handle all options? or only the default ones?
-        JsonNode keyNode = new JsonScalarNode(0, 0, SchemaType.STRING, key, key, QuoteStyle.DOUBLE, true, options);
+
+        // JsonNode keyNode = new JsonScalarNode(0, 0, SchemaType.STRING, key, key, QuoteStyle.DOUBLE, true, options);
+        JsonNode keyNode = new JsonScalarNode(key, QuoteStyle.DOUBLE, true, options);
+
         JsonMapEntryNode entry = new JsonMapEntryNode(0, 0, keyNode, value);
         entriesByKey.put(key, entry);
         return this;

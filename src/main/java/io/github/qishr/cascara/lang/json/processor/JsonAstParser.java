@@ -170,12 +170,13 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
             // Unexpected token
             error(token, JsonDiagnosticCode.UNEXPECTED_TOKEN, type);
             return new JsonScalarNode(
-                token.getStartLine(),
-                token.getStartColumn(),
+                token,
+                // token.getStartLine(),
+                // token.getStartColumn(),
                 SchemaType.ANY,
-                "",
-                "",
-                null,
+                // "",
+                // "",
+                // null,
                 false,
                 options
             );
@@ -260,12 +261,13 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
 
             case STRING -> {
                 key = new JsonScalarNode(
-                    tok.getStartLine(),
-                    tok.getStartColumn(),
+                    tok,
+                    // tok.getStartLine(),
+                    // tok.getStartColumn(),
                     SchemaType.STRING,
-                    tok.getLexeme(),
-                    tok.getContent(),
-                    QuoteStyle.DOUBLE,
+                    // tok.getLexeme(),
+                    // tok.getContent(),
+                    // QuoteStyle.DOUBLE,
                     true,
                     options
                 );
@@ -274,12 +276,13 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
             case IDENTIFIER -> {
                 if (ALLOW_UNQUOTED_KEYS) {
                     key = new JsonScalarNode(
-                        tok.getStartLine(),
-                        tok.getStartColumn(),
+                        tok,
+                        // tok.getStartLine(),
+                        // tok.getStartColumn(),
                         SchemaType.STRING,
-                        tok.getLexeme(),
-                        tok.getContent(),
-                        QuoteStyle.PLAIN,
+                        // tok.getLexeme(),
+                        // tok.getContent(),
+                        // QuoteStyle.PLAIN,
                         true,
                         options
                     );
@@ -360,14 +363,15 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
 
                 case STRING -> {
                     node = new JsonScalarNode(
-                        tok.getStartLine(),
-                        tok.getStartColumn(),
+                        tok,
+                        // tok.getStartLine(),
+                        // tok.getStartColumn(),
                         SchemaType.STRING,
 
 
-                        tok.getLexeme(),
-                        tok.getContent(),
-                        tok.getQuoteStyle(),
+                        // tok.getLexeme(),
+                        // tok.getContent(),
+                        // tok.getQuoteStyle(),
 
 
                         false,
@@ -377,55 +381,62 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
 
                 case NUMBER -> {
                     node = new JsonScalarNode(
-                        tok.getStartLine(),
-                        tok.getStartColumn(),
-                        null, // We don't know if it's NUMBER or INTERGER
+                        tok,
+                        // tok.getStartLine(),
+                        // tok.getStartColumn(),
+                        SchemaType.ANY, // We don't know if it's NUMBER or INTERGER
 
 
-                        tok.getLexeme(),
-                        tok.getContent(),
+                        // tok.getLexeme(),
+                        // tok.getContent(),
 
 
-                        QuoteStyle.PLAIN,
+                        // QuoteStyle.PLAIN,
                         false,
                         options
                     );
                 }
 
                 default -> {
+                    if (tok.getLiteral() == null) {
+                        System.out.println("Debug");
+                    }
                     switch(tok.getLiteral()) {
                         case TRUE -> {
                             node = new JsonScalarNode(
-                                tok.getStartLine(),
-                                tok.getStartColumn(),
+                                tok,
+                                // tok.getStartLine(),
+                                // tok.getStartColumn(),
                                 SchemaType.BOOLEAN,
-                                TRUE,
-                                TRUE,
-                                QuoteStyle.PLAIN,
+                                // TRUE,
+                                // TRUE,
+                                // QuoteStyle.PLAIN,
                                 false,
                                 options
                             );
                         }
                         case FALSE -> {
                             node = new JsonScalarNode(
-                                tok.getStartLine(),
-                                tok.getStartColumn(),
+                                tok,
+                                // tok.getStartLine(),
+                                // tok.getStartColumn(),
                                 SchemaType.BOOLEAN,
-                                FALSE,
-                                FALSE,
-                                QuoteStyle.PLAIN,
+                                // FALSE,
+                                // FALSE,
+                                // QuoteStyle.PLAIN,
                                 false,
                                 options
                             );
                         }
                         case NULL -> {
                             node = new JsonScalarNode(
-                                tok.getStartLine(),
-                                tok.getStartColumn(),
+                                tok,
+                                // tok.getStartLine(),
+                                // tok.getStartColumn(),
                                 SchemaType.NULL,
-                                NULL,
-                                NULL,
-                                QuoteStyle.PLAIN,
+                                // NULL,
+                                // NULL,
+                                // QuoteStyle.PLAIN,
                                 false,
                                 options
                             );
@@ -433,12 +444,13 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
                         case NAN -> {
                             if (ALLOW_INFINITY_AND_NAN) {
                                 node = new JsonScalarNode(
-                                    tok.getStartLine(),
-                                    tok.getStartColumn(),
+                                    tok,
+                                    // tok.getStartLine(),
+                                    // tok.getStartColumn(),
                                     SchemaType.STRING,
-                                    tok.getLexeme(),
-                                    NAN,
-                                    QuoteStyle.PLAIN,
+                                    // tok.getLexeme(),
+                                    // NAN,
+                                    // QuoteStyle.PLAIN,
                                     false,
                                     options
                                 );
@@ -450,12 +462,13 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
                         case INFINITY -> {
                             if (ALLOW_INFINITY_AND_NAN) {
                                 node = new JsonScalarNode(
-                                    tok.getStartLine(),
-                                    tok.getStartColumn(),
+                                    tok,
+                                    // tok.getStartLine(),
+                                    // tok.getStartColumn(),
                                     SchemaType.STRING,
-                                    tok.getLexeme(),
-                                    INFINITY,
-                                    QuoteStyle.PLAIN,
+                                    // tok.getLexeme(),
+                                    // INFINITY,
+                                    // QuoteStyle.PLAIN,
                                     false,
                                     options
                                 );
@@ -467,12 +480,13 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
                         default -> {
                             error(tok, JsonDiagnosticCode.UNEXPECTED_TOKEN, type);
                             node = new JsonScalarNode(
-                                tok.getStartLine(),
-                                tok.getStartColumn(),
+                                tok,
+                                // tok.getStartLine(),
+                                // tok.getStartColumn(),
                                 SchemaType.ANY,
-                                "",
-                                "",
-                                null,
+                                // "",
+                                // "",
+                                // null,
                                 false,
                                 options
                             );

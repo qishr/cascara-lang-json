@@ -32,7 +32,10 @@ class JsonAstParserTest {
         JsonMapNode root = (JsonMapNode) parser.parse(input);
 
         // 1. Get the Entry so we can see the Key
-        JsonMapEntryNode entry = root.getEntry(new JsonScalarNode(0, 0, SchemaType.STRING, "\"port\"", "port", QuoteStyle.DOUBLE, false, null));
+
+        // JsonMapEntryNode entry = root.getEntry(new JsonScalarNode(0, 0, SchemaType.STRING, "\"port\"", "port", QuoteStyle.DOUBLE, false, null));
+        JsonMapEntryNode entry = root.getEntry(new JsonScalarNode("port", QuoteStyle.DOUBLE, false, null));
+
         assertNotNull(entry, "Entry for 'port' should exist");
 
         JsonNode keyNode = entry.getKey();
@@ -278,10 +281,10 @@ class JsonAstParserTest {
 
     @Test
     void test_stringContaining_quotes() {
-        String yamlString = "{\"name\": \"one \\\"two\\\" three\"}";
+        String text = "{\"name\": \"one \\\"two\\\" three\"}";
         JsonAstParser parser = new JsonAstParser();
-        JsonMapNode yaml = (JsonMapNode)parser.parse(yamlString);
-        String name = yaml.getString("name");
+        JsonMapNode json = (JsonMapNode)parser.parse(text);
+        String name = json.getString("name");
         assertEquals("one \"two\" three", name);
     }
 
