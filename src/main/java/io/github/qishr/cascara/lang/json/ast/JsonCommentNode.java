@@ -43,7 +43,8 @@ public class JsonCommentNode extends JsonNode implements ScalarAstNode<JsonNode>
     }
 
     /// Returns the original raw string as seen in the source file.
-    public String getRaw() {
+    @Override
+    public String getLexeme() {
         return (rawValue != null) ? rawValue : value;
     }
 

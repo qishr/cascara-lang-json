@@ -15,11 +15,11 @@ import io.github.qishr.cascara.common.diagnostic.StandardReporter;
 import io.github.qishr.cascara.common.diagnostic.Diagnostic.Level;
 import io.github.qishr.cascara.lang.json.ast.JsonNode;
 import io.github.qishr.cascara.lang.json.processor.JsonEmitter;
+import io.github.qishr.cascara.lang.json.util.JsonOptions;
 import io.github.qishr.cascara.lang.json.processor.JsonAstParser;
 
 class JsonTestSuite {
 
-    private JsonOptions options;
     private JsonAstParser parser;
     private Reporter reporter;
 

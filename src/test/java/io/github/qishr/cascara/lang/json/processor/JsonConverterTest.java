@@ -25,7 +25,7 @@ public class JsonConverterTest {
         JsonScalarNode scalar = (JsonScalarNode)jsonRoot;
         assertEquals("testStr", scalar.asString());
         assertEquals(QuoteStyle.DOUBLE, scalar.getQuoteStyle());
-        // TODO: Assert PrimitiveType
+        // TODO: Assert SchemaType
     }
 
     @Test
@@ -37,7 +37,7 @@ public class JsonConverterTest {
         JsonScalarNode scalar = (JsonScalarNode)jsonRoot;
         assertEquals(true, scalar.asBoolean());
         assertEquals(QuoteStyle.PLAIN, scalar.getQuoteStyle());
-        // TODO: Assert PrimitiveType
+        // TODO: Assert SchemaType
     }
 
     @Test

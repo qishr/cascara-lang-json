@@ -1,15 +1,15 @@
-package io.github.qishr.cascara.lang.json;
+package io.github.qishr.cascara.lang.json.util;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 
 import io.github.qishr.cascara.lang.json.processor.JsonAstParser;
 
-public class TokenizerBenchmark {
+public class ProfilingHarness {
 
     public static void main(String[] args) throws Exception {
         // Load medium.json from classpath
-        InputStream inputStream = TokenizerBenchmark.class.getResourceAsStream("/medium.json");
+        InputStream inputStream = ProfilingHarness.class.getResourceAsStream("/medium.json");
         if (inputStream == null) {
             throw new FileNotFoundException("medium.json not found on classpath");
         }

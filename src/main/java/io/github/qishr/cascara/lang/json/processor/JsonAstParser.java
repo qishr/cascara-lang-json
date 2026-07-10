@@ -6,18 +6,16 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import io.github.qishr.cascara.common.diagnostic.NoOpReporter;
 import io.github.qishr.cascara.common.diagnostic.Reporter;
 import io.github.qishr.cascara.common.diagnostic.code.DiagnosticCode;
 import io.github.qishr.cascara.common.lang.exception.ParserException;
 import io.github.qishr.cascara.common.lang.processor.AstParser;
 import io.github.qishr.cascara.common.lang.processor.Tokenizer;
+import io.github.qishr.cascara.common.lang.type.SchemaType;
 import io.github.qishr.cascara.common.lang.util.LanguageOptions;
 import io.github.qishr.cascara.common.lang.util.QuoteStyle;
 import io.github.qishr.cascara.common.util.ContentType;
 import io.github.qishr.cascara.common.util.Properties;
-import io.github.qishr.cascara.lang.json.JsonOptions;
-import io.github.qishr.cascara.lang.json.JsonPrimitiveDescriptor;
 import io.github.qishr.cascara.lang.json.ast.JsonCommentNode;
 import io.github.qishr.cascara.lang.json.ast.JsonMapNode;
 import io.github.qishr.cascara.lang.json.ast.JsonNode;
@@ -26,12 +24,11 @@ import io.github.qishr.cascara.lang.json.ast.JsonSequenceNode;
 import io.github.qishr.cascara.lang.json.exception.JsonDiagnosticCode;
 import io.github.qishr.cascara.lang.json.token.JsonToken;
 import io.github.qishr.cascara.lang.json.token.JsonTokenType;
+import io.github.qishr.cascara.lang.json.util.JsonOptions;
 
 /// A recursive descent parser for JSON/JSON5.
 public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
         implements AstParser<JsonNode, JsonToken> {
-
-    private JsonPrimitiveDescriptor descriptor;
 
     /// Buffer to hold comments until a data node is created to claim them.
     private final List<JsonCommentNode> pendingComments = new ArrayList<>();
@@ -50,8 +47,6 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
     private JsonToken currentToken;
     private JsonToken lookaheadToken;
 
-
-
     /// Default constructor for SPI
     public JsonAstParser() {
         applyOptions(new JsonOptions());
@@ -64,9 +59,6 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
     }
 
     private void applyOptions(JsonOptions options) {
-        descriptor = new JsonPrimitiveDescriptor(options);
-        // Note: Keep this in alphabetical order,
-        // or it will become time consuming to maintain
         this.ALLOW_COMMENTS         = options.allowComments();
         this.ALLOW_INFINITY_AND_NAN = options.allowInfinityAndNaN();
         this.ALLOW_TRAILING_COMMA   = options.allowTrailingComma();
@@ -77,9 +69,9 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
     @Override
     protected JsonAstParser self() { return this; }
 
-    // ---------------------------------------------------------------------
+    //
     // High-level API: String / InputStream
-    // ---------------------------------------------------------------------
+    //
 
     @Override
     public JsonNode parse(String text) {
@@ -99,18 +91,18 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
         return parse(tokenizer);
     }
 
-    // ---------------------------------------------------------------------
+    //
     // Eager API: List<JsonToken> (adapter to streaming)
-    // ---------------------------------------------------------------------
+    //
 
     @Override
     public JsonNode parse(List<JsonToken> tokens) {
         return parse(new ListBackedJsonTokenizer(tokens));
     }
 
-    // ---------------------------------------------------------------------
+    //
     // Streaming API: Tokenizer<JsonToken>
-    // ---------------------------------------------------------------------
+    //
 
     @Override
     public JsonNode parse(Tokenizer<JsonToken> tokenizer) {
@@ -138,9 +130,9 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
         return root;
     }
 
-    // ---------------------------------------------------------------------
+    //
     // Core parsing
-    // ---------------------------------------------------------------------
+    //
 
     private JsonNode parseValue() {
         depth++;
@@ -177,11 +169,12 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
                     JsonScalarNode node = new JsonScalarNode(
                         token.getStartLine(),
                         token.getStartColumn(),
+                        SchemaType.ANY,
                         token.getLexeme(),
                         ident,
                         QuoteStyle.PLAIN,
-                        descriptor,
-                        false
+                        false,
+                        options
                     );
                     attachComments(node);
                     return node;
@@ -197,11 +190,12 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
             return new JsonScalarNode(
                 token.getStartLine(),
                 token.getStartColumn(),
+                SchemaType.ANY,
                 "",
                 "",
                 null,
-                descriptor,
-                false
+                false,
+                options
             );
 
         } finally {
@@ -286,11 +280,12 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
                 key = new JsonScalarNode(
                     tok.getStartLine(),
                     tok.getStartColumn(),
+                    SchemaType.STRING,
                     tok.getLexeme(),
                     tok.getContent(),
                     QuoteStyle.DOUBLE,
-                    descriptor,
-                    true
+                    true,
+                    options
                 );
             }
 
@@ -299,11 +294,12 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
                     key = new JsonScalarNode(
                         tok.getStartLine(),
                         tok.getStartColumn(),
+                        SchemaType.STRING,
                         tok.getLexeme(),
                         tok.getContent(),
                         QuoteStyle.PLAIN,
-                        descriptor,
-                        true
+                        true,
+                        options
                     );
                 } else {
                     error(tok, JsonDiagnosticCode.EXPECTED_MAP_KEY);
@@ -385,11 +381,12 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
                     node = new JsonScalarNode(
                         tok.getStartLine(),
                         tok.getStartColumn(),
+                        SchemaType.STRING,
                         tok.getLexeme(),
                         tok.getContent(),
                         tok.getQuoteStyle(),
-                        descriptor,
-                        false
+                        false,
+                        options
                     );
                 }
 
@@ -397,11 +394,12 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
                     node = new JsonScalarNode(
                         tok.getStartLine(),
                         tok.getStartColumn(),
+                        null, // We don't know if it's NUMBER or INTERGER
                         tok.getLexeme(),
                         tok.getContent(),
                         QuoteStyle.PLAIN,
-                        descriptor,
-                        false
+                        false,
+                        options
                     );
                 }
 
@@ -409,11 +407,12 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
                     node = new JsonScalarNode(
                         tok.getStartLine(),
                         tok.getStartColumn(),
+                        SchemaType.BOOLEAN,
                         tok.getLexeme(),
                         tok.getContent(),
                         QuoteStyle.PLAIN,
-                        descriptor,
-                        false
+                        false,
+                        options
                     );
                 }
 
@@ -421,11 +420,12 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
                     node = new JsonScalarNode(
                         tok.getStartLine(),
                         tok.getStartColumn(),
+                        SchemaType.NULL,
                         tok.getLexeme(),
                         tok.getContent(),
                         QuoteStyle.PLAIN,
-                        descriptor,
-                        false
+                        false,
+                        options
                     );
                 }
 
@@ -438,11 +438,12 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
                         node = new JsonScalarNode(
                             tok.getStartLine(),
                             tok.getStartColumn(),
+                            SchemaType.STRING,
                             tok.getLexeme(),
                             ident,
                             QuoteStyle.PLAIN,
-                            descriptor,
-                            false
+                            false,
+                            options
                         );
                     } else {
                         error(tok, JsonDiagnosticCode.UNEXPECTED_UNQUOTED_STRING_VALUE, ident);
@@ -455,11 +456,12 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
                     node = new JsonScalarNode(
                         tok.getStartLine(),
                         tok.getStartColumn(),
+                        SchemaType.ANY,
                         "",
                         "",
                         null,
-                        descriptor,
-                        false
+                        false,
+                        options
                     );
                 }
             }
@@ -472,9 +474,9 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
         }
     }
 
-    // ---------------------------------------------------------------------
+    //
     // Trivia / comments
-    // ---------------------------------------------------------------------
+    //
 
     private void skipTrivia() {
         if (!ALLOW_COMMENTS) return;
@@ -505,9 +507,9 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
         return node;
     }
 
-    // ---------------------------------------------------------------------
+    //
     // Token navigation (streaming)
-    // ---------------------------------------------------------------------
+    //
 
     private JsonToken peek() {
         if (currentToken == null) {
@@ -525,13 +527,6 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
         JsonToken prev = peek();
         currentToken = null;
         return prev;
-    }
-
-    private JsonToken lookahead() {
-        if (lookaheadToken == null) {
-            lookaheadToken = tokenizer.nextToken();
-        }
-        return lookaheadToken;
     }
 
     private boolean isAtEnd() {
@@ -563,12 +558,12 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
         return peek();
     }
 
-    // ---------------------------------------------------------------------
+    //
     // Diagnostics
-    // ---------------------------------------------------------------------
+    //
 
     private void trace(String methodName) {
-        if (reporter instanceof NoOpReporter) return;
+        if (reporter == null || reporter.isSilent()) return;
         JsonToken tok = peek();
         String indent = "  ".repeat(Math.max(0, depth));
         reporter.trace("L%3d C%3d %s%s: %s",
@@ -582,26 +577,18 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
         }
     }
 
-    // ---------------------------------------------------------------------
+    //
     // Adapter: List<JsonToken> → Tokenizer<JsonToken>
-    // ---------------------------------------------------------------------
+    //
 
     private static final class ListBackedJsonTokenizer implements Tokenizer<JsonToken> {
 
         private final List<JsonToken> tokens;
         private int index = 0;
 
-        // Required fields for Processor
-        private Reporter reporter = new NoOpReporter();
-        private LanguageOptions<?> options = null;
-
         ListBackedJsonTokenizer(List<JsonToken> tokens) {
             this.tokens = tokens;
         }
-
-        // ---------------------------------------------------------------------
-        // Tokenizer API
-        // ---------------------------------------------------------------------
 
         @Override
         public void open(String text) {
@@ -627,25 +614,15 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
             return Set.of(JsonTokenType.values());
         }
 
-        // ---------------------------------------------------------------------
-        // Processor API (inherited)
-        // ---------------------------------------------------------------------
-
         @Override
         public ListBackedJsonTokenizer setReporter(Reporter reporter) {
-            this.reporter = (reporter != null) ? reporter : new NoOpReporter();
             return this;
         }
 
         @Override
         public ListBackedJsonTokenizer setOptions(LanguageOptions<?> options) {
-            this.options = options;
             return this;
         }
-
-        // ---------------------------------------------------------------------
-        // ServiceProvider API (inherited)
-        // ---------------------------------------------------------------------
 
         @Override
         public Properties getServiceProperties() {

@@ -8,13 +8,33 @@ import java.util.Iterator;
 
 import io.github.qishr.cascara.common.lang.annotation.Nullable;
 import io.github.qishr.cascara.common.lang.ast.MapAstNode;
+import io.github.qishr.cascara.common.lang.type.SchemaType;
 import io.github.qishr.cascara.common.lang.util.QuoteStyle;
+import io.github.qishr.cascara.lang.json.util.JsonOptions;
 
 public class JsonMapNode extends JsonNode implements MapAstNode<JsonNode, JsonMapEntryNode> {
     private final LinkedHashMap<String, JsonMapEntryNode> entriesByKey = new LinkedHashMap<>();
+    private final JsonOptions options;
 
-    public JsonMapNode() { super(); }
-    public JsonMapNode(int line, int column) { super(line, column); }
+    public JsonMapNode() {
+        super();
+        this.options = JsonOptions.STRICT;
+    }
+
+    public JsonMapNode(int line, int column) {
+        super(line, column);
+        this.options = JsonOptions.STRICT;
+    }
+
+    public JsonMapNode(JsonOptions options) {
+        super();
+        this.options = options;
+    }
+
+    public JsonMapNode(int line, int column, JsonOptions options) {
+        super(line, column);
+        this.options = options;
+    }
 
     @Override
     public boolean containsKey(JsonNode key) {
@@ -147,7 +167,7 @@ public class JsonMapNode extends JsonNode implements MapAstNode<JsonNode, JsonMa
 
         // TODO: Where does JsonPrimitiveDesciptor come from?
         // Since we're passing null in as the descriptor, the node needs to be able to handle all options? or only the default ones?
-        JsonNode keyNode = new JsonScalarNode(0, 0, key, key, QuoteStyle.PLAIN, null, true);
+        JsonNode keyNode = new JsonScalarNode(0, 0, SchemaType.STRING, key, key, QuoteStyle.DOUBLE, true, options);
         JsonMapEntryNode entry = new JsonMapEntryNode(0, 0, keyNode, value);
         entriesByKey.put(key, entry);
         return this;

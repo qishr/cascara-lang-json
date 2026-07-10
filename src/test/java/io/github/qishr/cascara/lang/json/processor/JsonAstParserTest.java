@@ -4,9 +4,10 @@ import io.github.qishr.cascara.common.diagnostic.Diagnostic.Level;
 import io.github.qishr.cascara.common.diagnostic.SilentCollectingReporter;
 import io.github.qishr.cascara.common.diagnostic.StandardReporter;
 import io.github.qishr.cascara.common.lang.ast.CommentAstNode;
+import io.github.qishr.cascara.common.lang.type.SchemaType;
 import io.github.qishr.cascara.common.lang.util.QuoteStyle;
-import io.github.qishr.cascara.lang.json.JsonOptions;
 import io.github.qishr.cascara.lang.json.ast.*;
+import io.github.qishr.cascara.lang.json.util.JsonOptions;
 
 import org.junit.jupiter.api.Test;
 
@@ -31,7 +32,7 @@ class JsonAstParserTest {
         JsonMapNode root = (JsonMapNode) parser.parse(input);
 
         // 1. Get the Entry so we can see the Key
-        JsonMapEntryNode entry = root.getEntry(new JsonScalarNode(0, 0, "\"port\"", "port", QuoteStyle.DOUBLE, null, true));
+        JsonMapEntryNode entry = root.getEntry(new JsonScalarNode(0, 0, SchemaType.STRING, "\"port\"", "port", QuoteStyle.DOUBLE, false, null));
         assertNotNull(entry, "Entry for 'port' should exist");
 
         JsonNode keyNode = entry.getKey();
@@ -42,7 +43,7 @@ class JsonAstParserTest {
 
         // 3. Verify Comment is on the KEY (High-Fidelity alignment)
         assertFalse(keyNode.getComments().isEmpty(), "Comment should be attached to the KEY node");
-        assertEquals("// This is a comment", keyNode.getComments().get(0).getRaw());
+        assertEquals("// This is a comment", keyNode.getComments().get(0).getLexeme());
     }
 
     @Test
@@ -250,4 +251,38 @@ class JsonAstParserTest {
         CommentAstNode blockMulti = root.getEntry("c").getKey().getComments().get(0);
         assertTrue(blockMulti.isMultiLine(), "Actual multi-line blocks should be true");
     }
+
+    @Test
+    void testNestedFlowCollectionsInBlock() throws Exception {
+        String json = "{\"matrix\": [[1, 2], [3, 4]]}";
+
+        JsonNode root = parser.parse(json);
+        JsonMapNode rootMap = (JsonMapNode)root;
+
+        // 2. Get the value for "matrix"
+        JsonNode matrixNode = rootMap.get("matrix");
+        assertTrue(matrixNode instanceof JsonSequenceNode);
+
+        // 3. Now we are at the outer sequence: [[1, 2], [3, 4]]
+        JsonSequenceNode outer = (JsonSequenceNode) matrixNode;
+        assertEquals(2, outer.size());
+
+        // 4. Get the first inner sequence: [1, 2]
+        assertTrue(outer.get(0) instanceof JsonSequenceNode);
+        JsonSequenceNode inner = (JsonSequenceNode) outer.get(0);
+        assertEquals(2, inner.size());
+
+        // 5. Verify a leaf value
+        assertEquals("1", inner.get(0).asString());
+    }
+
+    @Test
+    void test_stringContaining_quotes() {
+        String yamlString = "{\"name\": \"one \\\"two\\\" three\"}";
+        JsonAstParser parser = new JsonAstParser();
+        JsonMapNode yaml = (JsonMapNode)parser.parse(yamlString);
+        String name = yaml.getString("name");
+        assertEquals("one \"two\" three", name);
+    }
+
 }

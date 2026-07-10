@@ -14,22 +14,13 @@ import io.github.qishr.cascara.common.lang.util.QuoteStyle;
 import io.github.qishr.cascara.common.lang.util.SourceBuffer;
 import io.github.qishr.cascara.common.lang.util.SourceInputStreamBuffer;
 import io.github.qishr.cascara.common.lang.util.SourceStringBuffer;
-import io.github.qishr.cascara.lang.json.JsonOptions;
 import io.github.qishr.cascara.lang.json.token.JsonBufferBackedToken;
 import io.github.qishr.cascara.lang.json.token.JsonComment;
 import io.github.qishr.cascara.lang.json.token.JsonToken;
 import io.github.qishr.cascara.lang.json.token.JsonTokenType;
+import io.github.qishr.cascara.lang.json.util.JsonOptions;
 
 public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implements Tokenizer<JsonToken>{
-
-    // TODO: WHy are these not being used after the refactor?
-    // Either they never did any good, or a regression has been made.
-    private static final String LBRACE = "{";
-    private static final String RBRACE = "}";
-    private static final String LBRACKET = "[";
-    private static final String RBRACKET = "]";
-    private static final String COMMA = ",";
-    private static final String COLON = ":";
 
     private static final boolean[] WS = new boolean[128];
     static {
@@ -65,12 +56,9 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         for (char c = 'A'; c <= 'F'; c++) HEX[c] = true;
     }
 
-    // Note: Keep this in alphabetical order,
-    // or it will become time consuming to maintain
     private boolean ALLOW_COMMENTS;
     private boolean ALLOW_HEXADECIMAL_NUMBERS;
     private boolean ALLOW_INFINITY_AND_NAN;
-    private boolean ALLOW_SINGLE_QUOTED_STRINGS; // TODO:L Why is this not used after the refactor?
     private boolean ALLOW_UNICODE;
     private boolean CAPTURE_COMMENTS;
 
@@ -78,8 +66,6 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
     private SourceBuffer buffer;
     private List<JsonToken> tokens;
-    private boolean isLegacyMode = false;
-    private boolean streamEnded = false; // TODO: If this is no longer needed, remove it.
     private final List<JsonComment> pendingComments = new ArrayList<>();
 
     /// Default constructor for SPI
@@ -99,15 +85,10 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         return this;
     }
 
-    // TODO: This makes zero performance difference if the methods
-    // using these values have to set a local final variable anyway.
     private void applyOptions(JsonOptions options) {
-        // Note: Keep this in alphabetical order,
-        // or it will become time consuming to maintain
         this.ALLOW_COMMENTS              = options.allowComments();
         this.ALLOW_HEXADECIMAL_NUMBERS   = options.allowHexadecimalNumbers();
         this.ALLOW_INFINITY_AND_NAN      = options.allowInfinityAndNaN();
-        this.ALLOW_SINGLE_QUOTED_STRINGS = options.allowSingleQuotedStrings();
         this.ALLOW_UNICODE               = options.allowUnicode();
         this.CAPTURE_COMMENTS            = options.captureComments();
     }
@@ -126,14 +107,12 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     @Override
     public void open(String text) {
         this.buffer = new SourceStringBuffer(text);
-        this.isLegacyMode = false;
         resetCommonState();
     }
 
     @Override
     public void open(InputStream is) {
         this.buffer = new SourceInputStreamBuffer(is);
-        this.isLegacyMode = false;
         resetCommonState();
     }
 
@@ -144,10 +123,8 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         }
 
         this.tokens = new ArrayList<>();
-        this.streamEnded = false;
 
         open(source);
-        this.isLegacyMode = true;
 
         JsonToken token;
         while ((token = nextToken()).getType() != JsonTokenType.EOF) {
@@ -158,10 +135,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             buffer.line(),
             buffer.column(),
             buffer.offset(),
-            JsonTokenType.EOF,
-            "",
-            "",
-            QuoteStyle.PLAIN
+            JsonTokenType.EOF
         ));
 
         return this.tokens;
@@ -173,18 +147,13 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     }
 
     public JsonToken nextToken() {
-
-        // reporter.debug("nextToken");
-
         if (!pendingComments.isEmpty()) {
-            // reporter.debug("calling toCommentToken");
             return toCommentToken(pendingComments.remove(0));
         }
 
         advanceWhitespaceAndComments();
 
         if (!pendingComments.isEmpty()) {
-            // reporter.debug("calling toCommentToken (post)");
             return toCommentToken(pendingComments.remove(0));
         }
 
@@ -193,10 +162,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
                 buffer.windowStartLine(),
                 buffer.windowStartColumn(),
                 buffer.windowStartOffset(),
-                JsonTokenType.EOF,
-                null,
-                null,
-                QuoteStyle.PLAIN
+                JsonTokenType.EOF
             );
 
             if (!pendingComments.isEmpty()) {
@@ -253,49 +219,6 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         return tok;
     }
 
-    private JsonToken toCommentToken(JsonComment c) {
-        return new JsonToken(
-            c.getLine(),
-            c.getColumn(),
-            /* offset */ 0,              // or a better offset if you track it
-            JsonTokenType.COMMENT,
-            c.getLexeme(),
-            c.getValue(),
-            QuoteStyle.PLAIN
-        );
-    }
-
-    private JsonToken structural(JsonTokenType type) {
-        int startOffset = buffer.offset();
-        int startLine   = buffer.line();
-        int startColumn = buffer.column();
-
-        buffer.advance();
-
-        if (buffer instanceof LexemeProvider lp) {
-            return new JsonBufferBackedToken(
-                lp,
-                startOffset,
-                buffer.offset(),
-                startLine,
-                startColumn,
-                type,
-                null,
-                QuoteStyle.PLAIN
-            );
-        }
-
-        return new JsonToken(
-            startLine,
-            startColumn,
-            startOffset,
-            type,
-            null,
-            null,
-            QuoteStyle.PLAIN
-        );
-    }
-
     private JsonToken scanStringToken(char quoteChar) {
         int startOffset = buffer.offset(); // actual position of the quote
         int startLine   = buffer.line();
@@ -340,16 +263,13 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         int startOffset, int line, int column,
         String lexeme, String content, QuoteStyle qs
     ) {
-
-        // reporter.debug("New string token with content: " + content);
-
         if (buffer instanceof LexemeProvider lp) {
             return new JsonBufferBackedToken(
                 lp,
-                startOffset,
-                buffer.offset(),
                 line,
                 column,
+                startOffset,
+                buffer.offset(),
                 JsonTokenType.STRING,
                 content,
                 qs
@@ -375,7 +295,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         buffer.startTokenWindow();
 
         // NUMBER?
-        if (isDigit(startChar) || startChar == '-' || startChar == '+' || startChar == '.') {
+        if (DIGIT[startChar] || startChar == '-' || startChar == '+' || startChar == '.') {
             scanNumber(startChar);
             String lexeme  = buffer.getTokenWindowLexeme();
             return makeNumberToken(startOffset, startLine, startColumn, lexeme, lexeme);
@@ -394,97 +314,6 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             "Unexpected character '" + startChar + "'",
             startLine,
             startColumn
-        );
-    }
-
-    private JsonToken classifyLexeme(
-        int startOffset, int line, int column,
-        String lexeme, String content
-    ) {
-        switch (lexeme) {
-            case "true":
-            case "false":
-                return new JsonToken(
-                    line, column, startOffset,
-                    JsonTokenType.BOOLEAN,
-                    lexeme,
-                    lexeme,
-                    QuoteStyle.PLAIN
-                );
-
-            case "null":
-                return new JsonToken(
-                    line, column, startOffset,
-                    JsonTokenType.NULL,
-                    lexeme,
-                    lexeme,
-                    QuoteStyle.PLAIN
-                );
-
-            case "Infinity":
-            case "NaN":
-                return makeNumberToken(startOffset, line, column, lexeme, lexeme);
-
-            default:
-                return makeIdentifierToken(startOffset, line, column, lexeme, content);
-        }
-    }
-
-
-
-    private JsonToken makeNumberToken(
-        int startOffset, int line, int column,
-        String lexeme, String content
-    ) {
-        if (buffer instanceof LexemeProvider lp) {
-            return new JsonBufferBackedToken(
-                lp,
-                startOffset,
-                buffer.offset(),
-                line,
-                column,
-                JsonTokenType.NUMBER,
-                content,
-                QuoteStyle.PLAIN
-            );
-        }
-
-        return new JsonToken(
-            line,
-            column,
-            startOffset,
-            JsonTokenType.NUMBER,
-            lexeme,
-            content,
-            QuoteStyle.PLAIN
-        );
-    }
-
-    private JsonToken makeIdentifierToken(
-        int startOffset, int line, int column,
-        String lexeme, String content
-    ) {
-        if (buffer instanceof LexemeProvider lp) {
-            return new JsonBufferBackedToken(
-                lp,
-                startOffset,
-                buffer.offset(),
-                line,
-                column,
-                JsonTokenType.IDENTIFIER,
-                content,
-                QuoteStyle.PLAIN
-            );
-        }
-
-        return new JsonToken(
-            line,
-            column,
-            startOffset,
-            JsonTokenType.IDENTIFIER,
-            lexeme,
-            content,
-            QuoteStyle.PLAIN
         );
     }
 
@@ -517,7 +346,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             }
         }
 
-        // EOF before closing quote → invalid string
+        // EOF before closing quote - invalid string
         return false;
     }
 
@@ -612,7 +441,6 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     private String scanSingleLineComment() {
         buffer.advance(); // '/'
         buffer.advance(); // '/'
-        // System.out.println("SLC consumed until offset: " + buffer.offset());
 
         while (true) {
             char c = buffer.peek();
@@ -627,11 +455,9 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         }
 
         // Full lexeme, including slashes
-        // String lexeme = buffer.getTokenWindowLexeme();
-        // Value: strip the leading "//"
-        // return lexeme.length() >= 2 ? lexeme.substring(2) : "";
-
         String lexeme = buffer.getTokenWindowLexeme();
+
+        // Value: strip the leading "//"
         String value = lexeme.length() >= 2 ? lexeme.substring(2) : "";
 
         // remove trailing newline from value
@@ -646,9 +472,6 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         // Consume the initial "/*"
         buffer.advance(); // '/'
         buffer.advance(); // '*'
-        // System.out.println("MLC consumed until offset: " + buffer.offset());
-
-        int start = buffer.offset();
 
         while (!buffer.isAtEnd()) {
             char c = buffer.peek();
@@ -678,10 +501,6 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         final boolean allowComments = ALLOW_COMMENTS;
         final boolean capture = CAPTURE_COMMENTS;
         final boolean allowUnicode = ALLOW_UNICODE;
-
-        // if (CAPTURE_COMMENTS) {
-        //     buffer.startTokenWindow();
-        // }
 
         while (true) {
             char c = buffer.peek();
@@ -716,9 +535,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
                     if (capture) {
                         String lexeme = buffer.getTokenWindowLexeme();
 
-                        // TODO: I expect this to go wrong.
-                        // And it's using 2 substring calls in the hot path!!!
-                        // Well done, Copilot!
+                        // TODO: This is using 2 substring calls in the hot path!!!
                         if (lexeme.endsWith("\n")) lexeme = lexeme.substring(0, lexeme.length() - 1);
                         if (lexeme.endsWith("\r")) lexeme = lexeme.substring(0, lexeme.length() - 1);
 
@@ -751,11 +568,6 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             return;
         }
     }
-
-
-
-
-
 
     //
     // Unicode
@@ -794,8 +606,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             return makeNumberToken(startOffset, line, column, lexeme, lexeme);
         }
 
-        // Otherwise → UNKNOWN
-        String lexeme = Character.toString(c);
+        // Otherwise - UNKNOWN
         buffer.advance();
         return errorToken("Unexpected character '" + c + "'", line, column);
     }
@@ -850,27 +661,128 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     }
 
     //
-    //
+    // Token Creation
     //
 
-    // Small interceptor ensuring that if someone runs the old tokenize() API,
-    // tokens get copied to the collection output array correctly.
-    private JsonToken queueToken(JsonToken token) {
-        if (isLegacyMode && token != null) {
-            tokens.add(token);
-        }
-        return token;
+    private JsonToken structural(JsonTokenType type) {
+        int startOffset = buffer.offset();
+        int startLine   = buffer.line();
+        int startColumn = buffer.column();
+
+        buffer.advance();
+
+        return new JsonToken(
+            startLine,
+            startColumn,
+            startOffset,
+            type
+        );
     }
+
+    private JsonToken classifyLexeme(int startOffset, int line, int column, String lexeme, String content) {
+        switch (lexeme) {
+            case "true":
+            case "false":
+                return new JsonToken(
+                    line, column, startOffset,
+                    JsonTokenType.BOOLEAN,
+                    lexeme,
+                    lexeme,
+                    QuoteStyle.PLAIN
+                );
+
+            case "null":
+                return new JsonToken(
+                    line, column, startOffset,
+                    JsonTokenType.NULL,
+                    lexeme,
+                    lexeme,
+                    QuoteStyle.PLAIN
+                );
+
+            case "Infinity":
+            case "NaN":
+                return makeNumberToken(startOffset, line, column, lexeme, lexeme);
+
+            default:
+                return makeIdentifierToken(startOffset, line, column, lexeme, content);
+        }
+    }
+
+    private JsonToken makeNumberToken(int startOffset, int line, int column, String lexeme, String content) {
+        if (buffer instanceof LexemeProvider lp) {
+            return new JsonBufferBackedToken(
+                lp,
+                line,
+                column,
+                startOffset,
+                buffer.offset(),
+                JsonTokenType.NUMBER,
+                content,
+                QuoteStyle.PLAIN
+            );
+        }
+
+        return new JsonToken(
+            line,
+            column,
+            startOffset,
+            JsonTokenType.NUMBER,
+            lexeme,
+            content,
+            QuoteStyle.PLAIN
+        );
+    }
+
+    private JsonToken makeIdentifierToken(
+        int startOffset, int line, int column,
+        String lexeme, String content
+    ) {
+        if (buffer instanceof LexemeProvider lp) {
+            return new JsonBufferBackedToken(
+                lp,
+                line,
+                column,
+                startOffset,
+                buffer.offset(),
+                JsonTokenType.IDENTIFIER,
+                content,
+                QuoteStyle.PLAIN
+            );
+        }
+
+        return new JsonToken(
+            line,
+            column,
+            startOffset,
+            JsonTokenType.IDENTIFIER,
+            lexeme,
+            content,
+            QuoteStyle.PLAIN
+        );
+    }
+
+    private JsonToken toCommentToken(JsonComment c) {
+        return new JsonToken(
+            c.getLine(),
+            c.getColumn(),
+            0, // TODO: Use a real value here
+            JsonTokenType.COMMENT,
+            c.getLexeme(),
+            c.getValue(),
+            QuoteStyle.PLAIN
+        );
+    }
+
+    //
+    //
+    //
 
     private void resetCommonState() {
         // Handle UTF-8 BOM if present at start of stream/string
         if (buffer.peek() == '\uFEFF') {
             buffer.advance();
         }
-    }
-
-    private boolean isDigit(char c) {
-        return c >= '0' && c <= '9';
     }
 
     //
@@ -892,22 +804,4 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             default -> Character.toString(c);
         };
     }
-
-    // //
-    // //
-    // //
-
-    // private static final class JsonComment {
-    //     final String lexeme;
-    //     final String value;
-    //     final int line;
-    //     final int column;
-
-    //     JsonComment(String lexeme, String value, int line, int column) {
-    //         this.lexeme = lexeme;
-    //         this.value = value;
-    //         this.line = line;
-    //         this.column = column;
-    //     }
-    // }
 }

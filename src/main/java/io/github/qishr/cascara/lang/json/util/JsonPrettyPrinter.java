@@ -1,4 +1,4 @@
-package io.github.qishr.cascara.lang.json.processor;
+package io.github.qishr.cascara.lang.json.util;
 
 import java.io.IOException;
 import java.io.Writer;
@@ -24,7 +24,7 @@ public class JsonPrettyPrinter {
         // 1. Print any comments attached to this node
         for (CommentAstNode comment : node.getComments()) {
             writeIndent();
-            writer.write(comment.getRaw()); // Raw value includes # or //
+            writer.write(comment.getLexeme()); // Raw value includes # or //
             writer.write("\n");
         }
 
@@ -34,8 +34,8 @@ public class JsonPrettyPrinter {
         } else if (node instanceof JsonSequenceNode seq) {
             printSequence(seq);
         } else if (node instanceof JsonScalarNode scalar) {
-            // ScalarAstNode provides getRaw() to preserve quotes/formatting
-            writer.write(scalar.getRaw());
+            // ScalarAstNode provides getLexeme() to preserve quotes/formatting
+            writer.write(scalar.getLexeme());
         }
     }
 

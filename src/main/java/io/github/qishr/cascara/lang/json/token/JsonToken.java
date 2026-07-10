@@ -11,10 +11,26 @@ public class JsonToken implements Token {
     protected int startColumn;
     protected int startOffset;
     protected JsonTokenType type;
-    protected String lexeme;
-    protected String content;
-    protected QuoteStyle quoteStyle;
+    private JsonLiteral literal;
+    private String lexeme;
+    private String content;
+    private QuoteStyle quoteStyle;
     private List<JsonComment> comments;
+
+    public JsonToken(int line, int column, int startOffset, JsonTokenType type) {
+        this.startLine = line;
+        this.startColumn = column;
+        this.startOffset = startOffset;
+        this.type = type;
+    }
+
+    public JsonToken(int line, int column, int startOffset, JsonTokenType type, JsonLiteral literal) {
+        this.startLine = line;
+        this.startColumn = column;
+        this.startOffset = startOffset;
+        this.type = type;
+        this.literal = literal;
+    }
 
     public JsonToken(int line, int column, int startOffset, JsonTokenType type, String lexeme, String content, QuoteStyle quoteStyle) {
         this.startLine = line;
@@ -26,10 +42,13 @@ public class JsonToken implements Token {
         this.quoteStyle = quoteStyle;
     }
 
-
     @Override
     public JsonTokenType getType() {
         return type;
+    }
+
+    public JsonLiteral getLiteral() {
+        return literal;
     }
 
     @Override

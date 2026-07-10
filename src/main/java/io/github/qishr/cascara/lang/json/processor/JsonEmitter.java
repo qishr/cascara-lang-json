@@ -4,12 +4,12 @@ import io.github.qishr.cascara.common.util.ContentType;
 import io.github.qishr.cascara.common.diagnostic.Reporter;
 import io.github.qishr.cascara.common.lang.util.LanguageOptions;
 import io.github.qishr.cascara.common.lang.processor.Emitter;
-import io.github.qishr.cascara.lang.json.JsonOptions;
 import io.github.qishr.cascara.lang.json.ast.JsonMapEntryNode;
 import io.github.qishr.cascara.lang.json.ast.JsonMapNode;
 import io.github.qishr.cascara.lang.json.ast.JsonNode;
 import io.github.qishr.cascara.lang.json.ast.JsonScalarNode;
 import io.github.qishr.cascara.lang.json.ast.JsonSequenceNode;
+import io.github.qishr.cascara.lang.json.util.JsonOptions;
 
 public class JsonEmitter extends AbstractJsonProcessor<JsonEmitter>  implements Emitter {
     private final StringBuilder output = new StringBuilder();
@@ -40,7 +40,7 @@ public class JsonEmitter extends AbstractJsonProcessor<JsonEmitter>  implements 
         // Handle Comments before the node
         if (node.getComments() != null) {
             for (var comment : node.getComments()) {
-                emitScalar(comment.getRaw());
+                emitScalar(comment.getLexeme());
                 emitNewLine();
             }
         }

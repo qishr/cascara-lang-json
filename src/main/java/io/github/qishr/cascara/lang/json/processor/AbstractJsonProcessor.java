@@ -6,7 +6,7 @@ import io.github.qishr.cascara.common.lang.util.LanguageOptions;
 import io.github.qishr.cascara.common.lang.processor.Processor;
 import io.github.qishr.cascara.common.util.ContentType;
 import io.github.qishr.cascara.common.util.Properties;
-import io.github.qishr.cascara.lang.json.JsonOptions;
+import io.github.qishr.cascara.lang.json.util.JsonOptions;
 
 public abstract class AbstractJsonProcessor<P extends Processor> implements Processor {
     static final String JSON_CONTENT_TYPE_STRING = "application/json";

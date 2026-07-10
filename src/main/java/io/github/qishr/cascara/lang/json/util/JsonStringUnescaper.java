@@ -1,9 +1,8 @@
-package io.github.qishr.cascara.lang.json;
+package io.github.qishr.cascara.lang.json.util;
 
-import io.github.qishr.cascara.common.lang.util.QuoteStyle;
-
-public class Json5SingleQuoteUnescaper {
+public class JsonStringUnescaper {
     public static String unescape(String text) {
+        if (text == null) return null;
         // , QuoteStyle style) {
         // if (style != QuoteStyle.DOUBLE || text == null || text.isEmpty()) {
         //     return text;

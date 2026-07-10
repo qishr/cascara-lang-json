@@ -10,14 +10,13 @@ import io.github.qishr.cascara.common.lang.exception.SerializerException;
 import io.github.qishr.cascara.common.lang.processor.AbstractSerializer;
 import io.github.qishr.cascara.common.lang.processor.AstParser;
 import io.github.qishr.cascara.common.util.ContentType;
-import io.github.qishr.cascara.lang.json.JsonOptions;
-import io.github.qishr.cascara.lang.json.JsonPrimitiveDelegate;
-import io.github.qishr.cascara.lang.json.JsonPrimitiveDescriptor;
 import io.github.qishr.cascara.lang.json.ast.JsonMapEntryNode;
 import io.github.qishr.cascara.lang.json.ast.JsonMapNode;
 import io.github.qishr.cascara.lang.json.ast.JsonNode;
+import io.github.qishr.cascara.lang.json.ast.JsonNodeFactory;
 import io.github.qishr.cascara.lang.json.ast.JsonScalarNode;
 import io.github.qishr.cascara.lang.json.ast.JsonSequenceNode;
+import io.github.qishr.cascara.lang.json.util.JsonOptions;
 
 /// Standard implementation for JSON serialization.
 public class JsonSerializer extends AbstractSerializer<JsonSerializer,JsonNode,JsonScalarNode,JsonSequenceNode,JsonMapNode,JsonMapEntryNode> {
@@ -32,7 +31,7 @@ public class JsonSerializer extends AbstractSerializer<JsonSerializer,JsonNode,J
         // TODO: Don't create a JsonPrimitiveDescriptor with defult options.
         // AbstractSerializer needs its setOptions to work.
         // This constructor is for SPI and cannot take a parameter.
-        super(AbstractJsonProcessor.JSON_CONTENT_TYPE_STRING, new JsonNodeFactory(), new JsonPrimitiveDescriptor(new JsonOptions()));
+        super(AbstractJsonProcessor.JSON_CONTENT_TYPE_STRING, new JsonNodeFactory(), new JsonOptions());
     }
 
     @Override

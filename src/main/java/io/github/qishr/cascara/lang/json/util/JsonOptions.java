@@ -1,4 +1,4 @@
-package io.github.qishr.cascara.lang.json;
+package io.github.qishr.cascara.lang.json.util;
 
 import io.github.qishr.cascara.common.diagnostic.LocalizableRuntimeException;
 import io.github.qishr.cascara.common.diagnostic.code.GenericDiagnosticCode;
@@ -17,6 +17,8 @@ public class JsonOptions extends LanguageOptions<JsonOptions> implements Duplica
             .setAllowTrailingComma(true)
             .setAllowUnquotedKeys(true)
     );
+
+    public static final JsonOptions STRICT = new ImmutableJsonOptions(new JsonOptions());
 
     private boolean allowBooleanKeys = false;
     private boolean allowComments = false;

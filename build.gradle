@@ -38,7 +38,7 @@ tasks.withType(Test).configureEach {
 
 
 application {
-    mainClass.set("io.github.qishr.cascara.lang.json.TokenizerBenchmark")
+    mainClass.set("io.github.qishr.cascara.lang.json.util.ProfilingHarness")
     // mainModule.set("cascara.ui.demo")
     // applicationDefaultJvmArgs = ['--add-reads', 'cascara.ui=ALL-UNNAMED']
 }

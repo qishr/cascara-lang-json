@@ -7,12 +7,18 @@ public final class JsonBufferBackedToken extends JsonToken {
     private final LexemeProvider provider;
     private final int endOffset;
 
+    public JsonBufferBackedToken(LexemeProvider provider, int startLine, int startColumn, int startOffset, int endOffset, JsonTokenType type) {
+        super(startLine, startColumn, startOffset, type);
+        this.provider = provider;
+        this.endOffset = endOffset;
+    }
+
     public JsonBufferBackedToken(
         LexemeProvider provider,
-        int startOffset,
-        int endOffset,
         int startLine,
         int startColumn,
+        int startOffset,
+        int endOffset,
         JsonTokenType type,
         String content,
         QuoteStyle quoteStyle
@@ -25,10 +31,6 @@ public final class JsonBufferBackedToken extends JsonToken {
     @Override
     public String getLexeme() {
         return provider.slice(startOffset, endOffset);
-    }
-
-    public QuoteStyle getQuoteStyle() {
-        return quoteStyle;
     }
 
     public int getEndOffset() {
