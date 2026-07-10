@@ -6,7 +6,6 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 
-import io.github.qishr.cascara.common.diagnostic.NoOpReporter;
 import io.github.qishr.cascara.common.lang.processor.Tokenizer;
 import io.github.qishr.cascara.common.lang.util.LanguageOptions;
 import io.github.qishr.cascara.common.lang.util.LexemeProvider;
@@ -16,6 +15,7 @@ import io.github.qishr.cascara.common.lang.util.SourceInputStreamBuffer;
 import io.github.qishr.cascara.common.lang.util.SourceStringBuffer;
 import io.github.qishr.cascara.lang.json.token.JsonBufferBackedToken;
 import io.github.qishr.cascara.lang.json.token.JsonComment;
+import io.github.qishr.cascara.lang.json.token.JsonLiteral;
 import io.github.qishr.cascara.lang.json.token.JsonToken;
 import io.github.qishr.cascara.lang.json.token.JsonTokenType;
 import io.github.qishr.cascara.lang.json.util.JsonOptions;
@@ -210,7 +210,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             pendingComments.clear();
         }
 
-        if (!(reporter instanceof NoOpReporter)) {
+        if (!reporter.isSilent()) {
             reporter.trace("TOKEN: " + tok.getType() +
                            " [" + tok.getStartLine() + ":" + tok.getStartColumn() + "] " +
                            (tok.getLexeme() != null ? tok.getLexeme() : ""));
@@ -682,22 +682,23 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     private JsonToken classifyLexeme(int startOffset, int line, int column, String lexeme, String content) {
         switch (lexeme) {
             case "true":
+                return new JsonToken(
+                    line, column, startOffset,
+                    JsonTokenType.BOOLEAN,
+                    JsonLiteral.TRUE
+                );
             case "false":
                 return new JsonToken(
                     line, column, startOffset,
                     JsonTokenType.BOOLEAN,
-                    lexeme,
-                    lexeme,
-                    QuoteStyle.PLAIN
+                    JsonLiteral.FALSE
                 );
 
             case "null":
                 return new JsonToken(
                     line, column, startOffset,
                     JsonTokenType.NULL,
-                    lexeme,
-                    lexeme,
-                    QuoteStyle.PLAIN
+                    JsonLiteral.NULL
                 );
 
             case "Infinity":
@@ -783,25 +784,5 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         if (buffer.peek() == '\uFEFF') {
             buffer.advance();
         }
-    }
-
-    //
-    // Diagnostics
-    //
-
-    private void trace(String method) {
-        if (reporter instanceof NoOpReporter) return;
-        char currentC = buffer.peek();
-        reporter.trace("C=%03d '%s' %03d:%03d %s",
-            buffer.offset(), currentChar(currentC), buffer.line(), buffer.column(), method);
-    }
-
-    private String currentChar(char c) {
-        return switch (c) {
-            case '\t' -> "⇥";
-            case '\r' -> "↵";
-            case '\n' -> "↩";
-            default -> Character.toString(c);
-        };
     }
 }
