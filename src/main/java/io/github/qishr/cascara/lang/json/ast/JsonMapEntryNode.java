@@ -2,7 +2,6 @@ package io.github.qishr.cascara.lang.json.ast;
 
 import java.util.List;
 import io.github.qishr.cascara.common.lang.ast.MapEntryAstNode;
-import io.github.qishr.cascara.common.lang.reference.ReferenceNode;
 
 /// Represents the structural pairing of a key and a value in a JSON object.
 public class JsonMapEntryNode extends JsonNode implements MapEntryAstNode<JsonNode> {

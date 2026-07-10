@@ -3,5 +3,7 @@ package io.github.qishr.cascara.lang.json.token;
 public enum JsonLiteral {
     TRUE,
     FALSE,
-    NULL
+    NULL,
+    NAN,
+    INFINITY
 }

@@ -1,4 +1,4 @@
-package io.github.qishr.cascara.lang.json;
+package io.github.qishr.cascara.lang.json.processor;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -14,24 +14,19 @@ import io.github.qishr.cascara.common.diagnostic.Reporter;
 import io.github.qishr.cascara.common.diagnostic.StandardReporter;
 import io.github.qishr.cascara.common.diagnostic.Diagnostic.Level;
 import io.github.qishr.cascara.lang.json.ast.JsonNode;
-import io.github.qishr.cascara.lang.json.processor.JsonEmitter;
 import io.github.qishr.cascara.lang.json.util.JsonOptions;
-import io.github.qishr.cascara.lang.json.processor.JsonAstParser;
 
-class Json5TestSuite {
+class JsonTestSuite {
 
-    private JsonOptions options;
     private JsonAstParser parser;
     private Reporter reporter;
 
     @BeforeEach
     void init() {
         reporter = new StandardReporter().setLevel(Level.TRACE);
-        options = JsonOptions.JSON5.duplicate()
-            // .setStrict(true)
-            .setCaptureComments(true);
+        // options = new JsonOptions();
         parser = new JsonAstParser()
-            .setOptions(options)
+            // .setOptions(options)
             .setReporter(reporter);
     }
 
@@ -48,11 +43,11 @@ class Json5TestSuite {
     }
 
     static Stream<Arguments> getValidFiles() throws Exception {
-        return scanFolder("src/test/resources/json5-suite/valid");
+        return scanFolder("src/test/resources/json-suite/valid");
     }
 
     static Stream<Arguments> getInvalidFiles() throws Exception {
-        return scanFolder("src/test/resources/json5-suite/invalid");
+        return scanFolder("src/test/resources/json-suite/invalid");
     }
 
     private static Stream<Arguments> scanFolder(String pathStr) throws Exception {

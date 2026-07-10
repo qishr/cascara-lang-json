@@ -17,19 +17,16 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
 
     private final String lexeme;
     private final String escapedContent;
-    // private final ScalarAstDelegate delegate;
     private SchemaType schemaType;
     private QuoteStyle quoteStyle = QuoteStyle.PLAIN;
     private String keyStringCache;
 
-    // dialect-aware native value cache
     private Object jvmValue;
     private boolean jvmValueCached;
 
     private String stringValue;
     private boolean stringValueCached;
 
-    // key/value context
     private final boolean isKey;
 
     /// Constructor for use in parsers.
@@ -76,16 +73,6 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
     /// Takes a pre-typed Object and skips text-based type inference.
     public JsonScalarNode(Object jvmValue, QuoteStyle quoteStyle) {
         this(jvmValue, quoteStyle, false, null);
-        // super(0, 0);
-        // this.jvmValue = jvmValue;
-        // this.quoteStyle = quoteStyle;
-
-        // this.jvmValueCached = true;
-        // this.schemaType = SchemaType.of(jvmValue);
-        // this.lexeme = null;
-        // this.escapedContent = null;
-        // this.options = null;
-        // this.isKey = false;
     }
 
     /// A programmatic and serializer constructor.
@@ -99,32 +86,12 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
     /// Used when building an AST dynamically in code.
     /// Takes a pre-typed Object and skips text-based type inference.
     public JsonScalarNode(Object jvmValue, boolean isKey) {
-        // TODO: isKey doesn't mean it has to be double quoted. This is wrong...
-        // this(jvmValue, isKey ? QuoteStyle.DOUBLE : QuoteStyle.UNDETERMINED, isKey, null);
         this(jvmValue, QuoteStyle.UNDETERMINED, isKey, null);
-
-
-        // super(0, 0);
-        // this.schemaType = SchemaType.of(jvmValue);
-        // this.lexeme = null;
-        // this.escapedContent = null;
-        // this.quoteStyle = isKey ? QuoteStyle.DOUBLE : QuoteStyle.PLAIN;
-        // this.options = null;
-        // this.isKey = isKey;
-        // this.jvmValue = jvmValue;
-        // this.jvmValueCached = true;
     }
 
     /// The default constructor
     public JsonScalarNode() {
         this(null);
-        // super(0, 0);
-        // this.schemaType = SchemaType.ANY;
-        // this.lexeme = null;
-        // this.escapedContent = null;
-        // this.quoteStyle = QuoteStyle.PLAIN;
-        // this.options = null;
-        // this.isKey = false;
     }
 
     @Override
@@ -157,29 +124,7 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
             } else {
                 keyStringCache = String.valueOf(getPrimitive());
             }
-            // keyStringCache = unescape(
-            //     escapedContent != null ? escapedContent : (lexeme != null ? lexeme : String.valueOf(getPrimitive())),
-            //     quoteStyle,
-            //     true
-            // );
         }
-
-        // if (delegate != null) {
-        //     // parser-constructed node: use descriptor + raw/content
-        //     keyStringCache = delegate.unescape(
-        //         content != null ? content : raw,
-        //         quoteStyle,
-        //         true
-        //     );
-        // } else if (content != null) {
-        //     // descriptor-less node with lexical content
-        //     keyStringCache = content;
-        // } else {
-        //     // pure programmatic node: fall back to nativeValue
-        //     Object v = nativeValue;
-        //     keyStringCache = (v == null) ? "" : String.valueOf(v);
-        // }
-
         return keyStringCache;
     }
 
@@ -193,32 +138,12 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
         return escapedContent;
     }
 
-    // TODO: Surely if we're looking for `content`, using `raw` is incorrect?
-
     /// Returns the dialect-aware JVM value (cached).
     @Override
     public Object getPrimitive() {
         if (jvmValueCached) {
             return jvmValue;
         }
-
-        // if (delegate == null) {
-        //     nativeValue = content;
-        //     nativeValueCached = true;
-        //     return nativeValue;
-        // }
-
-        // // TODO: Are we sure we don't want to interpret this?
-        // // I don't think ANY should be a valid value here
-        // if (schemaType == SchemaType.ANY) {
-        //     jvmValue = escapedContent; // do not interpret
-        //     jvmValueCached = true;
-        //     return jvmValue;
-        // }
-
-        // Use content, which is already de-quoted and unescaped by the tokenizer
-        // String source = (content != null) ? content : raw;
-
         jvmValue = parse(escapedContent, quoteStyle, isKey);
         jvmValueCached = true;
         return jvmValue;
@@ -228,18 +153,9 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
     @Override
     public String asString() {
         if (!stringValueCached) {
-
-            // STRING: return logical value (unescaped)
-            // if (delegate != null && quoteStyle != QuoteStyle.PLAIN) {
             if (schemaType == SchemaType.STRING) {
-
-
                 Object v = getPrimitive(); // unescaped logical value
                 stringValue = (v == null) ? null : String.valueOf(v);
-
-
-
-
             }
             // NUMBER / BOOLEAN / NULL / IDENTIFIER
             else if (escapedContent != null) {
@@ -258,50 +174,6 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
         return stringValue;
     }
 
-    // @Override
-    // public String asString() {
-    //     if (stringValueCached) {
-    //         return stringValue;
-    //     }
-
-    //     // Prefer content (already unescaped by tokenizer)
-    //     if (content != null) {
-    //         stringValue = content;
-    //     }
-    //     // Fall back to raw lexeme
-    //     else if (raw != null) {
-    //         stringValue = raw;
-    //     }
-    //     // Programmatic node: no lexeme, use nativeValue
-    //     else if (nativeValueCached) {
-    //         Object v = nativeValue;
-    //         stringValue = (v == null) ? null : String.valueOf(v);
-    //     }
-    //     else {
-    //         stringValue = null;
-    //     }
-
-    //     stringValueCached = true;
-    //     return stringValue;
-    // }
-
-    // // @Override
-    // // public String asString() {
-    // //     if (stringValueCached) {
-    // //         return stringValue;
-    // //     }
-    // //     Object v = getPrimitive();
-    // //     stringValue = (v == null) ? null : String.valueOf(v);
-    // //     stringValueCached = true;
-    // //     return stringValue;
-    // // }
-
-    // // @Override
-    // // public String asString() {
-    // //     Object v = getPrimitive();
-    // //     return (v == null) ? null : String.valueOf(v);
-    // // }
-
     @Override
     public int asInteger() {
         return asInteger(0);
@@ -310,14 +182,11 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
     @Override
     public int asInteger(int defaultValue) {
         Object v = getPrimitive();
-        // if (delegate == null) {
-            try {
-                return Integer.parseInt(String.valueOf(v));
-            } catch (Exception e) {
-                return defaultValue;
-            }
-        // }
-        // return delegate.toIntegerOrDefault(v, defaultValue);
+        try {
+            return Integer.parseInt(String.valueOf(v));
+        } catch (Exception e) {
+            return defaultValue;
+        }
     }
 
     @Override
@@ -328,14 +197,11 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
     @Override
     public double asDouble(double defaultValue) {
         Object v = getPrimitive();
-        // if (delegate == null) {
-            try {
-                return Double.parseDouble(String.valueOf(v));
-            } catch (Exception e) {
-                return defaultValue;
-            }
-        // }
-        // return delegate.toDoubleOrDefault(v, defaultValue);
+        try {
+            return Double.parseDouble(String.valueOf(v));
+        } catch (Exception e) {
+            return defaultValue;
+        }
     }
 
     @Override
@@ -346,26 +212,18 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
     @Override
     public boolean asBoolean(boolean defaultValue) {
         Object v = getPrimitive();
-        // if (delegate == null) {
-            if (v instanceof Boolean b) return b;
-            if (v == null) return defaultValue;
-            String s = String.valueOf(v);
-            if ("true".equals(s)) return true;
-            if ("false".equals(s)) return false;
-            return defaultValue;
-        // }
-        // return delegate.toBooleanOrDefault(v, defaultValue);
+        if (v instanceof Boolean b) return b;
+        if (v == null) return defaultValue;
+        String s = String.valueOf(v);
+        if ("true".equals(s)) return true;
+        if ("false".equals(s)) return false;
+        return defaultValue;
     }
 
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (!(o instanceof JsonScalarNode that)) return false;
-        // return Objects.equals(raw, that.raw)
-        //     && Objects.equals(content, that.content)
-        //     && Objects.equals(getPrimitive(), that.getPrimitive())
-        //     && quoteStyle == that.quoteStyle
-        //     && isKey == that.isKey;
         return Objects.equals(this.getPrimitive(), that.getPrimitive())
             && quoteStyle == that.quoteStyle
             && isKey == that.isKey;
@@ -379,7 +237,6 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
     /// {@inheritDoc}
     @Override
     public String toString() {
-        // return raw != null ? raw : asString();
         return lexeme != null ? lexeme : String.valueOf(getPrimitive());
     }
 
@@ -413,10 +270,6 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
     }
 
     private SchemaType inferType(String raw, QuoteStyle quoteStyle, boolean isKey) {
-
-        // -----------------------------
-        // KEY POSITION
-        // -----------------------------
         if (isKey) {
 
             // Strict JSON: keys must be double-quoted strings
@@ -461,10 +314,6 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
             return SchemaType.STRING;
         }
 
-        // -----------------------------
-        // VALUE POSITION
-        // -----------------------------
-
         // Quoted strings
         if (quoteStyle == QuoteStyle.DOUBLE) {
             return SchemaType.STRING;
@@ -503,10 +352,6 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
             if (numberType != null) {
                 return numberType;
             }
-            // // JSON strict number
-            // if (isDecimalNumber(raw)) {
-            //     return SchemaType.NUMBER;
-            // }
 
             return SchemaType.STRING;
         }
@@ -535,24 +380,9 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
         return raw;
     }
 
-    private QuoteStyle inferQuoteStyle(Object scalar, boolean isKey) {
-
-        // Keys: strict JSON always double-quoted
-        if (isKey && !options.allowUnquotedKeys()) {
-            return QuoteStyle.DOUBLE;
-        }
-
-        // JSON5-like: single quotes allowed
-        if (scalar instanceof String && options.allowSingleQuotedStrings()) {
-            return QuoteStyle.SINGLE;
-        }
-
-        return QuoteStyle.DOUBLE;
-    }
-
-    // ------------------------------------------------------------
-    // Internal helpers (fast, no regex, no startsWith)
-    // ------------------------------------------------------------
+    //
+    // Internal helpers
+    //
     private boolean isIdentifier(String raw) {
         int len = raw.length();
         if (len == 0) return false;
@@ -669,9 +499,9 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
         return hasDigit;
     }
 
-    // ------------------------------------------------------------
-    // Number parsing (fast, correct)
-    // ------------------------------------------------------------
+    //
+    // Number parsing
+    //
     private double parseNumber(String raw) {
         // JSON5 hex
         if (options.allowHexadecimalNumbers() && isHexRaw(raw)) {

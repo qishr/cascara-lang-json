@@ -17,10 +17,17 @@ import io.github.qishr.cascara.lang.json.token.JsonBufferBackedToken;
 import io.github.qishr.cascara.lang.json.token.JsonComment;
 import io.github.qishr.cascara.lang.json.token.JsonLiteral;
 import io.github.qishr.cascara.lang.json.token.JsonToken;
+import io.github.qishr.cascara.lang.json.token.JsonLexemeBackedToken;
 import io.github.qishr.cascara.lang.json.token.JsonTokenType;
 import io.github.qishr.cascara.lang.json.util.JsonOptions;
 
 public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implements Tokenizer<JsonToken>{
+
+    private static final String TRUE = "true";
+    private static final String FALSE = "false";
+    private static final String NULL = "null";
+    private static final String INFINITY = "Infinity";
+    private static final String NAN = "NaN";
 
     private static final boolean[] WS = new boolean[128];
     static {
@@ -68,6 +75,8 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     private List<JsonToken> tokens;
     private final List<JsonComment> pendingComments = new ArrayList<>();
 
+    private TokenFactory factory;
+
     /// Default constructor for SPI
     public JsonTokenizer() {
         // SPI will call this
@@ -103,7 +112,6 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         return buffer.column();
     }
 
-
     @Override
     public void open(String text) {
         this.buffer = new SourceStringBuffer(text);
@@ -131,7 +139,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             this.tokens.add(token);
         }
 
-        tokens.add(new JsonToken(
+        tokens.add(new JsonLexemeBackedToken(
             buffer.line(),
             buffer.column(),
             buffer.offset(),
@@ -158,7 +166,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         }
 
         if (buffer.isAtEnd()) {
-            JsonToken tok = new JsonToken(
+            JsonLexemeBackedToken tok = new JsonLexemeBackedToken(
                 buffer.windowStartLine(),
                 buffer.windowStartColumn(),
                 buffer.windowStartOffset(),
@@ -186,12 +194,12 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         } else {
             // ASCII path
             switch (c) {
-                case '{': tok = structural(JsonTokenType.LEFT_BRACE); break;
-                case '}': tok = structural(JsonTokenType.RIGHT_BRACE); break;
-                case '[': tok = structural(JsonTokenType.LEFT_BRACKET); break;
-                case ']': tok = structural(JsonTokenType.RIGHT_BRACKET); break;
-                case ':': tok = structural(JsonTokenType.COLON); break;
-                case ',': tok = structural(JsonTokenType.COMMA); break;
+                case '{': tok = makeStructuralToken(JsonTokenType.LEFT_BRACE); break;
+                case '}': tok = makeStructuralToken(JsonTokenType.RIGHT_BRACE); break;
+                case '[': tok = makeStructuralToken(JsonTokenType.LEFT_BRACKET); break;
+                case ']': tok = makeStructuralToken(JsonTokenType.RIGHT_BRACKET); break;
+                case ':': tok = makeStructuralToken(JsonTokenType.COLON); break;
+                case ',': tok = makeStructuralToken(JsonTokenType.COMMA); break;
 
                 case '"':
                 case '\'':
@@ -237,54 +245,14 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             : QuoteStyle.SINGLE;
 
         if (qs == QuoteStyle.SINGLE && !options.allowSingleQuotedStrings()) {
-            return errorToken("Single-quoted strings are not allowed in strict JSON", startLine, startColumn);
+            return makeErrorToken("Single-quoted strings are not allowed in strict JSON", startLine, startColumn);
         }
 
         if (!ok) {
-            return errorToken("Unterminated string literal", startLine, startColumn);
+            return makeErrorToken("Unterminated string literal", startLine, startColumn);
         }
 
-        return makeStringToken(startOffset, startLine, startColumn, lexeme, content, qs);
-    }
-
-    private JsonToken errorToken(String message, int line, int column) {
-        return new JsonToken(
-            line,
-            column,
-            buffer.windowStartOffset(),
-            JsonTokenType.ERROR,
-            message,
-            null,
-            QuoteStyle.PLAIN
-        );
-    }
-
-    private JsonToken makeStringToken(
-        int startOffset, int line, int column,
-        String lexeme, String content, QuoteStyle qs
-    ) {
-        if (buffer instanceof LexemeProvider lp) {
-            return new JsonBufferBackedToken(
-                lp,
-                line,
-                column,
-                startOffset,
-                buffer.offset(),
-                JsonTokenType.STRING,
-                content,
-                qs
-            );
-        }
-
-        return new JsonToken(
-            line,
-            column,
-            startOffset,
-            JsonTokenType.STRING,
-            lexeme,
-            content,
-            qs
-        );
+        return factory.makeStringToken(startOffset, startLine, startColumn, lexeme, content, qs);
     }
 
     private JsonToken scanNumberOrIdentifierOrError(char startChar) {
@@ -298,19 +266,19 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         if (DIGIT[startChar] || startChar == '-' || startChar == '+' || startChar == '.') {
             scanNumber(startChar);
             String lexeme  = buffer.getTokenWindowLexeme();
-            return makeNumberToken(startOffset, startLine, startColumn, lexeme, lexeme);
+            return factory.makeNumberToken(startOffset, startLine, startColumn, lexeme);
         }
 
         // IDENTIFIER?
         if (startChar < 128 && IDENT_START[startChar]) {
             scanIdentifierFast();
             String lexeme  = buffer.getTokenWindowLexeme();
-            return classifyLexeme(startOffset, startLine, startColumn, lexeme, lexeme);
+            return classifyLexeme(startOffset, startLine, startColumn, lexeme);
         }
 
         // ERROR
         buffer.advance();
-        return errorToken(
+        return makeErrorToken(
             "Unexpected character '" + startChar + "'",
             startLine,
             startColumn
@@ -589,26 +557,26 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         if (Character.isUnicodeIdentifierStart(c)) {
             scanUnicodeIdentifier();
             String lexeme = buffer.getTokenWindowLexeme();
-            return makeIdentifierToken(startOffset, line, column, lexeme, lexeme);
+            return factory.makeIdentifierToken(startOffset, line, column, lexeme);
         }
 
         // Unicode identifier part (rare case)
         if (Character.isUnicodeIdentifierPart(c)) {
             scanUnicodeIdentifier();
             String lexeme = buffer.getTokenWindowLexeme();
-            return makeIdentifierToken(startOffset, line, column, lexeme, lexeme);
+            return factory.makeIdentifierToken(startOffset, line, column, lexeme);
         }
 
         // Unicode digit (JSON5)
         if (Character.isDigit(c)) {
             scanUnicodeNumber(c);
             String lexeme = buffer.getTokenWindowLexeme();
-            return makeNumberToken(startOffset, line, column, lexeme, lexeme);
+            return factory.makeNumberToken(startOffset, line, column, lexeme);
         }
 
         // Otherwise - UNKNOWN
         buffer.advance();
-        return errorToken("Unexpected character '" + c + "'", line, column);
+        return makeErrorToken("Unexpected character '" + c + "'", line, column);
     }
 
     private void scanUnicodeIdentifier() {
@@ -661,17 +629,74 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     }
 
     //
+    //
+    //
+
+    private void resetCommonState() {
+        if (buffer instanceof LexemeProvider lp) {
+            factory = new BufferBackedTokenFactory(buffer, lp);
+        } else {
+            factory = new LexemeBackedTokenFactory();
+        }
+        // Handle UTF-8 BOM if present at start of stream/string
+        if (buffer.peek() == '\uFEFF') {
+            buffer.advance();
+        }
+    }
+
+    //
     // Token Creation
     //
 
-    private JsonToken structural(JsonTokenType type) {
+    private JsonToken classifyLexeme(int startOffset, int line, int column, String lexeme) {
+        switch (lexeme) {
+            case TRUE:
+                return new JsonLexemeBackedToken(
+                    line, column, startOffset,
+                    JsonTokenType.BOOLEAN,
+                    JsonLiteral.TRUE
+                );
+            case FALSE:
+                return new JsonLexemeBackedToken(
+                    line, column, startOffset,
+                    JsonTokenType.BOOLEAN,
+                    JsonLiteral.FALSE
+                );
+
+            case NULL:
+                return new JsonLexemeBackedToken(
+                    line, column, startOffset,
+                    JsonTokenType.NULL,
+                    JsonLiteral.NULL
+                );
+
+            case INFINITY:
+                return new JsonLexemeBackedToken(
+                    line, column, startOffset,
+                    JsonTokenType.IDENTIFIER,
+                    JsonLiteral.INFINITY
+                );
+
+            case NAN:
+                return new JsonLexemeBackedToken(
+                    line, column, startOffset,
+                    JsonTokenType.IDENTIFIER,
+                    JsonLiteral.NAN
+                );
+
+            default:
+                return factory.makeIdentifierToken(startOffset, line, column, lexeme);
+        }
+    }
+
+    private JsonLexemeBackedToken makeStructuralToken(JsonTokenType type) {
         int startOffset = buffer.offset();
         int startLine   = buffer.line();
         int startColumn = buffer.column();
 
         buffer.advance();
 
-        return new JsonToken(
+        return new JsonLexemeBackedToken(
             startLine,
             startColumn,
             startOffset,
@@ -679,92 +704,20 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         );
     }
 
-    private JsonToken classifyLexeme(int startOffset, int line, int column, String lexeme, String content) {
-        switch (lexeme) {
-            case "true":
-                return new JsonToken(
-                    line, column, startOffset,
-                    JsonTokenType.BOOLEAN,
-                    JsonLiteral.TRUE
-                );
-            case "false":
-                return new JsonToken(
-                    line, column, startOffset,
-                    JsonTokenType.BOOLEAN,
-                    JsonLiteral.FALSE
-                );
-
-            case "null":
-                return new JsonToken(
-                    line, column, startOffset,
-                    JsonTokenType.NULL,
-                    JsonLiteral.NULL
-                );
-
-            case "Infinity":
-            case "NaN":
-                return makeNumberToken(startOffset, line, column, lexeme, lexeme);
-
-            default:
-                return makeIdentifierToken(startOffset, line, column, lexeme, content);
-        }
-    }
-
-    private JsonToken makeNumberToken(int startOffset, int line, int column, String lexeme, String content) {
-        if (buffer instanceof LexemeProvider lp) {
-            return new JsonBufferBackedToken(
-                lp,
-                line,
-                column,
-                startOffset,
-                buffer.offset(),
-                JsonTokenType.NUMBER,
-                content,
-                QuoteStyle.PLAIN
-            );
-        }
-
-        return new JsonToken(
+    private JsonLexemeBackedToken makeErrorToken(String message, int line, int column) {
+        return new JsonLexemeBackedToken(
             line,
             column,
-            startOffset,
-            JsonTokenType.NUMBER,
-            lexeme,
-            content,
+            buffer.windowStartOffset(),
+            JsonTokenType.ERROR,
+            message,
+            null,
             QuoteStyle.PLAIN
         );
     }
 
-    private JsonToken makeIdentifierToken(
-        int startOffset, int line, int column,
-        String lexeme, String content
-    ) {
-        if (buffer instanceof LexemeProvider lp) {
-            return new JsonBufferBackedToken(
-                lp,
-                line,
-                column,
-                startOffset,
-                buffer.offset(),
-                JsonTokenType.IDENTIFIER,
-                content,
-                QuoteStyle.PLAIN
-            );
-        }
-
-        return new JsonToken(
-            line,
-            column,
-            startOffset,
-            JsonTokenType.IDENTIFIER,
-            lexeme,
-            content,
-            QuoteStyle.PLAIN
-        );
-    }
-
-    private JsonToken toCommentToken(JsonComment c) {
-        return new JsonToken(
+    private JsonLexemeBackedToken toCommentToken(JsonComment c) {
+        return new JsonLexemeBackedToken(
             c.getLine(),
             c.getColumn(),
             0, // TODO: Use a real value here
@@ -775,14 +728,89 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         );
     }
 
-    //
-    //
-    //
+    private interface TokenFactory {
+        JsonToken makeNumberToken(int startOffset, int line, int column, String lexeme);
+        JsonToken makeStringToken(int startOffset, int line, int column, String lexeme, String content, QuoteStyle qs);
+        JsonToken makeIdentifierToken(int startOffset, int line, int column, String lexeme);
+    }
 
-    private void resetCommonState() {
-        // Handle UTF-8 BOM if present at start of stream/string
-        if (buffer.peek() == '\uFEFF') {
-            buffer.advance();
+    private static class BufferBackedTokenFactory implements TokenFactory {
+        private final SourceBuffer buffer;
+        private final LexemeProvider lp;
+
+        public BufferBackedTokenFactory(SourceBuffer buffer, LexemeProvider lp) {
+            this.buffer = buffer;
+            this.lp = lp;
+        }
+
+        public JsonBufferBackedToken makeNumberToken(int startOffset, int line, int column, String lexeme) {
+            final int offset = buffer.offset();
+            return new JsonBufferBackedToken(
+                lp,
+                line,
+                column,
+                startOffset,
+                offset,
+                JsonTokenType.NUMBER
+            );
+        }
+
+        public JsonBufferBackedToken makeStringToken(int startOffset, int line, int column, String lexeme, String content, QuoteStyle qs) {
+            final int offset = buffer.offset();
+            return new JsonBufferBackedToken(
+                lp,
+                line,
+                column,
+                startOffset,
+                offset,
+                qs
+            );
+        }
+
+        public JsonBufferBackedToken makeIdentifierToken(int startOffset, int line, int column, String lexeme) {
+            final int offset = buffer.offset();
+            return new JsonBufferBackedToken(
+                lp,
+                line,
+                column,
+                startOffset,
+                offset,
+                JsonTokenType.IDENTIFIER
+            );
+        }
+    }
+
+    private static class LexemeBackedTokenFactory implements TokenFactory {
+        public JsonLexemeBackedToken makeNumberToken(int startOffset, int line, int column, String lexeme) {
+            return new JsonLexemeBackedToken(
+                line,
+                column,
+                startOffset,
+                JsonTokenType.NUMBER,
+                lexeme
+            );
+        }
+
+        public JsonLexemeBackedToken makeStringToken(int startOffset, int line, int column, String lexeme, String content, QuoteStyle qs) {
+            return new JsonLexemeBackedToken(
+                line,
+                column,
+                startOffset,
+                JsonTokenType.STRING,
+                lexeme,
+                content,
+                qs
+            );
+        }
+
+        public JsonLexemeBackedToken makeIdentifierToken(int startOffset, int line, int column, String lexeme) {
+            return new JsonLexemeBackedToken(
+                line,
+                column,
+                startOffset,
+                JsonTokenType.IDENTIFIER,
+                lexeme
+            );
         }
     }
 }

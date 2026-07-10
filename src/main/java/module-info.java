@@ -7,7 +7,7 @@ module cascara.lang.json {
     exports io.github.qishr.cascara.lang.json.util;
 
     // For testing
-    opens io.github.qishr.cascara.lang.json;
+    opens io.github.qishr.cascara.lang.json.processor;
 
     provides io.github.qishr.cascara.common.lang.processor.AstConverter
         with io.github.qishr.cascara.lang.json.processor.JsonConverter;

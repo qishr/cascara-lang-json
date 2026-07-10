@@ -22,7 +22,6 @@ import io.github.qishr.cascara.lang.json.ast.JsonNode;
 import io.github.qishr.cascara.lang.json.ast.JsonScalarNode;
 import io.github.qishr.cascara.lang.json.ast.JsonSequenceNode;
 import io.github.qishr.cascara.lang.json.exception.JsonDiagnosticCode;
-import io.github.qishr.cascara.lang.json.token.JsonLiteral;
 import io.github.qishr.cascara.lang.json.token.JsonToken;
 import io.github.qishr.cascara.lang.json.token.JsonTokenType;
 import io.github.qishr.cascara.lang.json.util.JsonOptions;
@@ -34,6 +33,8 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
     private static final String TRUE = "true";
     private static final String FALSE = "false";
     private static final String NULL = "null";
+    private static final String INFINITY = "Infinity";
+    private static final String NAN = "NaN";
 
     /// Buffer to hold comments until a data node is created to claim them.
     private final List<JsonCommentNode> pendingComments = new ArrayList<>();
@@ -161,33 +162,9 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
             if (type == JsonTokenType.STRING ||
                 type == JsonTokenType.NUMBER ||
                 type == JsonTokenType.BOOLEAN ||
-                type == JsonTokenType.NULL) {
+                type == JsonTokenType.NULL ||
+                type == JsonTokenType.IDENTIFIER) {
                 return parseScalar();
-            }
-
-            // JSON5 identifiers (Infinity/NaN only)
-            if (type == JsonTokenType.IDENTIFIER) {
-                String ident = token.getContent();
-
-                if ("Infinity".equals(ident) || "NaN".equals(ident)) {
-                    advance();
-                    JsonScalarNode node = new JsonScalarNode(
-                        token.getStartLine(),
-                        token.getStartColumn(),
-                        SchemaType.ANY,
-                        token.getLexeme(),
-                        ident,
-                        QuoteStyle.PLAIN,
-                        false,
-                        options
-                    );
-                    attachComments(node);
-                    return node;
-                }
-
-                // Everything else is an error
-                error(token, JsonDiagnosticCode.UNEXPECTED_UNQUOTED_STRING_VALUE, ident);
-                return new JsonScalarNode(); // safe empty node
             }
 
             // Unexpected token
@@ -377,7 +354,6 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
             skipTrivia();
             JsonToken tok = advance(); // consume the scalar token
             JsonTokenType type = tok.getType();
-
             JsonScalarNode node;
 
             switch (type) {
@@ -387,9 +363,13 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
                         tok.getStartLine(),
                         tok.getStartColumn(),
                         SchemaType.STRING,
+
+
                         tok.getLexeme(),
                         tok.getContent(),
                         tok.getQuoteStyle(),
+
+
                         false,
                         options
                     );
@@ -400,39 +380,21 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
                         tok.getStartLine(),
                         tok.getStartColumn(),
                         null, // We don't know if it's NUMBER or INTERGER
+
+
                         tok.getLexeme(),
                         tok.getContent(),
+
+
                         QuoteStyle.PLAIN,
                         false,
                         options
                     );
                 }
 
-                case IDENTIFIER -> {
-                    String ident = tok.getContent();
-
-                    if (ALLOW_INFINITY_AND_NAN &&
-                        ("Infinity".equals(ident) || "NaN".equals(ident))) {
-
-                        node = new JsonScalarNode(
-                            tok.getStartLine(),
-                            tok.getStartColumn(),
-                            SchemaType.STRING,
-                            tok.getLexeme(),
-                            ident,
-                            QuoteStyle.PLAIN,
-                            false,
-                            options
-                        );
-                    } else {
-                        error(tok, JsonDiagnosticCode.UNEXPECTED_UNQUOTED_STRING_VALUE, ident);
-                        node = new JsonScalarNode();
-                    }
-                }
-
                 default -> {
                     switch(tok.getLiteral()) {
-                        case JsonLiteral.TRUE -> {
+                        case TRUE -> {
                             node = new JsonScalarNode(
                                 tok.getStartLine(),
                                 tok.getStartColumn(),
@@ -444,7 +406,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
                                 options
                             );
                         }
-                        case JsonLiteral.FALSE -> {
+                        case FALSE -> {
                             node = new JsonScalarNode(
                                 tok.getStartLine(),
                                 tok.getStartColumn(),
@@ -456,7 +418,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
                                 options
                             );
                         }
-                        case JsonLiteral.NULL -> {
+                        case NULL -> {
                             node = new JsonScalarNode(
                                 tok.getStartLine(),
                                 tok.getStartColumn(),
@@ -467,6 +429,40 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
                                 false,
                                 options
                             );
+                        }
+                        case NAN -> {
+                            if (ALLOW_INFINITY_AND_NAN) {
+                                node = new JsonScalarNode(
+                                    tok.getStartLine(),
+                                    tok.getStartColumn(),
+                                    SchemaType.STRING,
+                                    tok.getLexeme(),
+                                    NAN,
+                                    QuoteStyle.PLAIN,
+                                    false,
+                                    options
+                                );
+                            } else {
+                                error(tok, JsonDiagnosticCode.UNEXPECTED_UNQUOTED_STRING_VALUE, NAN);
+                                node = new JsonScalarNode();
+                            }
+                        }
+                        case INFINITY -> {
+                            if (ALLOW_INFINITY_AND_NAN) {
+                                node = new JsonScalarNode(
+                                    tok.getStartLine(),
+                                    tok.getStartColumn(),
+                                    SchemaType.STRING,
+                                    tok.getLexeme(),
+                                    INFINITY,
+                                    QuoteStyle.PLAIN,
+                                    false,
+                                    options
+                                );
+                            } else {
+                                error(tok, JsonDiagnosticCode.UNEXPECTED_UNQUOTED_STRING_VALUE, INFINITY);
+                                node = new JsonScalarNode();
+                            }
                         }
                         default -> {
                             error(tok, JsonDiagnosticCode.UNEXPECTED_TOKEN, type);
