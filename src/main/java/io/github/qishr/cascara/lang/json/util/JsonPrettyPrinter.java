@@ -20,6 +20,10 @@ public class JsonPrettyPrinter {
         this.writer = writer;
     }
 
+    public void print(String key) throws IOException {
+        writer.write(key);
+    }
+
     public void print(JsonNode node) throws IOException {
         // 1. Print any comments attached to this node
         for (CommentAstNode comment : node.getComments()) {
@@ -46,9 +50,9 @@ public class JsonPrettyPrinter {
         // API doc: keys() returns Set<K> (which are AstNodes/JsonNodes)
         var keys = new ArrayList<>(map.keySet());
         for (int i = 0; i < keys.size(); i++) {
-            JsonNode keyNode = (JsonNode) keys.get(i);
+            String key = keys.get(i);
             // API doc: getEntry takes the Key node, not a String
-            JsonMapEntryNode entry = (JsonMapEntryNode) map.getEntry(keyNode);
+            JsonMapEntryNode entry = (JsonMapEntryNode) map.getEntry(key);
 
             writeIndent();
             print(entry.getKey());

@@ -8,6 +8,8 @@ public class JsonStringUnescaper {
         //     return text;
         // }
 
+        if (text.indexOf("\\") == -1) return text;
+
         StringBuilder sb = new StringBuilder();
         int len = text.length();
 

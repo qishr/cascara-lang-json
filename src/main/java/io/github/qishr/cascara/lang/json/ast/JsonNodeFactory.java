@@ -5,7 +5,7 @@ import io.github.qishr.cascara.common.lang.util.LanguageOptions;
 import io.github.qishr.cascara.common.lang.util.QuoteStyle;
 import io.github.qishr.cascara.lang.json.util.JsonOptions;
 
-public class JsonNodeFactory implements AstNodeFactory<JsonNode,JsonScalarNode,JsonSequenceNode,JsonMapNode,JsonMapEntryNode> {
+public class JsonNodeFactory implements AstNodeFactory<JsonNode,JsonScalarNode,JsonSequenceNode,JsonMapNode,JsonMapEntryNode,String> {
 
     @Override
     public JsonScalarNode createScalarNode(Object jvmValue) {
@@ -23,8 +23,10 @@ public class JsonNodeFactory implements AstNodeFactory<JsonNode,JsonScalarNode,J
 	}
 
     @Override
-    public JsonScalarNode createScalarKeyNode(Object key) {
-        return new JsonScalarNode(key, true);
+    public String createKey(Object key) {
+        if (key instanceof String s) return s;
+        return String.valueOf(key);
+        // return new JsonScalarNode(key, true);
     }
 
     @Override

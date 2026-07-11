@@ -34,14 +34,15 @@ public class JsonConverter extends AbstractJsonProcessor<JsonConverter> implemen
             JsonMapNode map = new JsonMapNode();
             for (Object entry : fromMap.getEntries()) {
                 if (entry instanceof MapEntryAstNode fromMapEntry) {
-                    AstNode astKey = fromMapEntry.getKey();
+                    Object astKey = fromMapEntry.getKey();
                     AstNode astValue = fromMapEntry.getValue();
-                    if (astKey instanceof ScalarAstNode) {
-                        if (fromAst(astKey) instanceof JsonScalarNode jsonKey) {
+                    if (astKey instanceof ScalarAstNode astScalar) {
+                        String jsonKey = astScalar.asString();
+                        // if (fromAst(astScalar) instanceof JsonScalarNode jsonKey) {
                             System.out.println("    scalar key " + jsonKey);
                             JsonNode jsonValue = fromAst(astValue);
                             map.put(jsonKey, jsonValue);
-                        }
+                        // }
                     }
                 }
             }

@@ -25,14 +25,12 @@ import io.github.qishr.cascara.lang.json.exception.JsonDiagnosticCode;
 import io.github.qishr.cascara.lang.json.token.JsonToken;
 import io.github.qishr.cascara.lang.json.token.JsonTokenType;
 import io.github.qishr.cascara.lang.json.util.JsonOptions;
+import io.github.qishr.cascara.lang.json.util.JsonStringUnescaper;
 
 /// A recursive descent parser for JSON/JSON5.
 public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
         implements AstParser<JsonNode, JsonToken> {
 
-    private static final String TRUE = "true";
-    private static final String FALSE = "false";
-    private static final String NULL = "null";
     private static final String INFINITY = "Infinity";
     private static final String NAN = "NaN";
 
@@ -217,17 +215,17 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
 
                 // ---- Parse key ----
                 JsonToken keyTok = advance();
-                JsonScalarNode key = parseKey(keyTok);
 
                 // JSON5: unquoted keys allowed only when configured
-                if (!ALLOW_UNQUOTED_KEYS && key.getQuoteStyle() != QuoteStyle.DOUBLE) {
-                    error(key.getToken(), JsonDiagnosticCode.EXPECTED_MAP_KEY);
+                if (!ALLOW_UNQUOTED_KEYS && keyTok.getQuoteStyle() != QuoteStyle.DOUBLE) {
+                    error(keyTok, JsonDiagnosticCode.EXPECTED_MAP_KEY);
                 }
 
                 // Duplicate key detection
-                String keyString = key.getKeyString();
+                String keyString = parseKey(keyTok);
+
                 if (!seenKeys.add(keyString)) {
-                    error(key.getToken(), JsonDiagnosticCode.DUPLICATE_KEY, keyString);
+                    error(keyTok, JsonDiagnosticCode.DUPLICATE_KEY, keyString);
                 }
 
                 // ---- Parse colon ----
@@ -235,7 +233,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
 
                 // ---- Parse value ----
                 JsonNode value = parseValue();
-                map.put(key, value);
+                map.put(keyString, value);
 
                 // Consume comments only
                 skipTrivia();
@@ -254,51 +252,32 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
         }
     }
 
-    private JsonScalarNode parseKey(JsonToken tok) {
-        JsonScalarNode key;
-
+    private String parseKey(JsonToken tok) {
+        // JsonScalarNode key;
+        String key;
         switch (tok.getType()) {
 
             case STRING -> {
-                key = new JsonScalarNode(
-                    tok,
-                    // tok.getStartLine(),
-                    // tok.getStartColumn(),
-                    SchemaType.STRING,
-                    // tok.getLexeme(),
-                    // tok.getContent(),
-                    // QuoteStyle.DOUBLE,
-                    true,
-                    options
-                );
+                key = JsonStringUnescaper.unescape(tok.getContent());
             }
 
             case IDENTIFIER -> {
                 if (ALLOW_UNQUOTED_KEYS) {
-                    key = new JsonScalarNode(
-                        tok,
-                        // tok.getStartLine(),
-                        // tok.getStartColumn(),
-                        SchemaType.STRING,
-                        // tok.getLexeme(),
-                        // tok.getContent(),
-                        // QuoteStyle.PLAIN,
-                        true,
-                        options
-                    );
+                    key = tok.getLexeme();
                 } else {
                     error(tok, JsonDiagnosticCode.EXPECTED_MAP_KEY);
-                    key = new JsonScalarNode();
+                    key = null;
                 }
             }
 
             default -> {
                 error(tok, JsonDiagnosticCode.EXPECTED_MAP_KEY);
-                key = new JsonScalarNode();
+                key = null;
             }
         }
 
-        attachComments(key);
+        // TODO:
+        // attachComments(key);
         return key;
     }
 
@@ -357,23 +336,14 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
             skipTrivia();
             JsonToken tok = advance(); // consume the scalar token
             JsonTokenType type = tok.getType();
-            JsonScalarNode node;
+            JsonScalarNode node = null;
 
             switch (type) {
 
                 case STRING -> {
                     node = new JsonScalarNode(
                         tok,
-                        // tok.getStartLine(),
-                        // tok.getStartColumn(),
                         SchemaType.STRING,
-
-
-                        // tok.getLexeme(),
-                        // tok.getContent(),
-                        // tok.getQuoteStyle(),
-
-
                         false,
                         options
                     );
@@ -382,117 +352,78 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
                 case NUMBER -> {
                     node = new JsonScalarNode(
                         tok,
-                        // tok.getStartLine(),
-                        // tok.getStartColumn(),
                         SchemaType.ANY, // We don't know if it's NUMBER or INTERGER
-
-
-                        // tok.getLexeme(),
-                        // tok.getContent(),
-
-
-                        // QuoteStyle.PLAIN,
                         false,
                         options
                     );
                 }
 
                 default -> {
-                    if (tok.getLiteral() == null) {
-                        System.out.println("Debug");
-                    }
-                    switch(tok.getLiteral()) {
-                        case TRUE -> {
-                            node = new JsonScalarNode(
-                                tok,
-                                // tok.getStartLine(),
-                                // tok.getStartColumn(),
-                                SchemaType.BOOLEAN,
-                                // TRUE,
-                                // TRUE,
-                                // QuoteStyle.PLAIN,
-                                false,
-                                options
-                            );
-                        }
-                        case FALSE -> {
-                            node = new JsonScalarNode(
-                                tok,
-                                // tok.getStartLine(),
-                                // tok.getStartColumn(),
-                                SchemaType.BOOLEAN,
-                                // FALSE,
-                                // FALSE,
-                                // QuoteStyle.PLAIN,
-                                false,
-                                options
-                            );
-                        }
-                        case NULL -> {
-                            node = new JsonScalarNode(
-                                tok,
-                                // tok.getStartLine(),
-                                // tok.getStartColumn(),
-                                SchemaType.NULL,
-                                // NULL,
-                                // NULL,
-                                // QuoteStyle.PLAIN,
-                                false,
-                                options
-                            );
-                        }
-                        case NAN -> {
-                            if (ALLOW_INFINITY_AND_NAN) {
+                    if (tok.getLiteral() != null) {
+                        switch(tok.getLiteral()) {
+                            case TRUE -> {
                                 node = new JsonScalarNode(
                                     tok,
-                                    // tok.getStartLine(),
-                                    // tok.getStartColumn(),
-                                    SchemaType.STRING,
-                                    // tok.getLexeme(),
-                                    // NAN,
-                                    // QuoteStyle.PLAIN,
+                                    SchemaType.BOOLEAN,
                                     false,
                                     options
                                 );
-                            } else {
-                                error(tok, JsonDiagnosticCode.UNEXPECTED_UNQUOTED_STRING_VALUE, NAN);
-                                node = new JsonScalarNode();
                             }
-                        }
-                        case INFINITY -> {
-                            if (ALLOW_INFINITY_AND_NAN) {
+                            case FALSE -> {
                                 node = new JsonScalarNode(
                                     tok,
-                                    // tok.getStartLine(),
-                                    // tok.getStartColumn(),
-                                    SchemaType.STRING,
-                                    // tok.getLexeme(),
-                                    // INFINITY,
-                                    // QuoteStyle.PLAIN,
+                                    SchemaType.BOOLEAN,
                                     false,
                                     options
                                 );
-                            } else {
-                                error(tok, JsonDiagnosticCode.UNEXPECTED_UNQUOTED_STRING_VALUE, INFINITY);
-                                node = new JsonScalarNode();
                             }
-                        }
-                        default -> {
-                            error(tok, JsonDiagnosticCode.UNEXPECTED_TOKEN, type);
-                            node = new JsonScalarNode(
-                                tok,
-                                // tok.getStartLine(),
-                                // tok.getStartColumn(),
-                                SchemaType.ANY,
-                                // "",
-                                // "",
-                                // null,
-                                false,
-                                options
-                            );
+                            case NULL -> {
+                                node = new JsonScalarNode(
+                                    tok,
+                                    SchemaType.NULL,
+                                    false,
+                                    options
+                                );
+                            }
+                            case NAN -> {
+                                if (ALLOW_INFINITY_AND_NAN) {
+                                    node = new JsonScalarNode(
+                                        tok,
+                                        SchemaType.STRING,
+                                        false,
+                                        options
+                                    );
+                                } else {
+                                    error(tok, JsonDiagnosticCode.UNEXPECTED_UNQUOTED_STRING_VALUE, NAN);
+                                    node = new JsonScalarNode();
+                                }
+                            }
+                            case INFINITY -> {
+                                if (ALLOW_INFINITY_AND_NAN) {
+                                    node = new JsonScalarNode(
+                                        tok,
+                                        SchemaType.STRING,
+                                        false,
+                                        options
+                                    );
+                                } else {
+                                    error(tok, JsonDiagnosticCode.UNEXPECTED_UNQUOTED_STRING_VALUE, INFINITY);
+                                    node = new JsonScalarNode();
+                                }
+                            }
                         }
                     }
                 }
+            }
+
+            if (node == null) {
+                error(tok, JsonDiagnosticCode.UNEXPECTED_TOKEN, type);
+                node = new JsonScalarNode(
+                    tok,
+                    SchemaType.ANY,
+                    false,
+                    options
+                );
             }
 
             attachComments(node);

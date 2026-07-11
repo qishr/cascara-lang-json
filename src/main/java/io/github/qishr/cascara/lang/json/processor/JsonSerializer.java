@@ -19,7 +19,7 @@ import io.github.qishr.cascara.lang.json.ast.JsonSequenceNode;
 import io.github.qishr.cascara.lang.json.util.JsonOptions;
 
 /// Standard implementation for JSON serialization.
-public class JsonSerializer extends AbstractSerializer<JsonSerializer,JsonNode,JsonScalarNode,JsonSequenceNode,JsonMapNode,JsonMapEntryNode> {
+public class JsonSerializer extends AbstractSerializer<JsonSerializer,JsonNode,JsonScalarNode,JsonSequenceNode,JsonMapNode,JsonMapEntryNode,String> {
 
     private JsonAstParser parser;
     private JsonOptions options = new JsonOptions();
@@ -37,6 +37,14 @@ public class JsonSerializer extends AbstractSerializer<JsonSerializer,JsonNode,J
     @Override
     public JsonSerializer self() {
         return this;
+    }
+
+    @Override
+    protected String serializeKey(Object key) {
+        if (key instanceof String s) {
+            return s;
+        }
+        return String.valueOf(key);
     }
 
     @Override

@@ -53,7 +53,14 @@ public class JsonEmitter extends AbstractJsonProcessor<JsonEmitter>  implements 
             for (int i = 0; i < entries.size(); i++) {
                 JsonMapEntryNode entry = (JsonMapEntryNode) entries.get(i);
 
-                emitNode(entry.getKey());
+
+
+                //
+                // emitNode(entry.getKey());
+                emitScalar(formatKey(entry.getKey()));
+
+
+
                 emitPropertySeparator();
                 emitNode(entry.getValue());
 
@@ -88,6 +95,20 @@ public class JsonEmitter extends AbstractJsonProcessor<JsonEmitter>  implements 
             case PLAIN -> value; // For numbers, booleans, or unquoted keys
             default -> value;
         };
+    }
+
+    private String formatKey(String value) {
+        if (value == null) return "null";
+
+        return "\"" + escapeJson(value) + "\"";
+
+        // return switch (scalar.getQuoteStyle()) {
+        //     case DOUBLE -> "\"" + escapeJson(value) + "\"";
+        //     case SINGLE -> "'" + escapeJson(value) + "'";
+        //     case LITERAL_BLOCK, FOLDED -> value; // Usually used for multi-line or raw blocks
+        //     case PLAIN -> value; // For numbers, booleans, or unquoted keys
+        //     default -> value;
+        // };
     }
 
     private String escapeJson(String input) {

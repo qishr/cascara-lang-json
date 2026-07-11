@@ -35,22 +35,19 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
     /// Takes a String and triggers full lexical dialect type inference.
     public JsonScalarNode(
         JsonToken token,
-        // int line,
-        // int column,
         SchemaType schemaType,
-        // String lexeme,
-        // String escapedContent,
-        // QuoteStyle quoteStyle,
         boolean isKey,
         JsonOptions options
     ) {
         super(token);
         this.schemaType = schemaType;
-        // this.lexeme = lexeme;
-        // this.escapedContent = escapedContent;
         this.quoteStyle = token.getQuoteStyle();
         this.options = (options == null) ? JsonOptions.STRICT : options;
         this.isKey = isKey;
+    }
+
+    public JsonScalarNode(String content, JsonOptions options) {
+        this(content, QuoteStyle.UNDETERMINED, false, options);
     }
 
     public JsonScalarNode(
@@ -60,10 +57,7 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
         JsonOptions options
     ) {
         super();
-        // this.token = null;
         this.schemaType = SchemaType.of(jvmValue);
-        // this.lexeme = null;
-        // this.escapedContent = null;
         this.quoteStyle = quoteStyle;
         this.options = (options == null) ? JsonOptions.STRICT : options;
         this.isKey = false;
@@ -118,36 +112,6 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
         return this;
     }
 
-    public String getKeyString() {
-        if (keyStringCache == null) {
-
-            if (token == null) {
-
-                // if (escapedContent != null) {
-                //     keyStringCache = unescape(escapedContent, quoteStyle, true);
-                // } else if (lexeme != null) {
-                //     keyStringCache = unescape(lexeme, quoteStyle, true);
-                // } else {
-                    keyStringCache = String.valueOf(getPrimitive());
-                // }
-
-            } else {
-                String content = token.getContent();
-                String lexeme = token.getLexeme();
-                if (content != null) {
-                    keyStringCache = unescape(content, quoteStyle, true);
-                } else if (lexeme != null) {
-                    keyStringCache = unescape(lexeme, quoteStyle, true);
-                } else {
-                    // TODO: Is this even possible?
-                    // Yes = for literals
-                    keyStringCache = String.valueOf(getPrimitive());
-                }
-            }
-        }
-        return keyStringCache;
-    }
-
     @Override
     public String getLexeme() {
         return token == null ? null : token.getLexeme();
@@ -155,8 +119,6 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
 
     @Override
     public String getContent() {
-        // return escapedContent;
-        // return asString();
         return token == null ? asString() : token.getContent();
     }
 
@@ -226,6 +188,7 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
         if (v instanceof Boolean b) return b;
         if (v == null) return defaultValue;
         String s = String.valueOf(v);
+        // TODO: JSON5...
         if ("true".equals(s)) return true;
         if ("false".equals(s)) return false;
         return defaultValue;

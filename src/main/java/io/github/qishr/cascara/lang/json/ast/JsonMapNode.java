@@ -8,11 +8,9 @@ import java.util.Iterator;
 
 import io.github.qishr.cascara.common.lang.annotation.Nullable;
 import io.github.qishr.cascara.common.lang.ast.MapAstNode;
-import io.github.qishr.cascara.common.lang.type.SchemaType;
-import io.github.qishr.cascara.common.lang.util.QuoteStyle;
 import io.github.qishr.cascara.lang.json.util.JsonOptions;
 
-public class JsonMapNode extends JsonNode implements MapAstNode<JsonNode, JsonMapEntryNode> {
+public class JsonMapNode extends JsonNode implements MapAstNode<String, JsonNode, JsonMapEntryNode> {
     private final LinkedHashMap<String, JsonMapEntryNode> entriesByKey = new LinkedHashMap<>();
     private final JsonOptions options;
 
@@ -37,40 +35,15 @@ public class JsonMapNode extends JsonNode implements MapAstNode<JsonNode, JsonMa
     }
 
     @Override
-    public boolean containsKey(JsonNode key) {
-        return getEntry(key) != null;
-    }
-
-    @Override
-    public JsonNode get(JsonNode key) {
-        JsonMapEntryNode entry = getEntry(key);
-        return entry == null ? null : entry.getValue();
-    }
-
-    @Override
     public List<JsonMapEntryNode> getChildren() {
         return List.copyOf(entriesByKey.values());
     }
 
-    @Override
-    @Nullable
-    public JsonMapEntryNode getEntry(JsonNode key) {
-        if (key == null) return null;
-        String lookup = (key instanceof JsonScalarNode s)
-            ? s.getKeyString()
-            : key.toString();
-        return entriesByKey.get(lookup);
-    }
-
-
-    /// Convenience method for internal use and testing.
-    /// Not part of the MapAstNode interface.
     @Nullable
     public JsonMapEntryNode getEntry(String key) {
         if (key == null) return null;
         return entriesByKey.get(key);
     }
-
 
     @Override
     public List<JsonMapEntryNode> getEntries() {
@@ -78,8 +51,8 @@ public class JsonMapNode extends JsonNode implements MapAstNode<JsonNode, JsonMa
     }
 
     @Override
-    public Set<JsonNode> keySet() {
-        Set<JsonNode> keys = new LinkedHashSet<>();
+    public Set<String> keySet() {
+        Set<String> keys = new LinkedHashSet<>();
         for (JsonMapEntryNode entry : entriesByKey.values()) {
             keys.add(entry.getKey());
         }
@@ -89,34 +62,6 @@ public class JsonMapNode extends JsonNode implements MapAstNode<JsonNode, JsonMa
     @Override
     public Set<JsonMapEntryNode> entrySet() {
         return new LinkedHashSet<>(entriesByKey.values());
-    }
-
-    public JsonMapNode put(JsonScalarNode keyNode, JsonNode value) {
-        String key = keyNode.getKeyString();
-        JsonMapEntryNode entry = entriesByKey.get(key);
-        if (entry == null) {
-            entry = new JsonMapEntryNode(0, 0, keyNode, value);
-            entriesByKey.put(key, entry);
-        } else {
-            entry.setRaw(value);
-        }
-        return this;
-    }
-
-    @Override
-    public JsonMapNode remove(JsonNode key) {
-        JsonMapEntryNode entry = getEntry(key);
-        if (entry != null) {
-            String lookup;
-            JsonNode kNode = entry.getKey();
-            if (kNode instanceof JsonScalarNode scalar) {
-                lookup = scalar.asString();
-            } else {
-                lookup = kNode.toString();
-            }
-            entriesByKey.remove(lookup);
-        }
-        return this;
     }
 
     @Override
@@ -144,18 +89,6 @@ public class JsonMapNode extends JsonNode implements MapAstNode<JsonNode, JsonMa
     }
 
     @Override
-    public JsonMapNode put(JsonNode key, JsonNode value) {
-        JsonMapEntryNode entry = getEntry(key);
-        if (entry == null) {
-            entry = new JsonMapEntryNode(0, 0, key, value);
-            entriesByKey.put(key.asString(), entry);
-            return this;
-        }
-        entry.setRaw(value);
-        return this;
-    }
-
-    @Override
     public JsonMapNode put(String key, JsonNode value) {
         JsonMapEntryNode existing = entriesByKey.get(key);
         if (existing != null) {
@@ -165,13 +98,7 @@ public class JsonMapNode extends JsonNode implements MapAstNode<JsonNode, JsonMa
             return this;
         }
 
-        // TODO: Where does JsonPrimitiveDesciptor come from?
-        // Since we're passing null in as the descriptor, the node needs to be able to handle all options? or only the default ones?
-
-        // JsonNode keyNode = new JsonScalarNode(0, 0, SchemaType.STRING, key, key, QuoteStyle.DOUBLE, true, options);
-        JsonNode keyNode = new JsonScalarNode(key, QuoteStyle.DOUBLE, true, options);
-
-        JsonMapEntryNode entry = new JsonMapEntryNode(0, 0, keyNode, value);
+        JsonMapEntryNode entry = new JsonMapEntryNode(0, 0, key, value);
         entriesByKey.put(key, entry);
         return this;
     }
@@ -190,7 +117,7 @@ public class JsonMapNode extends JsonNode implements MapAstNode<JsonNode, JsonMa
     /// {@inheritDoc}
     @Override
     public JsonMapNode put(String key, String value) {
-        return put(key, new JsonScalarNode(value));
+        return put(key, new JsonScalarNode(value, options));
     }
 
     @Override

@@ -77,11 +77,11 @@ public class JsonConverterTest {
 
         // Check quotes on value and key
         JsonMapEntryNode entry = map.getEntries().getFirst();
-        assertInstanceOf(JsonScalarNode.class, entry.getKey());
+        assertInstanceOf(String.class, entry.getKey());
         assertInstanceOf(JsonScalarNode.class, entry.getValue());
-        JsonScalarNode key = (JsonScalarNode)entry.getKey();
+        String key = entry.getKey();
         JsonScalarNode value = (JsonScalarNode)entry.getValue();
-        assertEquals(QuoteStyle.DOUBLE, key.getQuoteStyle());
+        // assertEquals(QuoteStyle.DOUBLE, key.getQuoteStyle());
         assertEquals(QuoteStyle.DOUBLE, value.getQuoteStyle());
 
         JsonNode testBool = map.get("testBool");
@@ -90,11 +90,11 @@ public class JsonConverterTest {
 
         // Check quotes on value and key
         entry = map.getEntries().get(1);
-        assertInstanceOf(JsonScalarNode.class, entry.getKey());
+        assertInstanceOf(String.class, entry.getKey());
         assertInstanceOf(JsonScalarNode.class, entry.getValue());
-        key = (JsonScalarNode)entry.getKey();
+        key = entry.getKey();
         value = (JsonScalarNode)entry.getValue();
-        assertEquals(QuoteStyle.DOUBLE, key.getQuoteStyle());
+        // assertEquals(QuoteStyle.DOUBLE, key.getQuoteStyle());
         assertEquals(QuoteStyle.PLAIN, value.getQuoteStyle());
 
         JsonNode testSeq = map.get("testSeq");
