@@ -1,6 +1,7 @@
 package io.github.qishr.cascara.lang.json.processor;
 
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
@@ -11,6 +12,7 @@ import io.github.qishr.cascara.common.lang.util.LanguageOptions;
 import io.github.qishr.cascara.common.lang.util.LexemeProvider;
 import io.github.qishr.cascara.common.lang.util.QuoteStyle;
 import io.github.qishr.cascara.common.lang.util.SourceBuffer;
+import io.github.qishr.cascara.common.lang.util.SourceByteBuffer;
 import io.github.qishr.cascara.common.lang.util.SourceInputStreamBuffer;
 import io.github.qishr.cascara.common.lang.util.SourceStringBuffer;
 import io.github.qishr.cascara.lang.json.token.JsonBufferBackedToken;
@@ -110,6 +112,29 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         applyOptions(new JsonOptions());
     }
 
+
+    @FunctionalInterface
+    private interface StringScanner {
+        boolean scan(char quoteChar);
+    }
+
+    private final StringScanner scalarStringScanner = this::scanString;
+
+    private final StringScanner simdStringScanner = (quoteChar) -> {
+        SourceByteBuffer bb = (SourceByteBuffer) buffer;
+
+        byte quoteByte = (byte) quoteChar;
+        int pos = bb.offset();
+        int simdPos = bb.scanStringAsciiSimd(pos, quoteByte);
+
+        bb.advanceBy(simdPos - pos);
+
+        return scanString(quoteChar); // scalar fallback for escapes/Unicode
+    };
+
+    private StringScanner stringScanner;
+
+
     @Override
     public JsonTokenizer setOptions(LanguageOptions<?> options) {
         super.setOptions(options);
@@ -139,11 +164,27 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         return buffer.column();
     }
 
+    // @Override
+    // public void open(String text) {
+    //     this.buffer = new SourceStringBuffer(text);
+    //     resetCommonState();
+    // }
+
     @Override
     public void open(String text) {
-        this.buffer = new SourceStringBuffer(text);
+
+        // SIMD + no JSON5 unquoted keys - use byte-based buffer
+        if (options.useSimd() && !options.allowUnquotedKeys()) {
+            byte[] raw = text.getBytes(StandardCharsets.UTF_8);
+            this.buffer = new SourceByteBuffer(raw);
+        } else {
+            // JSON5 identifiers or SIMD disabled - use char-based buffer
+            this.buffer = new SourceStringBuffer(text);
+        }
+
         resetCommonState();
     }
+
 
     @Override
     public void open(InputStream is) {
@@ -280,7 +321,8 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         buffer.startTokenWindow();
         buffer.advance(); // consume opening quote
 
-        boolean ok = scanString(quoteChar);
+        // boolean ok = scanString(quoteChar);
+        boolean ok = stringScanner.scan(quoteChar);
 
         QuoteStyle qs = (quoteChar == '"')
             ? QuoteStyle.DOUBLE
@@ -690,20 +732,52 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     //
     //
 
+    // private void resetCommonState() {
+    //     if (buffer instanceof LexemeProvider lp) {
+    //         factory = new BufferBackedTokenFactory(buffer, lp);
+    //     } else {
+    //         factory = new LexemeBackedTokenFactory(buffer);
+    //     }
+
+    //     if (!ALLOW_COMMENTS && buffer instanceof SourceStringBuffer stringBuffer) {
+    //         skipTrivia = () -> stringBuffer.skipWhitespaceSimd();
+    //     } else {
+    //         skipTrivia = () -> advanceWhitespaceAndComments();
+    //     }
+
+    //     // Handle UTF-8 BOM if present at start of stream/string
+    //     if (buffer.peek() == '\uFEFF') {
+    //         buffer.advance();
+    //     }
+    // }
+
     private void resetCommonState() {
+
+        // Token factory selection
         if (buffer instanceof LexemeProvider lp) {
             factory = new BufferBackedTokenFactory(buffer, lp);
         } else {
             factory = new LexemeBackedTokenFactory(buffer);
         }
 
+        // Whitespace skipping strategy
         if (!ALLOW_COMMENTS && buffer instanceof SourceStringBuffer stringBuffer) {
             skipTrivia = () -> stringBuffer.skipWhitespaceSimd();
         } else {
             skipTrivia = () -> advanceWhitespaceAndComments();
         }
 
-        // Handle UTF-8 BOM if present at start of stream/string
+        // TODO: SIMD strings are not giving the performance incease we need.
+        // Perhaps let them be configurable.
+
+        // String scanning strategy
+        if (options.useSimd() && buffer instanceof SourceByteBuffer) {
+            stringScanner = simdStringScanner;
+        } else {
+            stringScanner = scalarStringScanner;
+        }
+
+        // UTF‑8 BOM handling
         if (buffer.peek() == '\uFEFF') {
             buffer.advance();
         }

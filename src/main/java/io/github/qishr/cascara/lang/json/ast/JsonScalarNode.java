@@ -116,6 +116,18 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
     @Override
     public String getContent() {
         return token == null ? asString() : token.getContent();
+
+        // Caching here makes zero difference as this is only called once.
+
+        // if (!isStringValueCached) {
+        //     if (token == null) {
+        //         stringValue = (jvmValue == null) ? null : String.valueOf(jvmValue);
+        //     } else {
+        //         stringValue = unescape(token.getContent(), quoteStyle, isKey);
+        //     }
+        //     isStringValueCached = true;
+        // }
+        // return stringValue;
     }
 
     /// Returns the dialect-aware JVM value (cached).
