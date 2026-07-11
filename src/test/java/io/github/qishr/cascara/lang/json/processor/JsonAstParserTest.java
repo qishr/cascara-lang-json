@@ -4,7 +4,7 @@ import io.github.qishr.cascara.common.diagnostic.Diagnostic.Level;
 import io.github.qishr.cascara.common.diagnostic.SilentCollectingReporter;
 import io.github.qishr.cascara.common.diagnostic.StandardReporter;
 import io.github.qishr.cascara.common.lang.ast.CommentAstNode;
-import io.github.qishr.cascara.common.lang.type.SchemaType;
+import io.github.qishr.cascara.common.lang.type.PrimitiveType;
 import io.github.qishr.cascara.common.lang.util.QuoteStyle;
 import io.github.qishr.cascara.lang.json.ast.*;
 import io.github.qishr.cascara.lang.json.util.JsonOptions;
@@ -34,7 +34,7 @@ class JsonAstParserTest {
 
         // 1. Get the Entry so we can see the Key
 
-        // JsonMapEntryNode entry = root.getEntry(new JsonScalarNode(0, 0, SchemaType.STRING, "\"port\"", "port", QuoteStyle.DOUBLE, false, null));
+        // JsonMapEntryNode entry = root.getEntry(new JsonScalarNode(0, 0, PrimitiveType.STRING, "\"port\"", "port", QuoteStyle.DOUBLE, false, null));
         // JsonMapEntryNode entry = root.getEntry(new JsonScalarNode("port", QuoteStyle.DOUBLE, false, null));
         JsonMapEntryNode entry = root.getEntry("port");
 

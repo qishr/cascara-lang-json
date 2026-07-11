@@ -78,6 +78,8 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
     private TokenFactory factory;
 
+    private Runnable skipTrivia;
+
     /// Default constructor for SPI
     public JsonTokenizer() {
         // SPI will call this
@@ -160,7 +162,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             return toCommentToken(pendingComments.remove(0));
         }
 
-        advanceWhitespaceAndComments();
+        skipTrivia.run();
 
         if (!pendingComments.isEmpty()) {
             return toCommentToken(pendingComments.remove(0));
@@ -634,6 +636,13 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         } else {
             factory = new LexemeBackedTokenFactory(buffer);
         }
+
+        if (!ALLOW_COMMENTS && buffer instanceof SourceStringBuffer stringBuffer) {
+            skipTrivia = () -> stringBuffer.skipWhitespaceSimd();
+        } else {
+            skipTrivia = () -> advanceWhitespaceAndComments();
+        }
+
         // Handle UTF-8 BOM if present at start of stream/string
         if (buffer.peek() == '\uFEFF') {
             buffer.advance();

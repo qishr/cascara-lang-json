@@ -9,14 +9,14 @@ import io.github.qishr.cascara.lang.json.util.Json5SingleQuoteUnescaper;
 import io.github.qishr.cascara.lang.json.util.JsonOptions;
 import io.github.qishr.cascara.lang.json.util.JsonStringUnescaper;
 import io.github.qishr.cascara.common.lang.ast.ScalarAstNode;
-import io.github.qishr.cascara.common.lang.type.SchemaType;
+import io.github.qishr.cascara.common.lang.type.PrimitiveType;
 
 
 public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> {
 
     private final JsonOptions options;
 
-    private SchemaType schemaType;
+    private PrimitiveType schemaType;
     private QuoteStyle quoteStyle = QuoteStyle.PLAIN;
 
     private Object jvmValue;
@@ -32,7 +32,7 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
     /// Takes a String and triggers full lexical dialect type inference.
     public JsonScalarNode(
         JsonToken token,
-        SchemaType schemaType,
+        PrimitiveType schemaType,
         boolean isKey,
         JsonOptions options
     ) {
@@ -54,7 +54,7 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
         JsonOptions options
     ) {
         super();
-        this.schemaType = SchemaType.of(jvmValue);
+        this.schemaType = PrimitiveType.of(jvmValue);
         this.quoteStyle = quoteStyle;
         this.options = (options == null) ? JsonOptions.STRICT : options;
         this.isKey = false;
@@ -93,7 +93,7 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
         return List.of();
     }
 
-    public SchemaType getSchemaType() {
+    public PrimitiveType getPrimitiveType() {
         return schemaType;
     }
 
@@ -216,7 +216,7 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
 
     private Object parse(String raw, QuoteStyle quoteStyle, boolean isKey) {
 
-        if (schemaType == null || schemaType == SchemaType.ANY) {
+        if (schemaType == null || schemaType == PrimitiveType.ANY) {
             schemaType = inferType(raw, quoteStyle, isKey);
         }
 
@@ -239,17 +239,17 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
         }
     }
 
-    private SchemaType inferType(String raw, QuoteStyle quoteStyle, boolean isKey) {
+    private PrimitiveType inferType(String raw, QuoteStyle quoteStyle, boolean isKey) {
         if (isKey) {
 
             // Strict JSON: keys must be double-quoted strings
             if (!options.allowUnquotedKeys()) {
-                return SchemaType.STRING;
+                return PrimitiveType.STRING;
             }
 
             // JSON5-like: single-quoted keys allowed
             if (quoteStyle == QuoteStyle.SINGLE && options.allowSingleQuotedStrings()) {
-                return SchemaType.STRING;
+                return PrimitiveType.STRING;
             }
 
             // JSON5-like: unquoted keys allowed
@@ -257,39 +257,39 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
 
                 // Identifiers allowed as keys
                 if (isIdentifier(raw)) {
-                    return SchemaType.STRING;
+                    return PrimitiveType.STRING;
                 }
 
                 // Numbers allowed as keys
                 if (options.allowHexadecimalNumbers() && isHexRaw(raw)) {
-                    return SchemaType.STRING;
+                    return PrimitiveType.STRING;
                 }
                 if (options.allowHexadecimalNumbers() && isOctalRaw(raw)) {
-                    return SchemaType.STRING;
+                    return PrimitiveType.STRING;
                 }
                 if (isDecimalNumber(raw)) {
-                    return SchemaType.STRING;
+                    return PrimitiveType.STRING;
                 }
 
                 // Infinity / NaN allowed as keys
                 if (options.allowInfinityAndNaN() && isSpecialNumber(raw)) {
-                    return SchemaType.STRING;
+                    return PrimitiveType.STRING;
                 }
 
                 // Fallback: treat as string key
-                return SchemaType.STRING;
+                return PrimitiveType.STRING;
             }
 
             // Double-quoted key
-            return SchemaType.STRING;
+            return PrimitiveType.STRING;
         }
 
         // Quoted strings
         if (quoteStyle == QuoteStyle.DOUBLE) {
-            return SchemaType.STRING;
+            return PrimitiveType.STRING;
         }
         if (quoteStyle == QuoteStyle.SINGLE && options.allowSingleQuotedStrings()) {
-            return SchemaType.STRING;
+            return PrimitiveType.STRING;
         }
 
         // Plain scalars
@@ -297,36 +297,36 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
 
             // Boolean
             if ("true".equals(raw) || "false".equals(raw)) {
-                return SchemaType.BOOLEAN;
+                return PrimitiveType.BOOLEAN;
             }
 
             // Null
             if ("null".equals(raw)) {
-                return SchemaType.NULL;
+                return PrimitiveType.NULL;
             }
 
             // JSON5 special numbers
             if (options.allowInfinityAndNaN() && isSpecialNumber(raw)) {
-                return SchemaType.NUMBER;
+                return PrimitiveType.NUMBER;
             }
 
             // JSON5 hex/octal
             if (options.allowHexadecimalNumbers() && isHexRaw(raw)) {
-                return SchemaType.NUMBER;
+                return PrimitiveType.NUMBER;
             }
             if (options.allowHexadecimalNumbers() && isOctalRaw(raw)) {
-                return SchemaType.NUMBER;
+                return PrimitiveType.NUMBER;
             }
 
-            SchemaType numberType = inferNumberType(raw);
+            PrimitiveType numberType = inferNumberType(raw);
             if (numberType != null) {
                 return numberType;
             }
 
-            return SchemaType.STRING;
+            return PrimitiveType.STRING;
         }
 
-        return SchemaType.STRING;
+        return PrimitiveType.STRING;
     }
 
     private String unescape(String raw, QuoteStyle quoteStyle, boolean isKey) {
@@ -400,7 +400,7 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
         return inferNumberType(s) != null;
     }
 
-    private SchemaType inferNumberType(String s) {
+    private PrimitiveType inferNumberType(String s) {
         int len = s.length();
         if (len == 0) return null;
 
@@ -432,14 +432,14 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
 
             if (c == 'e' || c == 'E') {
                 if (isScientific(s, i)) {
-                    return SchemaType.NUMBER;
+                    return PrimitiveType.NUMBER;
                 }
             }
 
             return null;
         }
 
-        return hasDigit ? (hasDot ? SchemaType.NUMBER : SchemaType.INTEGER) : null;
+        return hasDigit ? (hasDot ? PrimitiveType.NUMBER : PrimitiveType.INTEGER) : null;
     }
 
     private boolean isScientific(String s, int ePos) {

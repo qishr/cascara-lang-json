@@ -11,7 +11,7 @@ import io.github.qishr.cascara.common.diagnostic.code.DiagnosticCode;
 import io.github.qishr.cascara.common.lang.exception.ParserException;
 import io.github.qishr.cascara.common.lang.processor.AstParser;
 import io.github.qishr.cascara.common.lang.processor.Tokenizer;
-import io.github.qishr.cascara.common.lang.type.SchemaType;
+import io.github.qishr.cascara.common.lang.type.PrimitiveType;
 import io.github.qishr.cascara.common.lang.util.LanguageOptions;
 import io.github.qishr.cascara.common.lang.util.QuoteStyle;
 import io.github.qishr.cascara.common.util.ContentType;
@@ -170,7 +170,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
             error(token, JsonDiagnosticCode.UNEXPECTED_TOKEN, type);
             return new JsonScalarNode(
                 token,
-                SchemaType.ANY,
+                PrimitiveType.ANY,
                 false,
                 options
             );
@@ -347,7 +347,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
                 case STRING -> {
                     node = new JsonScalarNode(
                         tok,
-                        SchemaType.STRING,
+                        PrimitiveType.STRING,
                         false,
                         options
                     );
@@ -356,7 +356,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
                 case NUMBER -> {
                     node = new JsonScalarNode(
                         tok,
-                        SchemaType.ANY, // We don't know if it's NUMBER or INTERGER
+                        PrimitiveType.ANY, // We don't know if it's NUMBER or INTERGER
                         false,
                         options
                     );
@@ -368,7 +368,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
                             case TRUE -> {
                                 node = new JsonScalarNode(
                                     tok,
-                                    SchemaType.BOOLEAN,
+                                    PrimitiveType.BOOLEAN,
                                     false,
                                     options
                                 );
@@ -376,7 +376,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
                             case FALSE -> {
                                 node = new JsonScalarNode(
                                     tok,
-                                    SchemaType.BOOLEAN,
+                                    PrimitiveType.BOOLEAN,
                                     false,
                                     options
                                 );
@@ -384,7 +384,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
                             case NULL -> {
                                 node = new JsonScalarNode(
                                     tok,
-                                    SchemaType.NULL,
+                                    PrimitiveType.NULL,
                                     false,
                                     options
                                 );
@@ -393,7 +393,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
                                 if (ALLOW_INFINITY_AND_NAN) {
                                     node = new JsonScalarNode(
                                         tok,
-                                        SchemaType.STRING,
+                                        PrimitiveType.STRING,
                                         false,
                                         options
                                     );
@@ -406,7 +406,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
                                 if (ALLOW_INFINITY_AND_NAN) {
                                     node = new JsonScalarNode(
                                         tok,
-                                        SchemaType.STRING,
+                                        PrimitiveType.STRING,
                                         false,
                                         options
                                     );
@@ -424,7 +424,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
                 error(tok, JsonDiagnosticCode.UNEXPECTED_TOKEN, type);
                 node = new JsonScalarNode(
                     tok,
-                    SchemaType.ANY,
+                    PrimitiveType.ANY,
                     false,
                     options
                 );
