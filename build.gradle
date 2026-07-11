@@ -28,18 +28,17 @@ dependencies {
 }
 
 
-tasks.withType(Test).configureEach {
-    // This is for benchmarking.
-    // Without forkEvery, the new jvmArgs won't do anything.
+// tasks.withType(Test).configureEach {
+//     jvmArgs '--add-modules=jdk.incubator.vector'
+// }
 
-    // forkEvery = 1
-    // jvmArgs '-XX:StartFlightRecording=duration=20s,filename=json_profile.jfr'
+
+test {
+    jvmArgs += ["--add-modules=jdk.incubator.vector"]
 }
 
 
 application {
     mainClass.set("io.github.qishr.cascara.lang.json.util.ProfilingHarness")
-    // mainModule.set("cascara.ui.demo")
-    // applicationDefaultJvmArgs = ['--add-reads', 'cascara.ui=ALL-UNNAMED']
 }
 

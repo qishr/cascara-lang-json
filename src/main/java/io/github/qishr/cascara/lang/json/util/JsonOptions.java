@@ -31,6 +31,7 @@ public class JsonOptions extends LanguageOptions<JsonOptions> implements Duplica
     private boolean captureComments = false;
     private boolean insertSpaces = true;
     private boolean prettyPrint = false;
+    private boolean useSimd = false;
 
     public JsonOptions() {}
 
@@ -46,6 +47,7 @@ public class JsonOptions extends LanguageOptions<JsonOptions> implements Duplica
         captureComments = original.captureComments;
         insertSpaces = original.insertSpaces;
         prettyPrint = original.prettyPrint;
+        useSimd = original.useSimd;
     }
 
     // public boolean allowBooleanKeys() { return allowBooleanKeys; }
@@ -59,6 +61,7 @@ public class JsonOptions extends LanguageOptions<JsonOptions> implements Duplica
     public boolean captureComments() { return captureComments; }
     public boolean insertSpaces() { return insertSpaces; }
     public boolean prettyPrint() { return prettyPrint; }
+    public boolean useSimd() { return useSimd; }
 
     public JsonOptions setAllowBooleanKeys(boolean val) {
         this.allowBooleanKeys = val;
@@ -113,6 +116,11 @@ public class JsonOptions extends LanguageOptions<JsonOptions> implements Duplica
 
     public JsonOptions setPrettyPrint(boolean v) {
         this.prettyPrint = v;
+        return this;
+    }
+
+    public JsonOptions setUseSimd(boolean v) {
+        this.useSimd = v;
         return this;
     }
 

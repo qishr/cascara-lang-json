@@ -64,11 +64,34 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         for (char c = 'A'; c <= 'F'; c++) HEX[c] = true;
     }
 
+    private static final byte[] STRUCTURAL = new byte[128];
+
+    // private static final byte S_OTHER      = 0;
+    private static final byte S_LBRACE     = 1;
+    private static final byte S_RBRACE     = 2;
+    private static final byte S_LBRACKET   = 3;
+    private static final byte S_RBRACKET   = 4;
+    private static final byte S_COLON      = 5;
+    private static final byte S_COMMA      = 6;
+    private static final byte S_STRING     = 7;
+
+    static {
+        STRUCTURAL['{'] = S_LBRACE;
+        STRUCTURAL['}'] = S_RBRACE;
+        STRUCTURAL['['] = S_LBRACKET;
+        STRUCTURAL[']'] = S_RBRACKET;
+        STRUCTURAL[':'] = S_COLON;
+        STRUCTURAL[','] = S_COMMA;
+        STRUCTURAL['"'] = S_STRING;
+        STRUCTURAL['\''] = S_STRING; // JSON5
+    }
+
     private boolean ALLOW_COMMENTS;
     private boolean ALLOW_HEXADECIMAL_NUMBERS;
     private boolean ALLOW_INFINITY_AND_NAN;
     private boolean ALLOW_UNICODE;
     private boolean CAPTURE_COMMENTS;
+    private boolean USE_SIMD;
 
     // private final Deque<JsonToken> pendingTokens = new ArrayDeque<>();
 
@@ -103,6 +126,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         this.ALLOW_INFINITY_AND_NAN      = options.allowInfinityAndNaN();
         this.ALLOW_UNICODE               = options.allowUnicode();
         this.CAPTURE_COMMENTS            = options.captureComments();
+        this.USE_SIMD                    = options.useSimd();
     }
 
     @Override protected JsonTokenizer self() { return this; }
@@ -196,16 +220,34 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             }
         } else {
             // ASCII path
-            switch (c) {
-                case '{': tok = makeStructuralToken(JsonTokenType.LEFT_BRACE); break;
-                case '}': tok = makeStructuralToken(JsonTokenType.RIGHT_BRACE); break;
-                case '[': tok = makeStructuralToken(JsonTokenType.LEFT_BRACKET); break;
-                case ']': tok = makeStructuralToken(JsonTokenType.RIGHT_BRACKET); break;
-                case ':': tok = makeStructuralToken(JsonTokenType.COLON); break;
-                case ',': tok = makeStructuralToken(JsonTokenType.COMMA); break;
+            byte kind = STRUCTURAL[c];
 
-                case '"':
-                case '\'':
+            switch (kind) {
+                case S_LBRACE:
+                    tok = makeStructuralToken(JsonTokenType.LEFT_BRACE);
+                    break;
+
+                case S_RBRACE:
+                    tok = makeStructuralToken(JsonTokenType.RIGHT_BRACE);
+                    break;
+
+                case S_LBRACKET:
+                    tok = makeStructuralToken(JsonTokenType.LEFT_BRACKET);
+                    break;
+
+                case S_RBRACKET:
+                    tok = makeStructuralToken(JsonTokenType.RIGHT_BRACKET);
+                    break;
+
+                case S_COLON:
+                    tok = makeStructuralToken(JsonTokenType.COLON);
+                    break;
+
+                case S_COMMA:
+                    tok = makeStructuralToken(JsonTokenType.COMMA);
+                    break;
+
+                case S_STRING:
                     tok = scanStringToken(c);
                     break;
 
@@ -255,36 +297,6 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         return factory.makeStringToken(startOffset, startLine, startColumn, qs);
     }
 
-    private JsonToken scanNumberOrIdentifierOrError(char startChar) {
-        int startOffset = buffer.offset();
-        int startLine   = buffer.line();
-        int startColumn = buffer.column();
-
-        buffer.startTokenWindow();
-
-        // NUMBER?
-        if (DIGIT[startChar] || startChar == '-' || startChar == '+' || startChar == '.') {
-            scanNumber(startChar);
-            String lexeme  = buffer.getTokenWindowLexeme();
-            return factory.makeNumberToken(startOffset, startLine, startColumn, lexeme);
-        }
-
-        // IDENTIFIER?
-        if (startChar < 128 && IDENT_START[startChar]) {
-            scanIdentifierFast();
-            String lexeme  = buffer.getTokenWindowLexeme();
-            return classifyLexeme(startOffset, startLine, startColumn, lexeme);
-        }
-
-        // ERROR
-        buffer.advance();
-        return makeErrorToken(
-            "Unexpected character '" + startChar + "'",
-            startLine,
-            startColumn
-        );
-    }
-
     private boolean scanString(char quoteChar) {
         boolean invalidUnicode = false;
 
@@ -316,6 +328,38 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
         // EOF before closing quote - invalid string
         return false;
+    }
+
+
+
+    private JsonToken scanNumberOrIdentifierOrError(char startChar) {
+        int startOffset = buffer.offset();
+        int startLine   = buffer.line();
+        int startColumn = buffer.column();
+
+        buffer.startTokenWindow();
+
+        // NUMBER?
+        if (DIGIT[startChar] || startChar == '-' || startChar == '+' || startChar == '.') {
+            scanNumber(startChar);
+            String lexeme  = buffer.getTokenWindowLexeme();
+            return factory.makeNumberToken(startOffset, startLine, startColumn, lexeme);
+        }
+
+        // IDENTIFIER?
+        if (startChar < 128 && IDENT_START[startChar]) {
+            scanIdentifierFast();
+            String lexeme  = buffer.getTokenWindowLexeme();
+            return classifyLexeme(startOffset, startLine, startColumn, lexeme);
+        }
+
+        // ERROR
+        buffer.advance();
+        return makeErrorToken(
+            "Unexpected character '" + startChar + "'",
+            startLine,
+            startColumn
+        );
     }
 
     private void scanNumber(char startChar) {
@@ -351,20 +395,13 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             }
         }
 
-        // 3. Integer part
         char c;
-        while (true) {
-            c = buffer.peek();
-            if (c < 128 && DIGIT[c]) {
-                buffer.advance();
-                continue;
-            }
-            break;
-        }
+        int pos;
 
-        // 4. Fractional part
-        if (buffer.peek() == '.') {
-            buffer.advance();
+        if (USE_SIMD) {
+            pos = buffer.scanDigitsSimd(buffer.offset());
+            buffer.setOffset(pos);
+        } else {
             while (true) {
                 c = buffer.peek();
                 if (c < 128 && DIGIT[c]) {
@@ -372,6 +409,24 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
                     continue;
                 }
                 break;
+            }
+        }
+
+        // 4. Fractional part
+        if (buffer.peek() == '.') {
+            buffer.advance();
+            if (USE_SIMD) {
+                pos = buffer.scanDigitsSimd(buffer.offset());
+                buffer.setOffset(pos);
+            } else {
+                while (true) {
+                    c = buffer.peek();
+                    if (c < 128 && DIGIT[c]) {
+                        buffer.advance();
+                        continue;
+                    }
+                    break;
+                }
             }
         }
 
@@ -383,13 +438,18 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             if (c == '+' || c == '-') {
                 buffer.advance();
             }
-            while (true) {
-                c = buffer.peek();
-                if (c < 128 && DIGIT[c]) {
-                    buffer.advance();
-                    continue;
+            if (USE_SIMD) {
+                pos = buffer.scanDigitsSimd(buffer.offset());
+                buffer.setOffset(pos);
+            } else {
+                while (true) {
+                    c = buffer.peek();
+                    if (c < 128 && DIGIT[c]) {
+                        buffer.advance();
+                        continue;
+                    }
+                    break;
                 }
-                break;
             }
         }
     }
