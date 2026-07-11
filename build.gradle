@@ -40,5 +40,6 @@ test {
 
 application {
     mainClass.set("io.github.qishr.cascara.lang.json.util.ProfilingHarness")
+    applicationDefaultJvmArgs = ["--add-modules=jdk.incubator.vector"]
 }
 

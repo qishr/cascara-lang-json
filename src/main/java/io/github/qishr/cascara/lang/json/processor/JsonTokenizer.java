@@ -313,6 +313,8 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         return tok;
     }
 
+
+
     private JsonToken scanStringToken(char quoteChar) {
         int startOffset = buffer.offset(); // actual position of the quote
         int startLine   = buffer.line();
@@ -761,7 +763,9 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         }
 
         // Whitespace skipping strategy
-        if (!ALLOW_COMMENTS && buffer instanceof SourceStringBuffer stringBuffer) {
+        if (!ALLOW_COMMENTS && options.useSimd() && buffer instanceof SourceByteBuffer bb) {
+            skipTrivia = () -> bb.skipWhitespaceAndFormattingSimd();
+        } else if (!ALLOW_COMMENTS && options.useSimd() && buffer instanceof SourceStringBuffer stringBuffer) {
             skipTrivia = () -> stringBuffer.skipWhitespaceSimd();
         } else {
             skipTrivia = () -> advanceWhitespaceAndComments();
@@ -770,12 +774,12 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         // TODO: SIMD strings are not giving the performance incease we need.
         // Perhaps let them be configurable.
 
-        // String scanning strategy
-        if (options.useSimd() && buffer instanceof SourceByteBuffer) {
-            stringScanner = simdStringScanner;
-        } else {
+        // // String scanning strategy
+        // if (options.useSimd() && buffer instanceof SourceByteBuffer) {
+        //     stringScanner = simdStringScanner;
+        // } else {
             stringScanner = scalarStringScanner;
-        }
+        // }
 
         // UTF‑8 BOM handling
         if (buffer.peek() == '\uFEFF') {

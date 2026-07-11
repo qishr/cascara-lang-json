@@ -27,9 +27,10 @@ public class ProfilingHarness {
         }
         String content = sb.toString();
 
+        JsonOptions options = new JsonOptions().setUseSimd(true);
 
         for (int i = 0; i < 500_000; i++) {
-            JsonAstParser parser = new JsonAstParser();
+            JsonAstParser parser = new JsonAstParser().setOptions(options);
             parser.parse(content);
         }
     }
