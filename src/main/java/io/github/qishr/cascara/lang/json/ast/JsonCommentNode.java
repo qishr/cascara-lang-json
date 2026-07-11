@@ -12,6 +12,7 @@ public class JsonCommentNode extends JsonNode implements ScalarAstNode<JsonNode>
     private final boolean multiLine;
 
     public JsonCommentNode(int line, int column, String rawValue, String stringValue, boolean multiLine) {
+        super(line, column);
         this.value = stringValue;
         this.rawValue = rawValue;
         this.multiLine = multiLine;

@@ -93,12 +93,27 @@ public class JsonMapNode extends JsonNode implements MapAstNode<String, JsonNode
         JsonMapEntryNode existing = entriesByKey.get(key);
         if (existing != null) {
             // TODO: Should the key's comments be removed?
-            // This should be in the javadoc.
+            // This needs to be in the javadoc.
             existing.setRaw(value);
             return this;
         }
 
         JsonMapEntryNode entry = new JsonMapEntryNode(0, 0, key, value);
+        entriesByKey.put(key, entry);
+        return this;
+    }
+
+    public JsonMapNode put(JsonMapEntryNode entry) {
+        String key = entry.getKey();
+        JsonMapEntryNode existing = entriesByKey.get(key);
+
+        if (existing != null) {
+            existing.setRaw(entry.getValue());
+            // Optionally merge comments:
+            existing.getComments().addAll(entry.getComments());
+            return this;
+        }
+
         entriesByKey.put(key, entry);
         return this;
     }

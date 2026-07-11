@@ -17,6 +17,7 @@ import io.github.qishr.cascara.common.lang.util.QuoteStyle;
 import io.github.qishr.cascara.common.util.ContentType;
 import io.github.qishr.cascara.common.util.Properties;
 import io.github.qishr.cascara.lang.json.ast.JsonCommentNode;
+import io.github.qishr.cascara.lang.json.ast.JsonMapEntryNode;
 import io.github.qishr.cascara.lang.json.ast.JsonMapNode;
 import io.github.qishr.cascara.lang.json.ast.JsonNode;
 import io.github.qishr.cascara.lang.json.ast.JsonScalarNode;
@@ -169,12 +170,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
             error(token, JsonDiagnosticCode.UNEXPECTED_TOKEN, type);
             return new JsonScalarNode(
                 token,
-                // token.getStartLine(),
-                // token.getStartColumn(),
                 SchemaType.ANY,
-                // "",
-                // "",
-                // null,
                 false,
                 options
             );
@@ -233,7 +229,16 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
 
                 // ---- Parse value ----
                 JsonNode value = parseValue();
-                map.put(keyString, value);
+
+                // map.put(keyString, value);
+                JsonMapEntryNode entry = new JsonMapEntryNode(
+                    keyTok.getStartLine(),
+                    keyTok.getStartColumn(),
+                    keyString,
+                    value
+                );
+                attachComments(entry);
+                map.put(entry);
 
                 // Consume comments only
                 skipTrivia();
@@ -253,7 +258,6 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
     }
 
     private String parseKey(JsonToken tok) {
-        // JsonScalarNode key;
         String key;
         switch (tok.getType()) {
 

@@ -16,11 +16,8 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
 
     private final JsonOptions options;
 
-    // private final String lexeme;
-    // private final String escapedContent;
     private SchemaType schemaType;
     private QuoteStyle quoteStyle = QuoteStyle.PLAIN;
-    private String keyStringCache;
 
     private Object jvmValue;
     private boolean isJvmValueCached;
@@ -108,7 +105,6 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
     @Override
     public JsonScalarNode setQuoteStyle(QuoteStyle style) {
         this.quoteStyle = style;
-        this.keyStringCache = null;
         return this;
     }
 

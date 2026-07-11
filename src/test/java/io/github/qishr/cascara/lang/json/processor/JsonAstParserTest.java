@@ -148,8 +148,6 @@ class JsonAstParserTest {
         assertTrue(reporter.hasErrors());
     }
 
-    // TODO: Comments not behaving
-    @Disabled
     @Test
     void testCommentTextStripping() {
         String input = "// This is a line comment\n/* This is a block comment */ { }";
@@ -200,8 +198,6 @@ class JsonAstParserTest {
         assertEquals(2, seq.size());
     }
 
-    // TODO: Comments not behaving
-    @Disabled
     @Test
     void testMultiLineCommentCoordinates() {
         String input = """
