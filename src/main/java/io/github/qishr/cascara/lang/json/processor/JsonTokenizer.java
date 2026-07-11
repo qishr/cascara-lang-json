@@ -405,7 +405,6 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     }
 
     private String scanSingleLineComment() {
-        // buffer.startTokenWindow();
         buffer.advance(); // '/'
         buffer.advance(); // '/'
 
@@ -436,7 +435,6 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     }
 
     private String scanMultiLineComment() {
-        // buffer.startTokenWindow();
         // Consume the initial "/*"
         buffer.advance(); // '/'
         buffer.advance(); // '*'
@@ -498,7 +496,6 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
                     if (capture) buffer.startTokenWindow();
                     int line = buffer.line();
                     int col  = buffer.column();
-
                     String value = scanSingleLineComment();
                     if (capture) {
                         String lexeme = buffer.getTokenWindowLexeme();
@@ -515,11 +512,8 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
                 // Multi-line comment
                 if (n == '*') {
                     if (capture) buffer.startTokenWindow();
-                    // int line = buffer.windowStartLine();
-                    // int col  = buffer.windowStartColumn();
                     int line = buffer.line();
                     int col  = buffer.column();
-
                     String value = scanMultiLineComment();
                     if (capture) {
                         String lexeme = buffer.getTokenWindowLexeme();
