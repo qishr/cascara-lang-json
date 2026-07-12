@@ -94,7 +94,6 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     private boolean ALLOW_INFINITY_AND_NAN;
     private boolean ALLOW_UNICODE;
     private boolean CAPTURE_COMMENTS;
-    private boolean USE_SIMD;
 
     // private final Deque<JsonToken> pendingTokens = new ArrayDeque<>();
 
@@ -124,34 +123,25 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
     @FunctionalInterface
     private interface NumberScanner {
-        JsonToken scan(char first);
+        void scan(char first);
+    }
+
+    @FunctionalInterface
+    private interface DigitScanner {
+        void scan();
     }
 
     @FunctionalInterface
     private interface IdentifierScanner {
-        JsonToken scan(char first);
+        void scan();
     }
 
-    private Runnable triviaHandler;
     private TokenHandler tokenHandler;
     private StringScanner stringScanner;
-    private NumberScanner numberScanner; // TODO: This isn't used yet
-    private IdentifierScanner identifierScanner; // TODO: This isn't used yet
-
-
-    private final StringScanner scalarStringScanner = this::scanString; // TODO: This isn't used yet
-
-    // I moved this into a normal method, quite a bit below here.
-
-    // private final StringScanner simdStringScanner = (quoteChar) -> {
-    //     SourceByteBuffer bb = (SourceByteBuffer) buffer;
-    //     byte quoteByte = (byte) quoteChar;
-    //     int pos = bb.offset();
-    //     int simdPos = bb.scanStringAsciiSimd(pos, quoteByte);
-    //     bb.advanceBy(simdPos - pos);
-    //     return scanString(quoteChar); // scalar fallback for escapes/Unicode
-    // };
-
+    private NumberScanner numberScanner;
+    private DigitScanner digitScanner;
+    private IdentifierScanner identifierScanner;
+    private Runnable triviaHandler;
 
     @Override
     public JsonTokenizer setOptions(LanguageOptions<?> options) {
@@ -169,7 +159,6 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         this.ALLOW_INFINITY_AND_NAN      = options.allowInfinityAndNaN();
         this.ALLOW_UNICODE               = options.allowUnicode();
         this.CAPTURE_COMMENTS            = options.captureComments();
-        this.USE_SIMD                    = options.useSimd();
     }
 
     @Override protected JsonTokenizer self() { return this; }
@@ -221,107 +210,14 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         return EnumSet.allOf(JsonTokenType.class);
     }
 
-    // Old code...
-
-    // public JsonToken nextToken() {
-    //     if (!pendingComments.isEmpty()) {
-    //         return toCommentToken(pendingComments.remove(0));
-    //     }
-
-    //     skipTrivia.run();
-
-    //     if (!pendingComments.isEmpty()) {
-    //         return toCommentToken(pendingComments.remove(0));
-    //     }
-
-    //     if (buffer.isAtEnd()) {
-    //         JsonToken tok = makeEofToken();
-
-    //         if (!pendingComments.isEmpty()) {
-    //             tok.attachComments(pendingComments);
-    //             pendingComments.clear();
-    //         }
-
-    //         return tok;
-    //     }
-
-    //     char c = buffer.peek();
-    //     JsonToken tok;
-
-    //     // Unicode path
-    //     if (c > 127) {
-    //         tok = handleUnicodeChar(c);
-    //         if (tok == null) {
-    //             // whitespace or skipped unicode trivia
-    //             return nextToken();
-    //         }
-    //     } else {
-    //         // ASCII path
-    //         byte kind = STRUCTURAL[c];
-
-    //         switch (kind) {
-    //             case S_LBRACE:
-    //                 tok = makeStructuralToken(JsonTokenType.LEFT_BRACE);
-    //                 break;
-
-    //             case S_RBRACE:
-    //                 tok = makeStructuralToken(JsonTokenType.RIGHT_BRACE);
-    //                 break;
-
-    //             case S_LBRACKET:
-    //                 tok = makeStructuralToken(JsonTokenType.LEFT_BRACKET);
-    //                 break;
-
-    //             case S_RBRACKET:
-    //                 tok = makeStructuralToken(JsonTokenType.RIGHT_BRACKET);
-    //                 break;
-
-    //             case S_COLON:
-    //                 tok = makeStructuralToken(JsonTokenType.COLON);
-    //                 break;
-
-    //             case S_COMMA:
-    //                 tok = makeStructuralToken(JsonTokenType.COMMA);
-    //                 break;
-
-    //             case S_STRING:
-    //                 tok = scanStringToken(c);
-    //                 break;
-
-    //             default:
-    //                 tok = scanNumberOrIdentifierOrError(c);
-    //                 break;
-    //         }
-    //     }
-
-    //     // Attach any captured comments
-    //     if (!pendingComments.isEmpty()) {
-    //         tok.attachComments(pendingComments);
-    //         pendingComments.clear();
-    //     }
-
-    //     if (!reporter.isSilent()) {
-    //         reporter.trace("TOKEN: " + tok.getType() +
-    //                        " [" + tok.getStartLine() + ":" + tok.getStartColumn() + "] " +
-    //                        (tok.getLexeme() != null ? tok.getLexeme() : ""));
-    //     }
-
-    //     return tok;
-    // }
-
-
     public JsonToken nextToken() {
-
         if (!pendingComments.isEmpty()) {
             return toCommentToken(pendingComments.remove(0));
         }
-
         triviaHandler.run();
-
         if (!pendingComments.isEmpty()) {
             return toCommentToken(pendingComments.remove(0));
         }
-
         if (buffer.isAtEnd()) {
             JsonToken tok = makeEofToken();
             if (!pendingComments.isEmpty()) {
@@ -332,6 +228,8 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         }
 
         char c = buffer.peek();
+
+        // Call either scanTokenAscii or scanTokenAsciiOrUnicode
         JsonToken tok = tokenHandler.handle(c);
 
         if (!pendingComments.isEmpty()) {
@@ -348,6 +246,104 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         return tok;
     }
 
+    private JsonToken scanTokenAsciiOrUnicode(char c) {
+        if (c > 127) {
+            JsonToken tok = scanTokenUnicode(c);
+            if (tok == null) return nextToken();
+            return tok;
+        }
+        return scanTokenAscii(c);
+    }
+
+    private JsonToken scanTokenAscii(char c) {
+        switch (c) {
+            case '{': return makeStructuralToken(JsonTokenType.LEFT_BRACE);
+            case '}': return makeStructuralToken(JsonTokenType.RIGHT_BRACE);
+            case '[': return makeStructuralToken(JsonTokenType.LEFT_BRACKET);
+            case ']': return makeStructuralToken(JsonTokenType.RIGHT_BRACKET);
+            case ':': return makeStructuralToken(JsonTokenType.COLON);
+            case ',': return makeStructuralToken(JsonTokenType.COMMA);
+
+            case '"':
+            case '\'':
+                return scanStringToken(c);
+
+            default:
+                return scanNumberOrIdentifierOrError(c);
+        }
+    }
+
+    private JsonToken scanTokenUnicode(char c) {
+        int startOffset = buffer.windowStartOffset();
+        int line        = buffer.windowStartLine();
+        int column      = buffer.windowStartColumn();
+
+        // Unicode whitespace (JSON5)
+        if (Character.isWhitespace(c)) {
+            // skip it
+            buffer.advance();
+            return null; // caller will continue skipping trivia
+        }
+
+        // Unicode identifier start (JSON5)
+        if (Character.isUnicodeIdentifierStart(c)) {
+            scanIdentifierUnicode();
+            String lexeme = buffer.getTokenWindowLexeme();
+            return factory.makeIdentifierToken(startOffset, line, column, lexeme);
+        }
+
+        // Unicode identifier part (rare case)
+        if (Character.isUnicodeIdentifierPart(c)) {
+            scanIdentifierUnicode();
+            String lexeme = buffer.getTokenWindowLexeme();
+            return factory.makeIdentifierToken(startOffset, line, column, lexeme);
+        }
+
+        // Unicode digit (JSON5)
+        if (Character.isDigit(c)) {
+            scanNumberUnicode(c);
+            String lexeme = buffer.getTokenWindowLexeme();
+            return factory.makeNumberToken(startOffset, line, column, lexeme);
+        }
+
+        // Otherwise - UNKNOWN
+        buffer.advance();
+        return makeErrorToken("Unexpected character '" + c + "'", line, column);
+    }
+
+    private JsonToken scanNumberOrIdentifierOrError(char startChar) {
+        int startOffset = buffer.offset();
+        int startLine   = buffer.line();
+        int startColumn = buffer.column();
+
+        buffer.startTokenWindow();
+
+        // NUMBER?
+        if (DIGIT[startChar] || startChar == '-' || startChar == '+' || startChar == '.') {
+            numberScanner.scan(startChar);
+            String lexeme  = buffer.getTokenWindowLexeme();
+            return factory.makeNumberToken(startOffset, startLine, startColumn, lexeme);
+        }
+
+        // IDENTIFIER?
+        if (startChar < 128 && IDENT_START[startChar]) {
+            identifierScanner.scan();
+            String lexeme  = buffer.getTokenWindowLexeme();
+            return classifyLexeme(startOffset, startLine, startColumn, lexeme);
+        }
+
+        // ERROR
+        buffer.advance();
+        return makeErrorToken(
+            "Unexpected character '" + startChar + "'",
+            startLine,
+            startColumn
+        );
+    }
+
+    //
+    // Strings
+    //
 
     private JsonToken scanStringToken(char quoteChar) {
         int startOffset = buffer.offset(); // actual position of the quote
@@ -357,7 +353,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         buffer.startTokenWindow();
         buffer.advance(); // consume opening quote
 
-        // boolean ok = scanString(quoteChar);
+        // Call either scanString or scanStringSimd
         boolean ok = stringScanner.scan(quoteChar);
 
         QuoteStyle qs = (quoteChar == '"')
@@ -375,7 +371,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         return factory.makeStringToken(startOffset, startLine, startColumn, qs);
     }
 
-    private boolean scanString(char quoteChar) {
+    private final boolean scanString(char quoteChar) {
         boolean invalidUnicode = false;
 
         while (!buffer.isAtEnd()) {
@@ -408,45 +404,20 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         return false;
     }
 
-
-
-    private JsonToken scanNumberOrIdentifierOrError(char startChar) {
-        int startOffset = buffer.offset();
-        int startLine   = buffer.line();
-        int startColumn = buffer.column();
-
-        buffer.startTokenWindow();
-
-        // NUMBER?
-        if (DIGIT[startChar] || startChar == '-' || startChar == '+' || startChar == '.') {
-            scanNumber(startChar);
-            String lexeme  = buffer.getTokenWindowLexeme();
-            return factory.makeNumberToken(startOffset, startLine, startColumn, lexeme);
-        }
-
-        // IDENTIFIER?
-        if (startChar < 128 && IDENT_START[startChar]) {
-            scanIdentifierFast();
-            String lexeme  = buffer.getTokenWindowLexeme();
-            return classifyLexeme(startOffset, startLine, startColumn, lexeme);
-        }
-
-        // ERROR
-        buffer.advance();
-        return makeErrorToken(
-            "Unexpected character '" + startChar + "'",
-            startLine,
-            startColumn
-        );
+    private final boolean scanStringSimd(char quoteChar) {
+        final SourceByteBuffer bb = (SourceByteBuffer) buffer;
+        final byte quoteByte = (byte) quoteChar;
+        final int pos = bb.offset();
+        final int simdPos = bb.scanStringAsciiSimd(pos, quoteByte);
+        bb.advanceBy(simdPos - pos);
+        return scanString(quoteChar);
     }
 
-    // TODO: scanNumber needs to be split into:
-    // - a SIMD version
-    // - a non-SIMD version
-    // And the SIMD version will require the scanDigitsSimd method in SimdCapableBuffer
-    // to be implemented by both SourceStringBuffer and SourceByteBuffer. At the moment
-    // they both have different signatures for that method.
-    private void scanNumber(char startChar) {
+    //
+    // Numbers
+    //
+
+    private void scanNumberAscii(char startChar) {
         // Always consume the starting character first
         buffer.advance();
 
@@ -479,13 +450,23 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             }
         }
 
-        char c;
-        int pos;
+        digitScanner.scan();
+    }
 
-        if (USE_SIMD && buffer instanceof SimdCapableBuffer simd) {
-            pos = simd.scanDigitsSimd(buffer.offset());
-            buffer.setOffset(pos);
-        } else {
+    private void scanDigits() {
+        char c;
+        while (true) {
+            c = buffer.peek();
+            if (c < 128 && DIGIT[c]) {
+                buffer.advance();
+                continue;
+            }
+            break;
+        }
+
+        // 4. Fractional part
+        if (buffer.peek() == '.') {
+            buffer.advance();
             while (true) {
                 c = buffer.peek();
                 if (c < 128 && DIGIT[c]) {
@@ -494,25 +475,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
                 }
                 break;
             }
-        }
-
-        // 4. Fractional part
-        if (buffer.peek() == '.') {
-            buffer.advance();
-            if (USE_SIMD && buffer instanceof SimdCapableBuffer simd) {
-                pos = simd.scanDigitsSimd(buffer.offset());
-                buffer.setOffset(pos);
-            } else {
-                while (true) {
-                    c = buffer.peek();
-                    if (c < 128 && DIGIT[c]) {
-                        buffer.advance();
-                        continue;
-                    }
-                    break;
-                }
             }
-        }
 
         // 5. Exponent part
         c = buffer.peek();
@@ -522,24 +485,80 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             if (c == '+' || c == '-') {
                 buffer.advance();
             }
-            if (USE_SIMD && buffer instanceof SimdCapableBuffer simd) {
-                pos = simd.scanDigitsSimd(buffer.offset());
-                buffer.setOffset(pos);
-            } else {
-                while (true) {
-                    c = buffer.peek();
-                    if (c < 128 && DIGIT[c]) {
-                        buffer.advance();
-                        continue;
-                    }
-                    break;
+            while (true) {
+                c = buffer.peek();
+                if (c < 128 && DIGIT[c]) {
+                    buffer.advance();
+                    continue;
                 }
+                break;
             }
         }
     }
 
-    private void scanIdentifierFast() {
-        // We already consumed the first character in scanToken()
+    private void scanDigitsSimd() {
+        final SimdCapableBuffer simd = (SimdCapableBuffer)buffer;
+
+        int pos = simd.scanDigitsSimd(buffer.offset());
+        buffer.setOffset(pos);
+
+        // 4. Fractional part
+        if (buffer.peek() == '.') {
+            buffer.advance();
+            pos = simd.scanDigitsSimd(buffer.offset());
+            buffer.setOffset(pos);
+        }
+
+        // 5. Exponent part
+        char c = buffer.peek();
+        if (c == 'e' || c == 'E') {
+            buffer.advance();
+            c = buffer.peek();
+            if (c == '+' || c == '-') {
+                buffer.advance();
+            }
+            pos = simd.scanDigitsSimd(buffer.offset());
+            buffer.setOffset(pos);
+        }
+    }
+
+    private void scanNumberUnicode(char startChar) {
+        // integer part
+        while (!buffer.isAtEnd()) {
+            char c = buffer.peek();
+            if (Character.isDigit(c)) {
+                buffer.advance();
+                continue;
+            }
+            break;
+        }
+
+        // fractional part
+        if (buffer.peek() == '.') {
+            buffer.advance();
+            while (!buffer.isAtEnd() && Character.isDigit(buffer.peek())) {
+                buffer.advance();
+            }
+        }
+
+        // exponent part
+        char c = buffer.peek();
+        if (c == 'e' || c == 'E') {
+            buffer.advance();
+            c = buffer.peek();
+            if (c == '+' || c == '-') buffer.advance();
+            while (!buffer.isAtEnd() && Character.isDigit(buffer.peek())) {
+                buffer.advance();
+            }
+        }
+    }
+
+    //
+    // Identifiers
+    //
+
+    private void scanIdentifierAscii() {
+        // We already consumed the first character in nextToken()
         while (true) {
             char c = buffer.peek();
             if (c < 128 && IDENT_PART[c]) {
@@ -549,6 +568,28 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             break;
         }
     }
+
+    private void scanIdentifierUnicode() {
+        while (!buffer.isAtEnd()) {
+            char c = buffer.peek();
+            if (c <= 127) {
+                if (c < 128 && IDENT_PART[c]) {
+                    buffer.advance();
+                    continue;
+                }
+                break;
+            }
+            if (Character.isUnicodeIdentifierPart(c)) {
+                buffer.advance();
+                continue;
+            }
+            break;
+        }
+    }
+
+    //
+    // Comments
+    //
 
     private String scanSingleLineComment() {
         buffer.advance(); // '/'
@@ -680,97 +721,6 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     }
 
     //
-    // Unicode
-    //
-
-    private JsonToken handleUnicodeChar(char c) {
-        int startOffset = buffer.windowStartOffset();
-        int line        = buffer.windowStartLine();
-        int column      = buffer.windowStartColumn();
-
-        // Unicode whitespace (JSON5)
-        if (Character.isWhitespace(c)) {
-            // skip it
-            buffer.advance();
-            return null; // caller will continue skipping trivia
-        }
-
-        // Unicode identifier start (JSON5)
-        if (Character.isUnicodeIdentifierStart(c)) {
-            scanUnicodeIdentifier();
-            String lexeme = buffer.getTokenWindowLexeme();
-            return factory.makeIdentifierToken(startOffset, line, column, lexeme);
-        }
-
-        // Unicode identifier part (rare case)
-        if (Character.isUnicodeIdentifierPart(c)) {
-            scanUnicodeIdentifier();
-            String lexeme = buffer.getTokenWindowLexeme();
-            return factory.makeIdentifierToken(startOffset, line, column, lexeme);
-        }
-
-        // Unicode digit (JSON5)
-        if (Character.isDigit(c)) {
-            scanUnicodeNumber(c);
-            String lexeme = buffer.getTokenWindowLexeme();
-            return factory.makeNumberToken(startOffset, line, column, lexeme);
-        }
-
-        // Otherwise - UNKNOWN
-        buffer.advance();
-        return makeErrorToken("Unexpected character '" + c + "'", line, column);
-    }
-
-    private void scanUnicodeIdentifier() {
-        while (!buffer.isAtEnd()) {
-            char c = buffer.peek();
-            if (c <= 127) {
-                if (c < 128 && IDENT_PART[c]) {
-                    buffer.advance();
-                    continue;
-                }
-                break;
-            }
-            if (Character.isUnicodeIdentifierPart(c)) {
-                buffer.advance();
-                continue;
-            }
-            break;
-        }
-    }
-
-    private void scanUnicodeNumber(char startChar) {
-        // integer part
-        while (!buffer.isAtEnd()) {
-            char c = buffer.peek();
-            if (Character.isDigit(c)) {
-                buffer.advance();
-                continue;
-            }
-            break;
-        }
-
-        // fractional part
-        if (buffer.peek() == '.') {
-            buffer.advance();
-            while (!buffer.isAtEnd() && Character.isDigit(buffer.peek())) {
-                buffer.advance();
-            }
-        }
-
-        // exponent part
-        char c = buffer.peek();
-        if (c == 'e' || c == 'E') {
-            buffer.advance();
-            c = buffer.peek();
-            if (c == '+' || c == '-') buffer.advance();
-            while (!buffer.isAtEnd() && Character.isDigit(buffer.peek())) {
-                buffer.advance();
-            }
-        }
-    }
-
-    //
     //
     //
 
@@ -799,47 +749,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             byte[] raw = text.getBytes(StandardCharsets.UTF_8);
             final SourceByteBuffer byteBuffer = new SourceByteBuffer(raw);
 
-            if (!ALLOW_UNICODE) {
-                // TODO: This doesn't work:
-                // - stringScanner takes a char and returns a boolean
-                // - scanStringAsciiSimd takes an int and a byte
-                // stringScanner = byteBuffer::scanStringAsciiSimd;
-                stringScanner = (quoteChar) -> {
-                    int pos = byteBuffer.offset();
-                    int end = byteBuffer.scanStringAsciiSimd(pos, (byte) quoteChar);
-                    byteBuffer.setOffset(end);
-                    return scanString(quoteChar); // scalar fallback
-                };
-
-
-                // TODO: This doesn't work:
-                // - numberScanner takes a char and returns a JsonToken
-                // - scanDigitsSimd takes an int and returns an int
-                // numberScanner = byteBuffer::scanDigitsSimd;
-                numberScanner = (first) -> {
-                    scanNumber(first);
-                    int startOffset = byteBuffer.windowStartOffset();
-                    int line        = byteBuffer.windowStartLine();
-                    int column      = byteBuffer.windowStartColumn();
-                    String lexeme   = byteBuffer.getTokenWindowLexeme();
-                    return factory.makeNumberToken(startOffset, line, column, lexeme);
-                };
-
-
-                // TODO: This doesn't work:
-                // - identifierScanner takes a char and returns a JsonToken
-                // - scanIdentifierFast takes no parameters and returns void
-                // identifierScanner = this::scanIdentifierFast;
-                identifierScanner = (first) -> {
-                    scanIdentifierFast();
-                    int startOffset = byteBuffer.windowStartOffset();
-                    int line        = byteBuffer.windowStartLine();
-                    int column      = byteBuffer.windowStartColumn();
-                    String lexeme   = byteBuffer.getTokenWindowLexeme();
-                    return classifyLexeme(startOffset, line, column, lexeme);
-                };
-            }
-
+            digitScanner = this::scanDigitsSimd;
 
             // Whitespace / trivia skipping
             if (ALLOW_COMMENTS) {
@@ -848,87 +758,40 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
                 triviaHandler = byteBuffer::skipWhitespaceSimd;
             }
 
+            if (!ALLOW_UNICODE) {
+                stringScanner = this::scanStringSimd;
+                numberScanner = this::scanNumberAscii;
+            }
+
             buffer = byteBuffer;
         } else {
             // JSON5 identifiers or SIMD disabled - use char-based buffer
             final SourceStringBuffer stringBuffer = new SourceStringBuffer(text);
 
+            digitScanner = this::scanDigits;
+            triviaHandler = this::advanceWhitespaceAndComments;
+
             if (!ALLOW_UNICODE) {
-                stringScanner = this::simdStringScanner;
-
-                // TODO: This doesn't work:
-                // - numberScanner takes a char and returns a JsonToken
-                // - scanNumber returns void
-                // numberScanner = this::scanNumber;
-                numberScanner = (first) -> {
-                    scanNumber(first);
-                    int startOffset = stringBuffer.windowStartOffset();
-                    int line        = stringBuffer.windowStartLine();
-                    int column      = stringBuffer.windowStartColumn();
-                    String lexeme   = stringBuffer.getTokenWindowLexeme();
-                    return factory.makeNumberToken(startOffset, line, column, lexeme);
-                };
-
-                // TODO: This doesn't work:
-                // - identifierScanner takes a char and returns a JsonToken
-                // - scanIdentifierFast takes no parameters and returns void
-                // identifierScanner = this::scanIdentifierFast;
-                identifierScanner = (first) -> {
-                    scanIdentifierFast();
-                    int startOffset = stringBuffer.windowStartOffset();
-                    int line        = stringBuffer.windowStartLine();
-                    int column      = stringBuffer.windowStartColumn();
-                    String lexeme   = stringBuffer.getTokenWindowLexeme();
-                    return classifyLexeme(startOffset, line, column, lexeme);
-                };
-            }
-
-            // Whitespace / trivia skipping
-            if (!ALLOW_COMMENTS && options.useSimd()) {
-                triviaHandler = stringBuffer::skipWhitespaceSimd;
-            } else {
-                triviaHandler = this::advanceWhitespaceAndComments;
+                stringScanner = this::scanString;
+                numberScanner = this::scanNumberAscii;
             }
 
             buffer = stringBuffer;
         }
 
-        // String and number scanning
         if (ALLOW_UNICODE) {
-            // // TODO: scanStringUnicode does not exist
-            // TODO: scanString must do branching for unicode. The purpose of
-            // setting up these method pointers was to avoid branching.
+            tokenHandler = this::scanTokenAsciiOrUnicode;
             stringScanner = this::scanString;
 
-            // TODO: This doesn't work:
-            // - numberScanner takes a char and returns a JsonToken
-            // - scanUnicodeNumber takes a char and returns void
-            // numberScanner = this::scanUnicodeNumber;
-            numberScanner = (first) -> {
-                scanUnicodeNumber(first);
-                int startOffset = buffer.windowStartOffset();
-                int line        = buffer.windowStartLine();
-                int column      = buffer.windowStartColumn();
-                String lexeme   = buffer.getTokenWindowLexeme();
-                return factory.makeNumberToken(startOffset, line, column, lexeme);
-            };
+            // TODO: scanNumberUnicode goes into an infinite loop
+            // numberScanner = this::scanNumberUnicode;
+            numberScanner = this::scanNumberAscii;
 
-            // TODO: This doesn't work:
-            // - identifierScanner takes a char and returns a JsonToken
-            // - scanUnicodeIdentifier takes no parameters and returns void
-            // identifierScanner = this::scanUnicodeIdentifier;
-            identifierScanner = (first) -> {
-                scanUnicodeIdentifier();
-                int startOffset = buffer.windowStartOffset();
-                int line        = buffer.windowStartLine();
-                int column      = buffer.windowStartColumn();
-                String lexeme   = buffer.getTokenWindowLexeme();
-                return factory.makeIdentifierToken(startOffset, line, column, lexeme);
-            };
+            identifierScanner = this::scanIdentifierUnicode;
+        } else {
+            tokenHandler = this::scanTokenAscii;
+            identifierScanner = this::scanIdentifierAscii;
         }
-
-        // TODO: Does this need to change for unicode and/or SIMD?
-        tokenHandler = this::handleToken;
 
         return buffer;
     }
@@ -936,117 +799,12 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     private SourceBuffer setupStreamBuffer(InputStream stream) {
         SourceInputStreamBuffer buffer = new SourceInputStreamBuffer(stream);
 
+        // TODO: Set up the handler and scanner methods.
+        // SourceInputStreamBuffer doesn't currently implement SimdCapableBuffer
+        // so this will be simpler than setupStringBuffer.
+
         return buffer;
     }
-
-    private JsonToken handleToken(char c) {
-
-        if (c > 127) {
-            JsonToken tok = handleUnicodeChar(c);
-            if (tok == null) return nextToken();
-            return tok;
-        }
-
-        switch (c) {
-            case '{': return makeStructuralToken(JsonTokenType.LEFT_BRACE);
-            case '}': return makeStructuralToken(JsonTokenType.RIGHT_BRACE);
-            case '[': return makeStructuralToken(JsonTokenType.LEFT_BRACKET);
-            case ']': return makeStructuralToken(JsonTokenType.RIGHT_BRACKET);
-            case ':': return makeStructuralToken(JsonTokenType.COLON);
-            case ',': return makeStructuralToken(JsonTokenType.COMMA);
-
-            case '"':
-            case '\'':
-                return scanStringToken(c);
-
-            default:
-                return scanNumberOrIdentifierOrError(c);
-        }
-    }
-
-    // private JsonToken handleAsciiToken(char c) {
-
-    //     if (c > 127) {
-    //         throw error("Non-ASCII byte encountered but unicode is disabled");
-    //     }
-
-    //     byte kind = STRUCTURAL[c];
-
-    //     switch (kind) {
-    //         case S_LBRACE:   return makeStructuralToken(JsonTokenType.LEFT_BRACE);
-    //         case S_RBRACE:   return makeStructuralToken(JsonTokenType.RIGHT_BRACE);
-    //         case S_LBRACKET: return makeStructuralToken(JsonTokenType.LEFT_BRACKET);
-    //         case S_RBRACKET: return makeStructuralToken(JsonTokenType.RIGHT_BRACKET);
-    //         case S_COLON:    return makeStructuralToken(JsonTokenType.COLON);
-    //         case S_COMMA:    return makeStructuralToken(JsonTokenType.COMMA);
-    //         case S_STRING:   return stringScanner.scan(c);
-    //         default:         return numberOrIdentifierAscii(c);
-    //     }
-    // }
-
-    // private JsonToken handleUnicodeToken(char c) {
-
-    //     if (c > 127) {
-    //         JsonToken tok = handleUnicodeChar(c);
-    //         if (tok == null) return nextToken();
-    //         return tok;
-    //     }
-
-    //     byte kind = STRUCTURAL[c];
-
-    //     switch (kind) {
-    //         case S_LBRACE:   return makeStructuralToken(JsonTokenType.LEFT_BRACE);
-    //         case S_RBRACE:   return makeStructuralToken(JsonTokenType.RIGHT_BRACE);
-    //         case S_LBRACKET: return makeStructuralToken(JsonTokenType.LEFT_BRACKET);
-    //         case S_RBRACKET: return makeStructuralToken(JsonTokenType.RIGHT_BRACKET);
-    //         case S_COLON:    return makeStructuralToken(JsonTokenType.COLON);
-    //         case S_COMMA:    return makeStructuralToken(JsonTokenType.COMMA);
-    //         case S_STRING:   return stringScanner.scan(c);
-    //         default:         return numberOrIdentifierUnicode(c);
-    //     }
-    // }
-
-
-
-
-    // private JsonToken scanStringAscii(char quote) {
-    //     // SIMD escape detection: only check for quote and control chars
-    //     int pos = ((SourceByteBuffer) buffer).scanStringSimdAsciiOnly(buffer.offset(), (byte) quote);
-    //     buffer.advanceBy(pos - buffer.offset());
-    //     return scanStringAsciiScalar(quote);
-    // }
-
-    // private JsonToken scanNumberAscii(char first) {
-    //     if (first > 127) throw error("Non-ASCII digit");
-    //     return scanNumberOrIdentifierAscii(first);
-    // }
-
-    // private JsonToken scanIdentifierAscii(char first) {
-    //     if (first > 127) throw error("Non-ASCII identifier");
-    //     return scanIdentifierAsciiScalar(first);
-    // }
-
-    // private void skipAsciiWhitespaceSimd() {
-    //     ((SourceByteBuffer) buffer).skipWhitespaceAndFormattingSimd();
-    // }
-
-    // private void skipUnicodeWhitespaceScalar() {
-    //     advanceWhitespaceAndCommentsUnicode();
-    // }
-
-    private final boolean simdStringScanner(char quoteChar) {
-        SourceByteBuffer bb = (SourceByteBuffer) buffer;
-
-        byte quoteByte = (byte) quoteChar;
-        int pos = bb.offset();
-        int simdPos = bb.scanStringAsciiSimd(pos, quoteByte);
-
-        bb.advanceBy(simdPos - pos);
-
-        return scanString(quoteChar); // scalar fallback for escapes/Unicode
-    }
-
-
 
     //
     // Token Creation
