@@ -247,12 +247,14 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     }
 
     private JsonToken scanTokenAsciiOrUnicode(char c) {
-        if (c > 127) {
-            JsonToken tok = scanTokenUnicode(c);
-            if (tok == null) return nextToken();
-            return tok;
+        if (c < 128) {
+            return scanTokenAscii(c);
         }
-        return scanTokenAscii(c);
+
+        // Unicode path (identifier, digit, whitespace)
+        JsonToken tok = scanTokenUnicode(c);
+        if (tok == null) return nextToken();
+        return tok;
     }
 
     private JsonToken scanTokenAscii(char c) {
@@ -274,6 +276,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     }
 
     private JsonToken scanTokenUnicode(char c) {
+        buffer.startTokenWindow();
         int startOffset = buffer.windowStartOffset();
         int line        = buffer.windowStartLine();
         int column      = buffer.windowStartColumn();
@@ -523,6 +526,8 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     }
 
     private void scanNumberUnicode(char startChar) {
+        buffer.advance(); // consume first digit
+
         // integer part
         while (!buffer.isAtEnd()) {
             char c = buffer.peek();
