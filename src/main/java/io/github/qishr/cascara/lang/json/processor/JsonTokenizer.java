@@ -482,8 +482,8 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         char c;
         int pos;
 
-        if (USE_SIMD) {
-            pos = buffer.scanDigitsSimd(buffer.offset());
+        if (USE_SIMD && buffer instanceof SimdCapableBuffer simd) {
+            pos = simd.scanDigitsSimd(buffer.offset());
             buffer.setOffset(pos);
         } else {
             while (true) {
@@ -499,8 +499,8 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         // 4. Fractional part
         if (buffer.peek() == '.') {
             buffer.advance();
-            if (USE_SIMD) {
-                pos = buffer.scanDigitsSimd(buffer.offset());
+            if (USE_SIMD && buffer instanceof SimdCapableBuffer simd) {
+                pos = simd.scanDigitsSimd(buffer.offset());
                 buffer.setOffset(pos);
             } else {
                 while (true) {
@@ -522,8 +522,8 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             if (c == '+' || c == '-') {
                 buffer.advance();
             }
-            if (USE_SIMD) {
-                pos = buffer.scanDigitsSimd(buffer.offset());
+            if (USE_SIMD && buffer instanceof SimdCapableBuffer simd) {
+                pos = simd.scanDigitsSimd(buffer.offset());
                 buffer.setOffset(pos);
             } else {
                 while (true) {
@@ -797,23 +797,47 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         // SIMD & no JSON5 unquoted keys - use byte-based buffer
         if (options.useSimd() && !options.allowUnquotedKeys()) {
             byte[] raw = text.getBytes(StandardCharsets.UTF_8);
-            SourceByteBuffer byteBuffer = new SourceByteBuffer(raw);
+            final SourceByteBuffer byteBuffer = new SourceByteBuffer(raw);
 
             if (!ALLOW_UNICODE) {
                 // TODO: This doesn't work:
                 // - stringScanner takes a char and returns a boolean
                 // - scanStringAsciiSimd takes an int and a byte
-                stringScanner = byteBuffer::scanStringAsciiSimd;
+                // stringScanner = byteBuffer::scanStringAsciiSimd;
+                stringScanner = (quoteChar) -> {
+                    int pos = byteBuffer.offset();
+                    int end = byteBuffer.scanStringAsciiSimd(pos, (byte) quoteChar);
+                    byteBuffer.setOffset(end);
+                    return scanString(quoteChar); // scalar fallback
+                };
+
 
                 // TODO: This doesn't work:
                 // - numberScanner takes a char and returns a JsonToken
                 // - scanDigitsSimd takes an int and returns an int
-                numberScanner = byteBuffer::scanDigitsSimd;
+                // numberScanner = byteBuffer::scanDigitsSimd;
+                numberScanner = (first) -> {
+                    scanNumber(first);
+                    int startOffset = byteBuffer.windowStartOffset();
+                    int line        = byteBuffer.windowStartLine();
+                    int column      = byteBuffer.windowStartColumn();
+                    String lexeme   = byteBuffer.getTokenWindowLexeme();
+                    return factory.makeNumberToken(startOffset, line, column, lexeme);
+                };
+
 
                 // TODO: This doesn't work:
                 // - identifierScanner takes a char and returns a JsonToken
                 // - scanIdentifierFast takes no parameters and returns void
-                identifierScanner = this::scanIdentifierFast;
+                // identifierScanner = this::scanIdentifierFast;
+                identifierScanner = (first) -> {
+                    scanIdentifierFast();
+                    int startOffset = byteBuffer.windowStartOffset();
+                    int line        = byteBuffer.windowStartLine();
+                    int column      = byteBuffer.windowStartColumn();
+                    String lexeme   = byteBuffer.getTokenWindowLexeme();
+                    return classifyLexeme(startOffset, line, column, lexeme);
+                };
             }
 
 
@@ -827,7 +851,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             buffer = byteBuffer;
         } else {
             // JSON5 identifiers or SIMD disabled - use char-based buffer
-            SourceStringBuffer stringBuffer = new SourceStringBuffer(text);
+            final SourceStringBuffer stringBuffer = new SourceStringBuffer(text);
 
             if (!ALLOW_UNICODE) {
                 stringScanner = this::simdStringScanner;
@@ -835,12 +859,28 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
                 // TODO: This doesn't work:
                 // - numberScanner takes a char and returns a JsonToken
                 // - scanNumber returns void
-                numberScanner = this::scanNumber;
+                // numberScanner = this::scanNumber;
+                numberScanner = (first) -> {
+                    scanNumber(first);
+                    int startOffset = stringBuffer.windowStartOffset();
+                    int line        = stringBuffer.windowStartLine();
+                    int column      = stringBuffer.windowStartColumn();
+                    String lexeme   = stringBuffer.getTokenWindowLexeme();
+                    return factory.makeNumberToken(startOffset, line, column, lexeme);
+                };
 
                 // TODO: This doesn't work:
                 // - identifierScanner takes a char and returns a JsonToken
                 // - scanIdentifierFast takes no parameters and returns void
-                identifierScanner = this::scanIdentifierFast;
+                // identifierScanner = this::scanIdentifierFast;
+                identifierScanner = (first) -> {
+                    scanIdentifierFast();
+                    int startOffset = stringBuffer.windowStartOffset();
+                    int line        = stringBuffer.windowStartLine();
+                    int column      = stringBuffer.windowStartColumn();
+                    String lexeme   = stringBuffer.getTokenWindowLexeme();
+                    return classifyLexeme(startOffset, line, column, lexeme);
+                };
             }
 
             // Whitespace / trivia skipping
@@ -855,18 +895,36 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
         // String and number scanning
         if (ALLOW_UNICODE) {
-            // TODO: scanStringUnicode does not exist
-            stringScanner = this::scanStringUnicode;
+            // // TODO: scanStringUnicode does not exist
+            // TODO: scanString must do branching for unicode. The purpose of
+            // setting up these method pointers was to avoid branching.
+            stringScanner = this::scanString;
 
             // TODO: This doesn't work:
             // - numberScanner takes a char and returns a JsonToken
             // - scanUnicodeNumber takes a char and returns void
-            numberScanner = this::scanUnicodeNumber;
+            // numberScanner = this::scanUnicodeNumber;
+            numberScanner = (first) -> {
+                scanUnicodeNumber(first);
+                int startOffset = buffer.windowStartOffset();
+                int line        = buffer.windowStartLine();
+                int column      = buffer.windowStartColumn();
+                String lexeme   = buffer.getTokenWindowLexeme();
+                return factory.makeNumberToken(startOffset, line, column, lexeme);
+            };
 
             // TODO: This doesn't work:
             // - identifierScanner takes a char and returns a JsonToken
             // - scanUnicodeIdentifier takes no parameters and returns void
-            identifierScanner = this::scanUnicodeIdentifier;
+            // identifierScanner = this::scanUnicodeIdentifier;
+            identifierScanner = (first) -> {
+                scanUnicodeIdentifier();
+                int startOffset = buffer.windowStartOffset();
+                int line        = buffer.windowStartLine();
+                int column      = buffer.windowStartColumn();
+                String lexeme   = buffer.getTokenWindowLexeme();
+                return factory.makeIdentifierToken(startOffset, line, column, lexeme);
+            };
         }
 
         // TODO: Does this need to change for unicode and/or SIMD?
