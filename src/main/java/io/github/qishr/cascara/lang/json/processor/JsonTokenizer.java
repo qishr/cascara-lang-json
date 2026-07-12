@@ -110,10 +110,14 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         applyOptions(new JsonOptions());
     }
 
-
     @FunctionalInterface
     private interface TokenHandler {
-        JsonToken handle(char c);
+        JsonToken handle();
+    }
+
+    @FunctionalInterface
+    private interface TokenScanner {
+        JsonToken scan(char c);
     }
 
     @FunctionalInterface
@@ -137,6 +141,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     }
 
     private TokenHandler tokenHandler;
+    private TokenScanner tokenScanner;
     private StringScanner stringScanner;
     private NumberScanner numberScanner;
     private DigitScanner digitScanner;
@@ -211,6 +216,15 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     }
 
     public JsonToken nextToken() {
+        return tokenHandler.handle();
+    }
+
+    public JsonToken nextTokenWithoutComments() {
+        triviaHandler.run();
+        return buffer.isAtEnd() ? makeEofToken() : tokenScanner.scan(buffer.peek());
+    }
+
+    public JsonToken nextTokenWithComments() {
         if (!pendingComments.isEmpty()) {
             return toCommentToken(pendingComments.remove(0));
         }
@@ -230,7 +244,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         char c = buffer.peek();
 
         // Call either scanTokenAscii or scanTokenAsciiOrUnicode
-        JsonToken tok = tokenHandler.handle(c);
+        JsonToken tok = tokenScanner.scan(c);
 
         if (!pendingComments.isEmpty()) {
             tok.attachComments(pendingComments);
@@ -244,6 +258,12 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         }
 
         return tok;
+    }
+
+    private void skipBom() {
+        if (buffer.peek() == '\uFEFF') {
+            buffer.advance();
+        }
     }
 
     private JsonToken scanTokenAsciiOrUnicode(char c) {
@@ -726,14 +746,8 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     }
 
     //
+    // Setup
     //
-    //
-
-    private void skipBom() {
-        if (buffer.peek() == '\uFEFF') {
-            buffer.advance();
-        }
-    }
 
     /// Token factory selection
     private TokenFactory setupTokenFactory(SourceBuffer buffer) {
@@ -758,8 +772,10 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
             // Whitespace / trivia skipping
             if (ALLOW_COMMENTS) {
+                tokenHandler = this::nextTokenWithComments;
                 triviaHandler = byteBuffer::skipWhitespaceAndFormattingSimd;
             } else {
+                tokenHandler = this::nextTokenWithoutComments;
                 triviaHandler = byteBuffer::skipWhitespaceSimd;
             }
 
@@ -776,6 +792,12 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             digitScanner = this::scanDigits;
             triviaHandler = this::advanceWhitespaceAndComments;
 
+            if (ALLOW_COMMENTS) {
+                tokenHandler = this::nextTokenWithComments;
+            } else {
+                tokenHandler = this::nextTokenWithoutComments;
+            }
+
             if (!ALLOW_UNICODE) {
                 stringScanner = this::scanString;
                 numberScanner = this::scanNumberAscii;
@@ -785,7 +807,8 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         }
 
         if (ALLOW_UNICODE) {
-            tokenHandler = this::scanTokenAsciiOrUnicode;
+            tokenHandler = this::nextTokenWithComments;
+            tokenScanner = this::scanTokenAsciiOrUnicode;
             stringScanner = this::scanString;
 
             // TODO: scanNumberUnicode goes into an infinite loop
@@ -794,7 +817,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
             identifierScanner = this::scanIdentifierUnicode;
         } else {
-            tokenHandler = this::scanTokenAscii;
+            tokenScanner = this::scanTokenAscii;
             identifierScanner = this::scanIdentifierAscii;
         }
 
