@@ -28,9 +28,9 @@ public class JsonConverter extends AbstractJsonProcessor<JsonConverter> implemen
     }
 
     public JsonNode fromAst(AstNode from) {
-        System.out.println("fromAst");
+        // System.out.println("fromAst");
         if (from instanceof MapAstNode fromMap) {
-            System.out.println("  map");
+            // System.out.println("  map");
             JsonMapNode map = new JsonMapNode();
             for (Object entry : fromMap.getEntries()) {
                 if (entry instanceof MapEntryAstNode fromMapEntry) {
@@ -39,7 +39,7 @@ public class JsonConverter extends AbstractJsonProcessor<JsonConverter> implemen
                     if (astKey instanceof ScalarAstNode astScalar) {
                         String jsonKey = astScalar.asString();
                         // if (fromAst(astScalar) instanceof JsonScalarNode jsonKey) {
-                            System.out.println("    scalar key " + jsonKey);
+                            // System.out.println("    scalar key " + jsonKey);
                             JsonNode jsonValue = fromAst(astValue);
                             map.put(jsonKey, jsonValue);
                         // }
@@ -48,7 +48,7 @@ public class JsonConverter extends AbstractJsonProcessor<JsonConverter> implemen
             }
             return map;
         } else if (from instanceof SequenceAstNode astSeq) {
-            System.out.println("  seq");
+            // System.out.println("  seq");
             JsonSequenceNode sequence = new JsonSequenceNode();
             for (Object element : astSeq.getElements()) {
                 if (element instanceof AstNode astElement) {
@@ -57,7 +57,7 @@ public class JsonConverter extends AbstractJsonProcessor<JsonConverter> implemen
             }
             return sequence;
         } else if (from instanceof ScalarAstNode astScalar) {
-            System.out.println("  sca " + astScalar.asString());
+            // System.out.println("  sca " + astScalar.asString());
 
             // TODO: Tests for this
 

@@ -24,6 +24,10 @@ import io.github.qishr.cascara.lang.json.token.JsonLexemeBackedToken;
 import io.github.qishr.cascara.lang.json.token.JsonTokenType;
 import io.github.qishr.cascara.lang.json.token.SourceByteBuffer;
 import io.github.qishr.cascara.lang.json.util.JsonOptions;
+import jdk.incubator.vector.ByteVector;
+import jdk.incubator.vector.VectorMask;
+import jdk.incubator.vector.VectorOperators;
+import jdk.incubator.vector.VectorSpecies;
 
 public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implements Tokenizer<JsonToken>{
 
@@ -69,7 +73,6 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
     private static final byte[] STRUCTURAL = new byte[128];
 
-    // private static final byte S_OTHER      = 0;
     private static final byte S_LBRACE     = 1;
     private static final byte S_RBRACE     = 2;
     private static final byte S_LBRACKET   = 3;
@@ -95,20 +98,11 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     private boolean ALLOW_UNICODE;
     private boolean CAPTURE_COMMENTS;
 
-    // private final Deque<JsonToken> pendingTokens = new ArrayDeque<>();
-
     private SourceBuffer buffer;
     private List<JsonToken> tokens;
     private final List<JsonComment> pendingComments = new ArrayList<>();
 
     private TokenFactory factory;
-
-    /// Default constructor for SPI
-    public JsonTokenizer() {
-        // SPI will call this
-        // Default is strict JSON
-        applyOptions(new JsonOptions());
-    }
 
     @FunctionalInterface
     private interface TokenHandler {
@@ -148,6 +142,13 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     private IdentifierScanner identifierScanner;
     private Runnable triviaHandler;
 
+    /// Default constructor for SPI
+    public JsonTokenizer() {
+        // SPI will call this
+        // Default is strict JSON
+        applyOptions(new JsonOptions());
+    }
+
     @Override
     public JsonTokenizer setOptions(LanguageOptions<?> options) {
         super.setOptions(options);
@@ -168,13 +169,13 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
     @Override protected JsonTokenizer self() { return this; }
 
-    public int getLine() {
-        return buffer.line();
-    }
+    // public int getLine() {
+    //     return buffer.line();
+    // }
 
-    public int getColumn() {
-        return buffer.column();
-    }
+    // public int getColumn() {
+    //     return buffer.column();
+    // }
 
     @Override
     public void open(String text) {
@@ -341,17 +342,24 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
         buffer.startTokenWindow();
 
+
+
+
+        // TODO: Fast lookup table
         // NUMBER?
         if (DIGIT[startChar] || startChar == '-' || startChar == '+' || startChar == '.') {
             numberScanner.scan(startChar);
-            String lexeme  = buffer.getTokenWindowLexeme();
+            String lexeme = buffer.getTokenWindowLexeme();
             return factory.makeNumberToken(startOffset, startLine, startColumn, lexeme);
         }
+
+
+
 
         // IDENTIFIER?
         if (startChar < 128 && IDENT_START[startChar]) {
             identifierScanner.scan();
-            String lexeme  = buffer.getTokenWindowLexeme();
+            String lexeme = buffer.getTokenWindowLexeme();
             return classifyLexeme(startOffset, startLine, startColumn, lexeme);
         }
 
@@ -427,13 +435,72 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         return false;
     }
 
-    private final boolean scanStringSimd(char quoteChar) {
+    private boolean scanStringSimd(char quoteChar) {
         final SourceByteBuffer bb = (SourceByteBuffer) buffer;
         final byte quoteByte = (byte) quoteChar;
-        final int pos = bb.offset();
-        final int simdPos = bb.scanStringAsciiSimd(pos, quoteByte);
-        bb.advanceBy(simdPos - pos);
-        return scanString(quoteChar);
+
+        int pos = bb.offset();
+        int len = bb.length();
+
+        while (pos < len) {
+            // SIMD: find first quote, backslash, or control char
+            int next = bb.scanStringAsciiSimd(pos, quoteByte);
+
+            if (next >= len) {
+                // EOF before closing quote
+                bb.setOffset(len);
+                return false;
+            }
+
+            // Advance logical offset/line/column to `next`
+            int delta = next - bb.offset();
+            if (delta > 0) {
+                bb.advanceBy(delta);
+            }
+
+            // We are now at `next`
+            char c = bb.peek();
+
+            if (c == quoteChar) {
+                // Closing quote → consume and done
+                bb.advance();
+                return true;
+            }
+
+            if (c == '\\') {
+                // SIMD escape detection: we hit a backslash
+                bb.advance(); // consume '\'
+                if (bb.isAtEnd()) {
+                    return false;
+                }
+
+                char esc = bb.advance(); // escaped char
+
+                if (esc == 'u' || esc == 'x') {
+                    int count = (esc == 'u') ? 4 : 2;
+                    for (int i = 0; i < count && !bb.isAtEnd(); i++) {
+                        bb.advance();
+                    }
+                }
+
+                // Continue SIMD from new position
+                pos = bb.offset();
+                len = bb.length();
+                continue;
+            }
+
+            if (c < 0x20) {
+                // Control char inside string → invalid
+                return false;
+            }
+
+            // Should not happen (non‑interesting byte), but advance conservatively
+            bb.advance();
+            pos = bb.offset();
+        }
+
+        // EOF before closing quote
+        return false;
     }
 
     //
@@ -594,6 +661,92 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         }
     }
 
+    private void scanIdentifierSimd() {
+        final SourceByteBuffer bb = (SourceByteBuffer) buffer;
+
+        int pos = bb.offset();
+        int len = bb.length();
+
+        // SIMD classify identifier characters:
+        // IDENT_PART: [A-Za-z0-9_$]
+        final byte A = (byte)'A';
+        final byte Z = (byte)'Z';
+        final byte a = (byte)'a';
+        final byte z = (byte)'z';
+        final byte zero = (byte)'0';
+        final byte nine = (byte)'9';
+        final byte us = (byte)'_';
+        final byte dl = (byte)'$';
+
+        final VectorSpecies<Byte> S = ByteVector.SPECIES_128;
+
+        while (pos < len) {
+            int remaining = len - pos;
+
+            if (remaining < S.length()) {
+                // scalar tail
+                while (!bb.isAtEnd()) {
+                    char c = bb.peek();
+                    if (c < 128 && IDENT_PART[c]) {
+                        bb.advance();
+                        continue;
+                    }
+                    return;
+                }
+                return;
+            }
+
+            ByteVector vec = ByteVector.fromArray(S, bb.raw, pos);
+
+            // ASCII only (IDENT_PART is ASCII)
+            VectorMask<Byte> mAscii = vec.compare(VectorOperators.LT, (byte)0x80);
+
+            // A–Z
+            VectorMask<Byte> mAZ =
+                vec.compare(VectorOperators.GE, A)
+                   .and(vec.compare(VectorOperators.LE, Z));
+
+            // a–z
+            VectorMask<Byte> maz =
+                vec.compare(VectorOperators.GE, a)
+                   .and(vec.compare(VectorOperators.LE, z));
+
+            // 0–9
+            VectorMask<Byte> m09 =
+                vec.compare(VectorOperators.GE, zero)
+                   .and(vec.compare(VectorOperators.LE, nine));
+
+            // '_' or '$'
+            VectorMask<Byte> mus = vec.compare(VectorOperators.EQ, us);
+            VectorMask<Byte> mdl = vec.compare(VectorOperators.EQ, dl);
+
+            // Combine all identifier masks
+            long maskIdent =
+                mAscii.toLong() &
+                (mAZ.or(maz).or(m09).or(mus).or(mdl)).toLong();
+
+            if (maskIdent == 0L) {
+                // First byte is non-identifier
+                return;
+            }
+
+            // Find first non-identifier byte
+            long maskNonIdent = ~maskIdent;
+
+            if (maskNonIdent != 0L) {
+                int firstBad = Long.numberOfTrailingZeros(maskNonIdent);
+                int end = pos + firstBad;
+
+                bb.advanceBy(end - bb.offset());
+                return;
+            }
+
+            // All 128 bytes are identifier chars
+            bb.advanceBy(S.length());
+            pos = bb.offset();
+        }
+    }
+
     private void scanIdentifierUnicode() {
         while (!buffer.isAtEnd()) {
             char c = buffer.peek();
@@ -725,7 +878,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
                 if (n == '*') {
                     if (capture) buffer.startTokenWindow();
                     int line = buffer.line();
-                    int col  = buffer.column();
+                    int col = buffer.column();
                     String value = scanMultiLineComment();
                     if (capture) {
                         String lexeme = buffer.getTokenWindowLexeme();
@@ -782,12 +935,13 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             if (!ALLOW_UNICODE) {
                 stringScanner = this::scanStringSimd;
                 numberScanner = this::scanNumberAscii;
+                identifierScanner = this::scanIdentifierSimd;
             }
 
             buffer = byteBuffer;
         } else {
             // JSON5 identifiers or SIMD disabled - use char-based buffer
-            final SourceStringBuffer stringBuffer = new SourceStringBuffer(text);
+            buffer = new SourceStringBuffer(text);
 
             digitScanner = this::scanDigits;
             triviaHandler = this::advanceWhitespaceAndComments;
@@ -801,24 +955,18 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             if (!ALLOW_UNICODE) {
                 stringScanner = this::scanString;
                 numberScanner = this::scanNumberAscii;
+                identifierScanner = this::scanIdentifierAscii;
             }
-
-            buffer = stringBuffer;
         }
 
         if (ALLOW_UNICODE) {
-            tokenHandler = this::nextTokenWithComments;
             tokenScanner = this::scanTokenAsciiOrUnicode;
             stringScanner = this::scanString;
-
-            // TODO: scanNumberUnicode goes into an infinite loop
-            // numberScanner = this::scanNumberUnicode;
+            numberScanner = this::scanNumberUnicode;
             numberScanner = this::scanNumberAscii;
-
             identifierScanner = this::scanIdentifierUnicode;
         } else {
             tokenScanner = this::scanTokenAscii;
-            identifierScanner = this::scanIdentifierAscii;
         }
 
         return buffer;
@@ -827,9 +975,29 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     private SourceBuffer setupStreamBuffer(InputStream stream) {
         SourceInputStreamBuffer buffer = new SourceInputStreamBuffer(stream);
 
-        // TODO: Set up the handler and scanner methods.
         // SourceInputStreamBuffer doesn't currently implement SimdCapableBuffer
         // so this will be simpler than setupStringBuffer.
+
+        digitScanner = this::scanDigits;
+        triviaHandler = this::advanceWhitespaceAndComments;
+
+        if (ALLOW_COMMENTS) {
+            tokenHandler = this::nextTokenWithComments;
+        } else {
+            tokenHandler = this::nextTokenWithoutComments;
+        }
+        if (ALLOW_UNICODE) {
+            tokenScanner = this::scanTokenAsciiOrUnicode;
+            stringScanner = this::scanString;
+            numberScanner = this::scanNumberUnicode;
+            numberScanner = this::scanNumberAscii;
+            identifierScanner = this::scanIdentifierUnicode;
+        } else {
+            tokenScanner = this::scanTokenAscii;
+            stringScanner = this::scanString;
+            numberScanner = this::scanNumberAscii;
+            identifierScanner = this::scanIdentifierAscii;
+        }
 
         return buffer;
     }

@@ -1,12 +1,14 @@
 package io.github.qishr.cascara.lang.json.token;
 
 import java.nio.charset.StandardCharsets;
+
+import io.github.qishr.cascara.common.lang.util.LexemeProvider;
 import jdk.incubator.vector.*;
 
-public final class SourceByteBuffer implements JsonSimdCapableBuffer {
+public final class SourceByteBuffer implements JsonSimdCapableBuffer, LexemeProvider {
 
-    private final byte[] raw;        // UTF‑8 bytes
-    private int offset = 0;          // byte offset
+    public final byte[] raw; // UTF‑8 bytes
+    private int offset = 0;  // byte offset
     private int line = 1;
     private int column = 1;
 
@@ -16,6 +18,12 @@ public final class SourceByteBuffer implements JsonSimdCapableBuffer {
 
     public SourceByteBuffer(byte[] raw) {
         this.raw = (raw != null) ? raw : new byte[0];
+    }
+
+    @Override
+    public String slice(int startOffset, int endOffset) {
+        byte[] part = java.util.Arrays.copyOfRange(raw, startOffset, endOffset);
+        return new String(part, StandardCharsets.UTF_8);
     }
 
     // ------------------------------------------------------------
@@ -420,6 +428,110 @@ public final class SourceByteBuffer implements JsonSimdCapableBuffer {
         }
 
         this.advanceBy(pos - offset());
+    }
+
+    // ------------------------------------------------------------
+    // SIMD ASCII / UTF‑8 lead-byte scanning
+    // ------------------------------------------------------------
+
+    public int scanAsciiUntilUtf8LeadSimd(int pos) {
+        final VectorSpecies<Byte> S = ByteVector.SPECIES_128;
+        final int len = raw.length;
+
+        // ASCII:        0x00–0x7F
+        // UTF-8 lead:   0xC0–0xF7 (we treat any >= 0x80 as "non-ASCII" here)
+        final byte ASCII_MAX = (byte)0x7F;
+
+        while (pos < len) {
+            int remaining = len - pos;
+
+            if (remaining < S.length()) {
+                while (pos < len) {
+                    byte b = raw[pos];
+                    if ((b & 0x80) != 0) { // non-ASCII → UTF-8 lead or continuation
+                        return pos;
+                    }
+                    pos++;
+                }
+                return pos;
+            }
+
+            ByteVector vec = ByteVector.fromArray(S, raw, pos);
+
+            // mask for non-ASCII (b >= 0x80)
+            VectorMask<Byte> mNonAscii = vec.compare(VectorOperators.GT, ASCII_MAX);
+
+            long mask = mNonAscii.toLong();
+
+            if (mask != 0L) {
+                int first = Long.numberOfTrailingZeros(mask);
+                return pos + first;
+            }
+
+            pos += S.length();
+        }
+
+        return pos;
+    }
+
+    public int scanIdentifierStartSimd(int pos) {
+        final VectorSpecies<Byte> S = ByteVector.SPECIES_128;
+        final int len = raw.length;
+
+        // IDENT_START: [A-Za-z_$]
+        final byte A = (byte)'A';
+        final byte Z = (byte)'Z';
+        final byte a = (byte)'a';
+        final byte z = (byte)'z';
+        final byte us = (byte)'_';
+        final byte dl = (byte)'$';
+
+        while (pos < len) {
+            int remaining = len - pos;
+
+            if (remaining < S.length()) {
+                // scalar tail
+                while (pos < len) {
+                    byte b = raw[pos];
+                    if (b < 0x80 &&
+                        ((b >= A && b <= Z) ||
+                         (b >= a && b <= z) ||
+                         b == us || b == dl)) {
+                        return pos;
+                    }
+                    pos++;
+                }
+                return -1;
+            }
+
+            ByteVector vec = ByteVector.fromArray(S, raw, pos);
+
+            VectorMask<Byte> mAscii = vec.compare(VectorOperators.LT, (byte)0x80);
+
+            VectorMask<Byte> mAZ =
+                vec.compare(VectorOperators.GE, A)
+                   .and(vec.compare(VectorOperators.LE, Z));
+
+            VectorMask<Byte> maz =
+                vec.compare(VectorOperators.GE, a)
+                   .and(vec.compare(VectorOperators.LE, z));
+
+            VectorMask<Byte> mus = vec.compare(VectorOperators.EQ, us);
+            VectorMask<Byte> mdl = vec.compare(VectorOperators.EQ, dl);
+
+            long mask =
+                mAscii.toLong() &
+                (mAZ.or(maz).or(mus).or(mdl)).toLong();
+
+            if (mask != 0L) {
+                int first = Long.numberOfTrailingZeros(mask);
+                return pos + first;
+            }
+
+            pos += S.length();
+        }
+
+        return -1;
     }
 
 }

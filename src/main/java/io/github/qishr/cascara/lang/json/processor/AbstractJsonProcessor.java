@@ -10,6 +10,7 @@ import io.github.qishr.cascara.lang.json.util.JsonOptions;
 
 public abstract class AbstractJsonProcessor<P extends Processor> implements Processor {
     static final String JSON_CONTENT_TYPE_STRING = "application/json";
+    static final Reporter NO_OP_REPORTER = new NoOpReporter();
 
     static final ContentType JSON_CONTENT_TYPE = new ContentType("JSON")
             .withType("text/json")
@@ -17,8 +18,8 @@ public abstract class AbstractJsonProcessor<P extends Processor> implements Proc
             .withType("application/schema+json")
             .withSuffix(".json");
 
-    protected JsonOptions options = new JsonOptions();
-    protected Reporter reporter = new NoOpReporter();
+    protected JsonOptions options = JsonOptions.STRICT;
+    protected Reporter reporter = NO_OP_REPORTER;
     private Properties capabilities;
 
     protected abstract P self();
@@ -40,7 +41,7 @@ public abstract class AbstractJsonProcessor<P extends Processor> implements Proc
     /// {@inheritDoc}
     @Override
     public P setReporter(Reporter reporter) {
-        this.reporter = (reporter == null ? new NoOpReporter() : reporter);
+        this.reporter = (reporter == null ? NO_OP_REPORTER : reporter);
         return self();
     }
 
