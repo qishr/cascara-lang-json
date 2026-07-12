@@ -11,8 +11,8 @@ import io.github.qishr.cascara.common.lang.processor.Tokenizer;
 import io.github.qishr.cascara.common.lang.util.LanguageOptions;
 import io.github.qishr.cascara.common.lang.util.LexemeProvider;
 import io.github.qishr.cascara.common.lang.util.QuoteStyle;
+import io.github.qishr.cascara.common.lang.util.SimdCapableBuffer;
 import io.github.qishr.cascara.common.lang.util.SourceBuffer;
-import io.github.qishr.cascara.common.lang.util.SourceByteBuffer;
 import io.github.qishr.cascara.common.lang.util.SourceInputStreamBuffer;
 import io.github.qishr.cascara.common.lang.util.SourceStringBuffer;
 import io.github.qishr.cascara.lang.json.token.JsonBufferBackedToken;
@@ -22,6 +22,7 @@ import io.github.qishr.cascara.lang.json.token.JsonStructuralToken;
 import io.github.qishr.cascara.lang.json.token.JsonToken;
 import io.github.qishr.cascara.lang.json.token.JsonLexemeBackedToken;
 import io.github.qishr.cascara.lang.json.token.JsonTokenType;
+import io.github.qishr.cascara.lang.json.token.SourceByteBuffer;
 import io.github.qishr.cascara.lang.json.util.JsonOptions;
 
 public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implements Tokenizer<JsonToken>{
@@ -103,8 +104,6 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
     private TokenFactory factory;
 
-    private Runnable skipTrivia;
-
     /// Default constructor for SPI
     public JsonTokenizer() {
         // SPI will call this
@@ -114,25 +113,44 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
 
     @FunctionalInterface
+    private interface TokenHandler {
+        JsonToken handle(char c);
+    }
+
+    @FunctionalInterface
     private interface StringScanner {
         boolean scan(char quoteChar);
     }
 
-    private final StringScanner scalarStringScanner = this::scanString;
+    @FunctionalInterface
+    private interface NumberScanner {
+        JsonToken scan(char first);
+    }
 
-    private final StringScanner simdStringScanner = (quoteChar) -> {
-        SourceByteBuffer bb = (SourceByteBuffer) buffer;
+    @FunctionalInterface
+    private interface IdentifierScanner {
+        JsonToken scan(char first);
+    }
 
-        byte quoteByte = (byte) quoteChar;
-        int pos = bb.offset();
-        int simdPos = bb.scanStringAsciiSimd(pos, quoteByte);
-
-        bb.advanceBy(simdPos - pos);
-
-        return scanString(quoteChar); // scalar fallback for escapes/Unicode
-    };
-
+    private Runnable triviaHandler;
+    private TokenHandler tokenHandler;
     private StringScanner stringScanner;
+    private NumberScanner numberScanner; // TODO: This isn't used yet
+    private IdentifierScanner identifierScanner; // TODO: This isn't used yet
+
+
+    private final StringScanner scalarStringScanner = this::scanString; // TODO: This isn't used yet
+
+    // I moved this into a normal method, quite a bit below here.
+
+    // private final StringScanner simdStringScanner = (quoteChar) -> {
+    //     SourceByteBuffer bb = (SourceByteBuffer) buffer;
+    //     byte quoteByte = (byte) quoteChar;
+    //     int pos = bb.offset();
+    //     int simdPos = bb.scanStringAsciiSimd(pos, quoteByte);
+    //     bb.advanceBy(simdPos - pos);
+    //     return scanString(quoteChar); // scalar fallback for escapes/Unicode
+    // };
 
 
     @Override
@@ -164,32 +182,18 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         return buffer.column();
     }
 
-    // @Override
-    // public void open(String text) {
-    //     this.buffer = new SourceStringBuffer(text);
-    //     resetCommonState();
-    // }
-
     @Override
     public void open(String text) {
-
-        // SIMD + no JSON5 unquoted keys - use byte-based buffer
-        if (options.useSimd() && !options.allowUnquotedKeys()) {
-            byte[] raw = text.getBytes(StandardCharsets.UTF_8);
-            this.buffer = new SourceByteBuffer(raw);
-        } else {
-            // JSON5 identifiers or SIMD disabled - use char-based buffer
-            this.buffer = new SourceStringBuffer(text);
-        }
-
-        resetCommonState();
+        buffer = setupStringBuffer(text);
+        factory = setupTokenFactory(buffer);
+        skipBom();
     }
 
-
     @Override
-    public void open(InputStream is) {
-        this.buffer = new SourceInputStreamBuffer(is);
-        resetCommonState();
+    public void open(InputStream stream) {
+        buffer = setupStreamBuffer(stream);
+        factory = setupTokenFactory(buffer);
+        skipBom();
     }
 
     @Override
@@ -197,23 +201,18 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         if (source == null || source.isEmpty()) {
             return List.of();
         }
-
         this.tokens = new ArrayList<>();
-
         open(source);
-
         JsonToken token;
         while ((token = nextToken()).getType() != JsonTokenType.EOF) {
             this.tokens.add(token);
         }
-
         tokens.add(new JsonLexemeBackedToken(
             buffer.line(),
             buffer.column(),
             buffer.offset(),
             JsonTokenType.EOF
         ));
-
         return this.tokens;
     }
 
@@ -222,83 +221,119 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         return EnumSet.allOf(JsonTokenType.class);
     }
 
+    // Old code...
+
+    // public JsonToken nextToken() {
+    //     if (!pendingComments.isEmpty()) {
+    //         return toCommentToken(pendingComments.remove(0));
+    //     }
+
+    //     skipTrivia.run();
+
+    //     if (!pendingComments.isEmpty()) {
+    //         return toCommentToken(pendingComments.remove(0));
+    //     }
+
+    //     if (buffer.isAtEnd()) {
+    //         JsonToken tok = makeEofToken();
+
+    //         if (!pendingComments.isEmpty()) {
+    //             tok.attachComments(pendingComments);
+    //             pendingComments.clear();
+    //         }
+
+    //         return tok;
+    //     }
+
+    //     char c = buffer.peek();
+    //     JsonToken tok;
+
+    //     // Unicode path
+    //     if (c > 127) {
+    //         tok = handleUnicodeChar(c);
+    //         if (tok == null) {
+    //             // whitespace or skipped unicode trivia
+    //             return nextToken();
+    //         }
+    //     } else {
+    //         // ASCII path
+    //         byte kind = STRUCTURAL[c];
+
+    //         switch (kind) {
+    //             case S_LBRACE:
+    //                 tok = makeStructuralToken(JsonTokenType.LEFT_BRACE);
+    //                 break;
+
+    //             case S_RBRACE:
+    //                 tok = makeStructuralToken(JsonTokenType.RIGHT_BRACE);
+    //                 break;
+
+    //             case S_LBRACKET:
+    //                 tok = makeStructuralToken(JsonTokenType.LEFT_BRACKET);
+    //                 break;
+
+    //             case S_RBRACKET:
+    //                 tok = makeStructuralToken(JsonTokenType.RIGHT_BRACKET);
+    //                 break;
+
+    //             case S_COLON:
+    //                 tok = makeStructuralToken(JsonTokenType.COLON);
+    //                 break;
+
+    //             case S_COMMA:
+    //                 tok = makeStructuralToken(JsonTokenType.COMMA);
+    //                 break;
+
+    //             case S_STRING:
+    //                 tok = scanStringToken(c);
+    //                 break;
+
+    //             default:
+    //                 tok = scanNumberOrIdentifierOrError(c);
+    //                 break;
+    //         }
+    //     }
+
+    //     // Attach any captured comments
+    //     if (!pendingComments.isEmpty()) {
+    //         tok.attachComments(pendingComments);
+    //         pendingComments.clear();
+    //     }
+
+    //     if (!reporter.isSilent()) {
+    //         reporter.trace("TOKEN: " + tok.getType() +
+    //                        " [" + tok.getStartLine() + ":" + tok.getStartColumn() + "] " +
+    //                        (tok.getLexeme() != null ? tok.getLexeme() : ""));
+    //     }
+
+    //     return tok;
+    // }
+
+
     public JsonToken nextToken() {
+
         if (!pendingComments.isEmpty()) {
             return toCommentToken(pendingComments.remove(0));
         }
 
-        skipTrivia.run();
+        triviaHandler.run();
 
         if (!pendingComments.isEmpty()) {
             return toCommentToken(pendingComments.remove(0));
         }
 
         if (buffer.isAtEnd()) {
-            JsonLexemeBackedToken tok = new JsonLexemeBackedToken(
-                buffer.windowStartLine(),
-                buffer.windowStartColumn(),
-                buffer.windowStartOffset(),
-                JsonTokenType.EOF
-            );
-
+            JsonToken tok = makeEofToken();
             if (!pendingComments.isEmpty()) {
                 tok.attachComments(pendingComments);
                 pendingComments.clear();
             }
-
             return tok;
         }
 
         char c = buffer.peek();
-        JsonToken tok;
+        JsonToken tok = tokenHandler.handle(c);
 
-        // Unicode path
-        if (c > 127) {
-            tok = handleUnicodeChar(c);
-            if (tok == null) {
-                // whitespace or skipped unicode trivia
-                return nextToken();
-            }
-        } else {
-            // ASCII path
-            byte kind = STRUCTURAL[c];
-
-            switch (kind) {
-                case S_LBRACE:
-                    tok = makeStructuralToken(JsonTokenType.LEFT_BRACE);
-                    break;
-
-                case S_RBRACE:
-                    tok = makeStructuralToken(JsonTokenType.RIGHT_BRACE);
-                    break;
-
-                case S_LBRACKET:
-                    tok = makeStructuralToken(JsonTokenType.LEFT_BRACKET);
-                    break;
-
-                case S_RBRACKET:
-                    tok = makeStructuralToken(JsonTokenType.RIGHT_BRACKET);
-                    break;
-
-                case S_COLON:
-                    tok = makeStructuralToken(JsonTokenType.COLON);
-                    break;
-
-                case S_COMMA:
-                    tok = makeStructuralToken(JsonTokenType.COMMA);
-                    break;
-
-                case S_STRING:
-                    tok = scanStringToken(c);
-                    break;
-
-                default:
-                    tok = scanNumberOrIdentifierOrError(c);
-                    break;
-            }
-        }
-
-        // Attach any captured comments
         if (!pendingComments.isEmpty()) {
             tok.attachComments(pendingComments);
             pendingComments.clear();
@@ -312,7 +347,6 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
         return tok;
     }
-
 
 
     private JsonToken scanStringToken(char quoteChar) {
@@ -406,6 +440,12 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         );
     }
 
+    // TODO: scanNumber needs to be split into:
+    // - a SIMD version
+    // - a non-SIMD version
+    // And the SIMD version will require the scanDigitsSimd method in SimdCapableBuffer
+    // to be implemented by both SourceStringBuffer and SourceByteBuffer. At the moment
+    // they both have different signatures for that method.
     private void scanNumber(char startChar) {
         // Always consume the starting character first
         buffer.advance();
@@ -734,58 +774,221 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     //
     //
 
-    // private void resetCommonState() {
-    //     if (buffer instanceof LexemeProvider lp) {
-    //         factory = new BufferBackedTokenFactory(buffer, lp);
-    //     } else {
-    //         factory = new LexemeBackedTokenFactory(buffer);
-    //     }
+    private void skipBom() {
+        if (buffer.peek() == '\uFEFF') {
+            buffer.advance();
+        }
+    }
 
-    //     if (!ALLOW_COMMENTS && buffer instanceof SourceStringBuffer stringBuffer) {
-    //         skipTrivia = () -> stringBuffer.skipWhitespaceSimd();
-    //     } else {
-    //         skipTrivia = () -> advanceWhitespaceAndComments();
-    //     }
-
-    //     // Handle UTF-8 BOM if present at start of stream/string
-    //     if (buffer.peek() == '\uFEFF') {
-    //         buffer.advance();
-    //     }
-    // }
-
-    private void resetCommonState() {
-
-        // Token factory selection
+    /// Token factory selection
+    private TokenFactory setupTokenFactory(SourceBuffer buffer) {
+        TokenFactory factory;
         if (buffer instanceof LexemeProvider lp) {
             factory = new BufferBackedTokenFactory(buffer, lp);
         } else {
             factory = new LexemeBackedTokenFactory(buffer);
         }
+        return factory;
+    }
 
-        // Whitespace skipping strategy
-        if (!ALLOW_COMMENTS && options.useSimd() && buffer instanceof SourceByteBuffer bb) {
-            skipTrivia = () -> bb.skipWhitespaceAndFormattingSimd();
-        } else if (!ALLOW_COMMENTS && options.useSimd() && buffer instanceof SourceStringBuffer stringBuffer) {
-            skipTrivia = () -> stringBuffer.skipWhitespaceSimd();
+    private SourceBuffer setupStringBuffer(String text) {
+        SimdCapableBuffer buffer;
+
+        // SIMD & no JSON5 unquoted keys - use byte-based buffer
+        if (options.useSimd() && !options.allowUnquotedKeys()) {
+            byte[] raw = text.getBytes(StandardCharsets.UTF_8);
+            SourceByteBuffer byteBuffer = new SourceByteBuffer(raw);
+
+            if (!ALLOW_UNICODE) {
+                // TODO: This doesn't work:
+                // - stringScanner takes a char and returns a boolean
+                // - scanStringAsciiSimd takes an int and a byte
+                stringScanner = byteBuffer::scanStringAsciiSimd;
+
+                // TODO: This doesn't work:
+                // - numberScanner takes a char and returns a JsonToken
+                // - scanDigitsSimd takes an int and returns an int
+                numberScanner = byteBuffer::scanDigitsSimd;
+
+                // TODO: This doesn't work:
+                // - identifierScanner takes a char and returns a JsonToken
+                // - scanIdentifierFast takes no parameters and returns void
+                identifierScanner = this::scanIdentifierFast;
+            }
+
+
+            // Whitespace / trivia skipping
+            if (ALLOW_COMMENTS) {
+                triviaHandler = byteBuffer::skipWhitespaceAndFormattingSimd;
+            } else {
+                triviaHandler = byteBuffer::skipWhitespaceSimd;
+            }
+
+            buffer = byteBuffer;
         } else {
-            skipTrivia = () -> advanceWhitespaceAndComments();
+            // JSON5 identifiers or SIMD disabled - use char-based buffer
+            SourceStringBuffer stringBuffer = new SourceStringBuffer(text);
+
+            if (!ALLOW_UNICODE) {
+                stringScanner = this::simdStringScanner;
+
+                // TODO: This doesn't work:
+                // - numberScanner takes a char and returns a JsonToken
+                // - scanNumber returns void
+                numberScanner = this::scanNumber;
+
+                // TODO: This doesn't work:
+                // - identifierScanner takes a char and returns a JsonToken
+                // - scanIdentifierFast takes no parameters and returns void
+                identifierScanner = this::scanIdentifierFast;
+            }
+
+            // Whitespace / trivia skipping
+            if (!ALLOW_COMMENTS && options.useSimd()) {
+                triviaHandler = stringBuffer::skipWhitespaceSimd;
+            } else {
+                triviaHandler = this::advanceWhitespaceAndComments;
+            }
+
+            buffer = stringBuffer;
         }
 
-        // TODO: SIMD strings are not giving the performance incease we need.
-        // Perhaps let them be configurable.
+        // String and number scanning
+        if (ALLOW_UNICODE) {
+            // TODO: scanStringUnicode does not exist
+            stringScanner = this::scanStringUnicode;
 
-        // // String scanning strategy
-        // if (options.useSimd() && buffer instanceof SourceByteBuffer) {
-        //     stringScanner = simdStringScanner;
-        // } else {
-            stringScanner = scalarStringScanner;
-        // }
+            // TODO: This doesn't work:
+            // - numberScanner takes a char and returns a JsonToken
+            // - scanUnicodeNumber takes a char and returns void
+            numberScanner = this::scanUnicodeNumber;
 
-        // UTF‑8 BOM handling
-        if (buffer.peek() == '\uFEFF') {
-            buffer.advance();
+            // TODO: This doesn't work:
+            // - identifierScanner takes a char and returns a JsonToken
+            // - scanUnicodeIdentifier takes no parameters and returns void
+            identifierScanner = this::scanUnicodeIdentifier;
+        }
+
+        // TODO: Does this need to change for unicode and/or SIMD?
+        tokenHandler = this::handleToken;
+
+        return buffer;
+    }
+
+    private SourceBuffer setupStreamBuffer(InputStream stream) {
+        SourceInputStreamBuffer buffer = new SourceInputStreamBuffer(stream);
+
+        return buffer;
+    }
+
+    private JsonToken handleToken(char c) {
+
+        if (c > 127) {
+            JsonToken tok = handleUnicodeChar(c);
+            if (tok == null) return nextToken();
+            return tok;
+        }
+
+        switch (c) {
+            case '{': return makeStructuralToken(JsonTokenType.LEFT_BRACE);
+            case '}': return makeStructuralToken(JsonTokenType.RIGHT_BRACE);
+            case '[': return makeStructuralToken(JsonTokenType.LEFT_BRACKET);
+            case ']': return makeStructuralToken(JsonTokenType.RIGHT_BRACKET);
+            case ':': return makeStructuralToken(JsonTokenType.COLON);
+            case ',': return makeStructuralToken(JsonTokenType.COMMA);
+
+            case '"':
+            case '\'':
+                return scanStringToken(c);
+
+            default:
+                return scanNumberOrIdentifierOrError(c);
         }
     }
+
+    // private JsonToken handleAsciiToken(char c) {
+
+    //     if (c > 127) {
+    //         throw error("Non-ASCII byte encountered but unicode is disabled");
+    //     }
+
+    //     byte kind = STRUCTURAL[c];
+
+    //     switch (kind) {
+    //         case S_LBRACE:   return makeStructuralToken(JsonTokenType.LEFT_BRACE);
+    //         case S_RBRACE:   return makeStructuralToken(JsonTokenType.RIGHT_BRACE);
+    //         case S_LBRACKET: return makeStructuralToken(JsonTokenType.LEFT_BRACKET);
+    //         case S_RBRACKET: return makeStructuralToken(JsonTokenType.RIGHT_BRACKET);
+    //         case S_COLON:    return makeStructuralToken(JsonTokenType.COLON);
+    //         case S_COMMA:    return makeStructuralToken(JsonTokenType.COMMA);
+    //         case S_STRING:   return stringScanner.scan(c);
+    //         default:         return numberOrIdentifierAscii(c);
+    //     }
+    // }
+
+    // private JsonToken handleUnicodeToken(char c) {
+
+    //     if (c > 127) {
+    //         JsonToken tok = handleUnicodeChar(c);
+    //         if (tok == null) return nextToken();
+    //         return tok;
+    //     }
+
+    //     byte kind = STRUCTURAL[c];
+
+    //     switch (kind) {
+    //         case S_LBRACE:   return makeStructuralToken(JsonTokenType.LEFT_BRACE);
+    //         case S_RBRACE:   return makeStructuralToken(JsonTokenType.RIGHT_BRACE);
+    //         case S_LBRACKET: return makeStructuralToken(JsonTokenType.LEFT_BRACKET);
+    //         case S_RBRACKET: return makeStructuralToken(JsonTokenType.RIGHT_BRACKET);
+    //         case S_COLON:    return makeStructuralToken(JsonTokenType.COLON);
+    //         case S_COMMA:    return makeStructuralToken(JsonTokenType.COMMA);
+    //         case S_STRING:   return stringScanner.scan(c);
+    //         default:         return numberOrIdentifierUnicode(c);
+    //     }
+    // }
+
+
+
+
+    // private JsonToken scanStringAscii(char quote) {
+    //     // SIMD escape detection: only check for quote and control chars
+    //     int pos = ((SourceByteBuffer) buffer).scanStringSimdAsciiOnly(buffer.offset(), (byte) quote);
+    //     buffer.advanceBy(pos - buffer.offset());
+    //     return scanStringAsciiScalar(quote);
+    // }
+
+    // private JsonToken scanNumberAscii(char first) {
+    //     if (first > 127) throw error("Non-ASCII digit");
+    //     return scanNumberOrIdentifierAscii(first);
+    // }
+
+    // private JsonToken scanIdentifierAscii(char first) {
+    //     if (first > 127) throw error("Non-ASCII identifier");
+    //     return scanIdentifierAsciiScalar(first);
+    // }
+
+    // private void skipAsciiWhitespaceSimd() {
+    //     ((SourceByteBuffer) buffer).skipWhitespaceAndFormattingSimd();
+    // }
+
+    // private void skipUnicodeWhitespaceScalar() {
+    //     advanceWhitespaceAndCommentsUnicode();
+    // }
+
+    private final boolean simdStringScanner(char quoteChar) {
+        SourceByteBuffer bb = (SourceByteBuffer) buffer;
+
+        byte quoteByte = (byte) quoteChar;
+        int pos = bb.offset();
+        int simdPos = bb.scanStringAsciiSimd(pos, quoteByte);
+
+        bb.advanceBy(simdPos - pos);
+
+        return scanString(quoteChar); // scalar fallback for escapes/Unicode
+    }
+
+
 
     //
     // Token Creation
@@ -832,14 +1035,22 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         }
     }
 
-    private JsonStructuralToken makeStructuralToken(JsonTokenType type) {
+    private JsonToken makeStructuralToken(JsonTokenType type) {
         buffer.advance();
-
         return new JsonStructuralToken(
             buffer.line(),
             buffer.column(),
             buffer.offset(),
             type
+        );
+    }
+
+    private JsonToken makeEofToken() {
+        return new JsonLexemeBackedToken(
+            buffer.windowStartLine(),
+            buffer.windowStartColumn(),
+            buffer.windowStartOffset(),
+            JsonTokenType.EOF
         );
     }
 
