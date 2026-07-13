@@ -65,7 +65,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
 
     private void applyOptions(JsonOptions options) {
         this.ALLOW_COMMENTS         = options.allowComments();
-        this.ALLOW_INFINITY_AND_NAN = options.allowInfinityAndNaN();
+        this.ALLOW_INFINITY_AND_NAN = options.allowJson5Numbers();
         this.ALLOW_TRAILING_COMMA   = options.allowTrailingComma();
         this.ALLOW_UNQUOTED_KEYS    = options.allowUnquotedKeys();
         this.CAPTURE_COMMENTS       = options.captureComments();

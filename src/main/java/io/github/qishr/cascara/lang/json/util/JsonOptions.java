@@ -12,7 +12,7 @@ public class JsonOptions extends LanguageOptions<JsonOptions> implements Duplica
         new JsonOptions()
             .setAllowComments(true)
             .setAllowHexadecimalNumbers(true)
-            .setAllowInfinityAndNaN(true)
+            .setAllowJson5Numbers(true)
             .setAllowSingleQuotedStrings(true)
             .setAllowTrailingComma(true)
             .setAllowUnquotedKeys(true)
@@ -23,7 +23,7 @@ public class JsonOptions extends LanguageOptions<JsonOptions> implements Duplica
     private boolean allowBooleanKeys = false;
     private boolean allowComments = false;
     private boolean allowHexadecimalNumbers = false;
-    private boolean allowInfinityAndNaN = false;
+    private boolean allowJson5Numbers = false;
     private boolean allowSingleQuotedStrings = false;
     private boolean allowTrailingComma = false;
     private boolean allowUnicode = true;
@@ -39,7 +39,7 @@ public class JsonOptions extends LanguageOptions<JsonOptions> implements Duplica
         allowBooleanKeys = original.allowBooleanKeys;
         allowComments = original.allowComments;
         allowHexadecimalNumbers = original.allowHexadecimalNumbers;
-        allowInfinityAndNaN = original.allowInfinityAndNaN;
+        allowJson5Numbers = original.allowJson5Numbers;
         allowSingleQuotedStrings = original.allowSingleQuotedStrings;
         allowTrailingComma = original.allowTrailingComma;
         allowUnicode = original.allowUnicode;
@@ -53,7 +53,7 @@ public class JsonOptions extends LanguageOptions<JsonOptions> implements Duplica
     // public boolean allowBooleanKeys() { return allowBooleanKeys; }
     public boolean allowComments() { return allowComments; }
     public boolean allowHexadecimalNumbers() { return allowHexadecimalNumbers; }
-    public boolean allowInfinityAndNaN() { return allowInfinityAndNaN; }
+    public boolean allowJson5Numbers() { return allowJson5Numbers; }
     public boolean allowSingleQuotedStrings() { return allowSingleQuotedStrings; }
     public boolean allowTrailingComma() { return allowTrailingComma; }
     public boolean allowUnicode() { return allowUnicode; }
@@ -77,8 +77,8 @@ public class JsonOptions extends LanguageOptions<JsonOptions> implements Duplica
         this.allowHexadecimalNumbers = val;
         return this;
     }
-    public JsonOptions setAllowInfinityAndNaN(boolean val) {
-        this.allowInfinityAndNaN = val;
+    public JsonOptions setAllowJson5Numbers(boolean val) {
+        this.allowJson5Numbers = val;
         return this;
     }
 
@@ -141,7 +141,7 @@ public class JsonOptions extends LanguageOptions<JsonOptions> implements Duplica
         public JsonOptions setAllowHexadecimalNumbers(boolean val) {
             throw new LocalizableRuntimeException(GenericDiagnosticCode.UNSUPPORTED_OPERATION, "setAllowHexadecimalNumbers");
         }
-        public JsonOptions setAllowInfinityAndNaN(boolean val) {
+        public JsonOptions setAllowJson5Numbers(boolean val) {
             throw new LocalizableRuntimeException(GenericDiagnosticCode.UNSUPPORTED_OPERATION, "setAllowInfinityAndNaN");
         }
 

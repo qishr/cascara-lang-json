@@ -167,7 +167,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     private void applyOptions(JsonOptions options) {
         this.ALLOW_COMMENTS              = options.allowComments();
         this.ALLOW_HEXADECIMAL_NUMBERS   = options.allowHexadecimalNumbers();
-        this.ALLOW_INFINITY_AND_NAN      = options.allowInfinityAndNaN();
+        this.ALLOW_INFINITY_AND_NAN      = options.allowJson5Numbers();
         this.ALLOW_UNICODE               = options.allowUnicode();
         this.CAPTURE_COMMENTS            = options.captureComments();
     }
@@ -183,11 +183,16 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     }
 
     public void open(byte[] data) {
+        // Strict UTF‑8 validation (no conversion to String)
+        validateUtf8(data);
+
+        // Keep SIMD path fully active
         buffer = setupByteBuffer(data);
         factory = setupTokenFactory(buffer);
         setupHandlers();
         skipBom();
     }
+
 
     @Override
     public void open(InputStream stream) {
@@ -466,8 +471,8 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
             // Normal termination
             if (next == quoteChar) {
-                // Return true = “string terminated normally”
-                return !invalidUnicode;
+                // invalid if we ended with an unmatched high surrogate
+                return !invalidUnicode && !pendingHighSurrogate;
             }
 
             // Raw unicode check
@@ -581,10 +586,10 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             final char c = bb.peek();
 
             if (c == quoteChar) {
-                // Closing quote → consume and done
                 bb.advance();
-                return true;
+                return !pendingHighSurrogate;
             }
+
 
 
 
@@ -1094,6 +1099,174 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
     private static boolean isLowSurrogate(int codeUnit) {
         return codeUnit >= 0xDC00 && codeUnit <= 0xDFFF;
+    }
+
+    // private static char[] decodeUtf8Strict(byte[] data) {
+    //     char[] out = new char[data.length]; // worst case
+    //     int o = 0;
+
+    //     for (int i = 0; i < data.length; ) {
+    //         int b = data[i] & 0xFF;
+
+    //         if (b < 0x80) {
+    //             // ASCII
+    //             out[o++] = (char)b;
+    //             i++;
+    //             continue;
+    //         }
+
+    //         // Reject continuation bytes as leading bytes
+    //         if (b >= 0x80 && b < 0xC2) {
+    //             throw new IllegalArgumentException("Invalid UTF-8: lone continuation byte");
+    //         }
+
+    //         // 2-byte sequence
+    //         if (b < 0xE0) {
+    //             if (i + 1 >= data.length) throw new IllegalArgumentException("Truncated UTF-8");
+    //             int b2 = data[i+1] & 0xFF;
+    //             if ((b2 & 0xC0) != 0x80) throw new IllegalArgumentException("Invalid UTF-8 continuation");
+    //             int cp = ((b & 0x1F) << 6) | (b2 & 0x3F);
+    //             if (cp < 0x80) throw new IllegalArgumentException("Overlong UTF-8");
+    //             out[o++] = (char)cp;
+    //             i += 2;
+    //             continue;
+    //         }
+
+    //         // 3-byte sequence
+    //         if (b < 0xF0) {
+    //             if (i + 2 >= data.length) throw new IllegalArgumentException("Truncated UTF-8");
+    //             int b2 = data[i+1] & 0xFF;
+    //             int b3 = data[i+2] & 0xFF;
+    //             if ((b2 & 0xC0) != 0x80 || (b3 & 0xC0) != 0x80)
+    //                 throw new IllegalArgumentException("Invalid UTF-8 continuation");
+
+    //             int cp = ((b & 0x0F) << 12) | ((b2 & 0x3F) << 6) | (b3 & 0x3F);
+
+    //             // Reject surrogates
+    //             if (cp >= 0xD800 && cp <= 0xDFFF)
+    //                 throw new IllegalArgumentException("Invalid UTF-8: surrogate");
+
+    //             // Reject overlong
+    //             if (cp < 0x800)
+    //                 throw new IllegalArgumentException("Overlong UTF-8");
+
+    //             out[o++] = (char)cp;
+    //             i += 3;
+    //             continue;
+    //         }
+
+    //         // 4-byte sequence
+    //         if (b < 0xF5) {
+    //             if (i + 3 >= data.length) throw new IllegalArgumentException("Truncated UTF-8");
+    //             int b2 = data[i+1] & 0xFF;
+    //             int b3 = data[i+2] & 0xFF;
+    //             int b4 = data[i+3] & 0xFF;
+    //             if ((b2 & 0xC0) != 0x80 ||
+    //                 (b3 & 0xC0) != 0x80 ||
+    //                 (b4 & 0xC0) != 0x80)
+    //                 throw new IllegalArgumentException("Invalid UTF-8 continuation");
+
+    //             int cp = ((b & 0x07) << 18) |
+    //                      ((b2 & 0x3F) << 12) |
+    //                      ((b3 & 0x3F) << 6) |
+    //                      (b4 & 0x3F);
+
+    //             if (cp < 0x10000)
+    //                 throw new IllegalArgumentException("Overlong UTF-8");
+
+    //             if (cp > 0x10FFFF)
+    //                 throw new IllegalArgumentException("Invalid UTF-8: out of range");
+
+    //             // Encode surrogate pair
+    //             cp -= 0x10000;
+    //             out[o++] = (char)(0xD800 | (cp >> 10));
+    //             out[o++] = (char)(0xDC00 | (cp & 0x3FF));
+
+    //             i += 4;
+    //             continue;
+    //         }
+
+    //         throw new IllegalArgumentException("Invalid UTF-8 leading byte");
+    //     }
+
+    //     char[] trimmed = new char[o];
+    //     System.arraycopy(out, 0, trimmed, 0, o);
+    //     return trimmed;
+    // }
+
+    private static void validateUtf8(byte[] data) {
+        int i = 0;
+        int len = data.length;
+
+        while (i < len) {
+            int b1 = data[i] & 0xFF;
+
+            // ASCII
+            if (b1 < 0x80) {
+                i++;
+                continue;
+            }
+
+            // Reject continuation bytes as leading bytes
+            if (b1 < 0xC2) {
+                throw new IllegalArgumentException("Invalid UTF-8: lone continuation byte");
+            }
+
+            // 2-byte sequence
+            if (b1 < 0xE0) {
+                if (i + 1 >= len) throw new IllegalArgumentException("Invalid UTF-8: truncated");
+                int b2 = data[i+1] & 0xFF;
+                if ((b2 & 0xC0) != 0x80) throw new IllegalArgumentException("Invalid UTF-8 continuation");
+                int cp = ((b1 & 0x1F) << 6) | (b2 & 0x3F);
+                if (cp < 0x80) throw new IllegalArgumentException("Invalid UTF-8: overlong");
+                i += 2;
+                continue;
+            }
+
+            // 3-byte sequence
+            if (b1 < 0xF0) {
+                if (i + 2 >= len) throw new IllegalArgumentException("Invalid UTF-8: truncated");
+                int b2 = data[i+1] & 0xFF;
+                int b3 = data[i+2] & 0xFF;
+                if ((b2 & 0xC0) != 0x80 || (b3 & 0xC0) != 0x80)
+                    throw new IllegalArgumentException("Invalid UTF-8 continuation");
+
+                int cp = ((b1 & 0x0F) << 12) | ((b2 & 0x3F) << 6) | (b3 & 0x3F);
+
+                if (cp < 0x800) throw new IllegalArgumentException("Invalid UTF-8: overlong");
+                if (cp >= 0xD800 && cp <= 0xDFFF)
+                    throw new IllegalArgumentException("Invalid UTF-8: surrogate");
+
+                i += 3;
+                continue;
+            }
+
+            // 4-byte sequence
+            if (b1 < 0xF5) {
+                if (i + 3 >= len) throw new IllegalArgumentException("Invalid UTF-8: truncated");
+                int b2 = data[i+1] & 0xFF;
+                int b3 = data[i+2] & 0xFF;
+                int b4 = data[i+3] & 0xFF;
+
+                if ((b2 & 0xC0) != 0x80 ||
+                    (b3 & 0xC0) != 0x80 ||
+                    (b4 & 0xC0) != 0x80)
+                    throw new IllegalArgumentException("Invalid UTF-8 continuation");
+
+                int cp = ((b1 & 0x07) << 18) |
+                         ((b2 & 0x3F) << 12) |
+                         ((b3 & 0x3F) << 6) |
+                         (b4 & 0x3F);
+
+                if (cp < 0x10000) throw new IllegalArgumentException("Invalid UTF-8: overlong");
+                if (cp > 0x10FFFF) throw new IllegalArgumentException("Invalid UTF-8: out of range");
+
+                i += 4;
+                continue;
+            }
+
+            throw new IllegalArgumentException("Invalid UTF-8 leading byte");
+        }
     }
 
     //

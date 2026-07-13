@@ -284,7 +284,7 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
                 }
 
                 // Infinity / NaN allowed as keys
-                if (options.allowInfinityAndNaN() && isSpecialNumber(raw)) {
+                if (options.allowJson5Numbers() && isSpecialNumber(raw)) {
                     return PrimitiveType.STRING;
                 }
 
@@ -318,7 +318,7 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
             }
 
             // JSON5 special numbers
-            if (options.allowInfinityAndNaN() && isSpecialNumber(raw)) {
+            if (options.allowJson5Numbers() && isSpecialNumber(raw)) {
                 return PrimitiveType.NUMBER;
             }
 
@@ -498,7 +498,7 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
         }
 
         // JSON5 special numbers
-        if (options.allowInfinityAndNaN()) {
+        if (options.allowJson5Numbers()) {
             if (raw.equals("Infinity")) return Double.POSITIVE_INFINITY;
             if (raw.equals("-Infinity")) return Double.NEGATIVE_INFINITY;
             if (raw.equals("NaN")) return Double.NaN;

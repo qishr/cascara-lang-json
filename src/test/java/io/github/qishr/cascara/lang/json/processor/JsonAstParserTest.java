@@ -329,18 +329,6 @@ class JsonAstParserTest {
         assertThrows(Exception.class, () -> parser.parse("[\"\\uD888\\u1234\"]"));
     }
 
-    @Test void test_i_string_UTF16LE_with_BOM() {
-        assertThrows(Exception.class, () -> parser.parse("\"\uFEFF\""));
-    }
-
-    @Test void test_i_string_UTF8_invalid_sequence() {
-        assertThrows(Exception.class, () -> parser.parse("[\"E697A5D188FA\"]"));
-    }
-
-    @Test void test_i_string_UTF8_surrogate_U_D800() {
-        assertThrows(Exception.class, () -> parser.parse("[\"EDA080\"]"));
-    }
-
     @Test void test_i_string_incomplete_surrogate_and_escape_valid() {
         assertThrows(Exception.class, () -> parser.parse("[\"\\uD800\n\"]"));
     }
@@ -361,51 +349,224 @@ class JsonAstParserTest {
         assertThrows(Exception.class, () -> parser.parse("[\"\\ud800abc\"]"));
     }
 
-    @Test void test_i_string_invalid_utf8() {
-        assertThrows(Exception.class, () -> parser.parse("[\"FF\"]"));
-    }
-
     @Test void test_i_string_inverted_surrogates_U_1D11E() {
         assertThrows(Exception.class, () -> parser.parse("[\"\\uDd1e\\uD834\"]"));
-    }
-
-    @Test void test_i_string_iso_latin_1() {
-        assertThrows(Exception.class, () -> parser.parse("[\"E9\"]"));
     }
 
     @Test void test_i_string_lone_second_surrogate() {
         assertThrows(Exception.class, () -> parser.parse("[\"\\uDFAA\"]"));
     }
 
-    @Test void test_i_string_lone_utf8_continuation_byte() {
-        assertThrows(Exception.class, () -> parser.parse("[\"81\"]"));
-    }
 
-    @Test void test_i_string_not_in_unicode_range() {
-        assertThrows(Exception.class, () -> parser.parse("[\"F4BFBFBF\"]"));
+
+
+    @Test void test_i_string_lone_utf8_continuation_byte() {
+        byte[] data = { '[', '"', (byte)0x81, '"', ']' };
+        assertThrows(Exception.class, () -> parser.parse(data));
     }
 
     @Test void test_i_string_overlong_sequence_2_bytes() {
-        assertThrows(Exception.class, () -> parser.parse("[\"C0AF\"]"));
+        byte[] data = { '[', '"', (byte)0xC0, (byte)0xAF, '"', ']' };
+        assertThrows(Exception.class, () -> parser.parse(data));
     }
+
 
     @Test void test_i_string_overlong_sequence_6_bytes() {
-        assertThrows(Exception.class, () -> parser.parse("[\"FC83BFBFBFBF\"]"));
+        byte[] data = {
+            '[', '"',
+            (byte)0xFC, (byte)0x83, (byte)0xBF, (byte)0xBF, (byte)0xBF, (byte)0xBF,
+            '"', ']'
+        };
+        assertThrows(Exception.class, () -> parser.parse(data));
     }
+
 
     @Test void test_i_string_overlong_sequence_6_bytes_null() {
-        assertThrows(Exception.class, () -> parser.parse("[\"FC8080808080\"]"));
+        byte[] data = {
+            '[', '"',
+            (byte)0xFC, (byte)0x80, (byte)0x80, (byte)0x80, (byte)0x80, (byte)0x80,
+            '"', ']'
+        };
+        assertThrows(Exception.class, () -> parser.parse(data));
     }
+
 
     @Test void test_i_string_truncated_utf8() {
-        assertThrows(Exception.class, () -> parser.parse("[\"E0FF\"]"));
+        byte[] data = { '[', '"', (byte)0xE0, (byte)0xFF, '"', ']' };
+        assertThrows(Exception.class, () -> parser.parse(data));
     }
+
+
+    @Test void test_i_string_not_in_unicode_range() {
+        byte[] data = { '[', '"', (byte)0xF4, (byte)0xBF, (byte)0xBF, (byte)0xBF, '"', ']' };
+        assertThrows(Exception.class, () -> parser.parse(data));
+    }
+
+
+    @Test void test_i_string_UTF8_surrogate_U_D800() {
+        byte[] data = { '[', '"', (byte)0xED, (byte)0xA0, (byte)0x80, '"', ']' };
+        assertThrows(Exception.class, () -> parser.parse(data));
+    }
+
+
+    @Test void test_i_string_UTF8_invalid_sequence() {
+        byte[] data = {
+            '[', '"',
+            (byte)0xE6, (byte)0x97, (byte)0xA5, (byte)0xD1, (byte)0x88, (byte)0xFA,
+            '"', ']'
+        };
+        assertThrows(Exception.class, () -> parser.parse(data));
+    }
+
+
+    @Test void test_i_string_iso_latin_1() {
+        byte[] data = { '[', '"', (byte)0xE9, '"', ']' };
+        assertThrows(Exception.class, () -> parser.parse(data));
+    }
+
+
+    @Test void test_i_string_invalid_utf8() {
+        byte[] data = { '[', '"', (byte)0xFF, '"', ']' };
+        assertThrows(Exception.class, () -> parser.parse(data));
+    }
+
 
     @Test void test_i_string_utf16BE_no_BOM() {
-        assertThrows(Exception.class, () -> parser.parse("[\"\\u0000\\u00E9\"]"));
+        byte[] data = {
+            0x00, '[', 0x00, '"',
+            0x00, 0x00,       // U+0000
+            0x00, (byte)0xE9, // U+00E9
+            0x00, '"', 0x00, ']'
+        };
+        assertThrows(Exception.class, () -> parser.parse(data));
     }
 
+
     @Test void test_i_string_utf16LE_no_BOM() {
-        assertThrows(Exception.class, () -> parser.parse("[\"\\uE900\"]"));
+        byte[] data = {
+            '[', 0x00, '"', 0x00,
+            (byte)0xE9, 0x00,
+            '"', 0x00, ']', 0x00
+        };
+        assertThrows(Exception.class, () -> parser.parse(data));
     }
+
+
+    @Test void test_i_string_UTF16LE_with_BOM() {
+        byte[] data = { '"', (byte)0xFE, (byte)0xFF, '"' };
+        assertThrows(Exception.class, () -> parser.parse(data));
+    }
+
+    @Test void test_i_structure_500_nested_arrays() {
+        assertThrows(Exception.class, () -> parser.parse("[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[["));
+    }
+
+    @Test void test_i_structure_UTF8_BOM_empty_object() {
+        assertThrows(Exception.class, () -> parser.parse("\uFEFF{}"));
+    }
+
+    @Test void test_n_number_plus_1() {
+        assertThrows(Exception.class, () -> parser.parse("[+1]"));
+    }
+
+    @Test void test_n_number_minus_01() {
+        assertThrows(Exception.class, () -> parser.parse("[-01]"));
+    }
+
+    @Test void test_n_number_minus_2_dot() {
+        assertThrows(Exception.class, () -> parser.parse("[-2.]"));
+    }
+
+    @Test void test_n_number_dot2e_minus3() {
+        assertThrows(Exception.class, () -> parser.parse("[.2e-3]"));
+    }
+
+    @Test void test_n_number_0_3e_plus() {
+        assertThrows(Exception.class, () -> parser.parse("[0.3e+]"));
+    }
+
+    @Test void test_n_number_0_3e() {
+        assertThrows(Exception.class, () -> parser.parse("[0.3e]"));
+    }
+
+    @Test void test_n_number_0_dot_e1() {
+        assertThrows(Exception.class, () -> parser.parse("[0.e1]"));
+    }
+
+    @Test void test_n_number_0E_plus() {
+        assertThrows(Exception.class, () -> parser.parse("[0E+]"));
+    }
+
+    @Test void test_n_number_0E() {
+        assertThrows(Exception.class, () -> parser.parse("[0E]"));
+    }
+
+    @Test void test_n_number_0e_plus() {
+        assertThrows(Exception.class, () -> parser.parse("[0e+]"));
+    }
+
+    @Test void test_n_number_0e() {
+        assertThrows(Exception.class, () -> parser.parse("[0e]"));
+    }
+
+    @Test void test_n_number_1_0e_plus() {
+        assertThrows(Exception.class, () -> parser.parse("[1.0e+]"));
+    }
+
+    @Test void test_n_number_1_0e_minus() {
+        assertThrows(Exception.class, () -> parser.parse("[1.0e-]"));
+    }
+
+    @Test void test_n_number_1_0e() {
+        assertThrows(Exception.class, () -> parser.parse("[1.0e]"));
+    }
+
+    @Test void test_n_number_2_dot_e_plus3() {
+        assertThrows(Exception.class, () -> parser.parse("[2.e+3]"));
+    }
+
+    @Test void test_n_number_2_dot_e_minus3() {
+        assertThrows(Exception.class, () -> parser.parse("[2.e-3]"));
+    }
+
+    @Test void test_n_number_2_dot_e3() {
+        assertThrows(Exception.class, () -> parser.parse("[2.e3]"));
+    }
+
+    @Test void test_n_number_9_dot_e_plus() {
+        assertThrows(Exception.class, () -> parser.parse("[9.e+]"));
+    }
+
+    @Test void test_n_number_neg_int_starting_with_zero() {
+        assertThrows(Exception.class, () -> parser.parse("[-012]"));
+    }
+
+    @Test void test_n_number_neg_real_without_int_part() {
+        assertThrows(Exception.class, () -> parser.parse("[-.123]"));
+    }
+
+    @Test void test_n_number_real_without_fractional_part() {
+        assertThrows(Exception.class, () -> parser.parse("[1.]"));
+    }
+
+    @Test void test_n_number_starting_with_dot() {
+        assertThrows(Exception.class, () -> parser.parse("[.123]"));
+    }
+
+    @Test void test_n_number_with_leading_zero() {
+        assertThrows(Exception.class, () -> parser.parse("[012]"));
+    }
+
+    @Test void test_n_string_unescaped_ctrl_char() {
+        assertThrows(Exception.class, () -> parser.parse("[\"a\u0000a\"]"));
+    }
+
+    @Test void test_n_string_unescaped_newline() {
+        assertThrows(Exception.class, () -> parser.parse("[\"new\nline\"]"));
+    }
+
+    @Test void test_n_string_unescaped_tab() {
+        assertThrows(Exception.class, () -> parser.parse("[\"a\tb\"]"));
+    }
+
 }
