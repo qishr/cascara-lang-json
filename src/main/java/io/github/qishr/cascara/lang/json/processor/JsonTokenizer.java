@@ -64,11 +64,16 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     // Lookup tables for digits and hex digits
     private static final boolean[] DIGIT = new boolean[128];
     private static final boolean[] HEX   = new boolean[128];
+    private static final boolean[] NUM   = new boolean[128];
     static {
         for (char c = '0'; c <= '9'; c++) DIGIT[c] = true;
         for (char c = '0'; c <= '9'; c++) HEX[c] = true;
         for (char c = 'a'; c <= 'f'; c++) HEX[c] = true;
         for (char c = 'A'; c <= 'F'; c++) HEX[c] = true;
+        for (char c = '0'; c <= '9'; c++) NUM[c] = true;
+        NUM['.'] = true;
+        NUM['+'] = true;
+        NUM['-'] = true;
     }
 
     private static final byte[] STRUCTURAL = new byte[128];
@@ -242,10 +247,10 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             return tok;
         }
 
-        char c = buffer.peek();
+        final char c = buffer.peek();
 
         // Call either scanTokenAscii or scanTokenAsciiOrUnicode
-        JsonToken tok = tokenScanner.scan(c);
+        final JsonToken tok = tokenScanner.scan(c);
 
         if (!pendingComments.isEmpty()) {
             tok.attachComments(pendingComments);
@@ -273,7 +278,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         }
 
         // Unicode path (identifier, digit, whitespace)
-        JsonToken tok = scanTokenUnicode(c);
+        final JsonToken tok = scanTokenUnicode(c);
         if (tok == null) return nextToken();
         return tok;
     }
@@ -298,9 +303,9 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
     private JsonToken scanTokenUnicode(char c) {
         buffer.startTokenWindow();
-        int startOffset = buffer.windowStartOffset();
-        int line        = buffer.windowStartLine();
-        int column      = buffer.windowStartColumn();
+        final int startOffset = buffer.windowStartOffset();
+        final int line        = buffer.windowStartLine();
+        final int column      = buffer.windowStartColumn();
 
         // Unicode whitespace (JSON5)
         if (Character.isWhitespace(c)) {
@@ -313,21 +318,21 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         if (Character.isUnicodeIdentifierStart(c)) {
             scanIdentifierUnicode();
             String lexeme = buffer.getTokenWindowLexeme();
-            return factory.makeIdentifierToken(startOffset, line, column, lexeme);
+            return factory.makeIdentifierToken(line, column, startOffset, lexeme);
         }
 
         // Unicode identifier part (rare case)
         if (Character.isUnicodeIdentifierPart(c)) {
             scanIdentifierUnicode();
             String lexeme = buffer.getTokenWindowLexeme();
-            return factory.makeIdentifierToken(startOffset, line, column, lexeme);
+            return factory.makeIdentifierToken(line, column, startOffset, lexeme);
         }
 
         // Unicode digit (JSON5)
         if (Character.isDigit(c)) {
             scanNumberUnicode(c);
             String lexeme = buffer.getTokenWindowLexeme();
-            return factory.makeNumberToken(startOffset, line, column, lexeme);
+            return factory.makeNumberToken(line, column, startOffset, lexeme);
         }
 
         // Otherwise - UNKNOWN
@@ -336,31 +341,21 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     }
 
     private JsonToken scanNumberOrIdentifierOrError(char startChar) {
-        int startOffset = buffer.offset();
-        int startLine   = buffer.line();
-        int startColumn = buffer.column();
+        final int startOffset = buffer.offset();
+        final int startLine   = buffer.line();
+        final int startColumn = buffer.column();
 
         buffer.startTokenWindow();
 
-
-
-
-        // TODO: Fast lookup table
-        // NUMBER?
-        if (DIGIT[startChar] || startChar == '-' || startChar == '+' || startChar == '.') {
+        if (NUM[startChar]) {
             numberScanner.scan(startChar);
-            String lexeme = buffer.getTokenWindowLexeme();
-            return factory.makeNumberToken(startOffset, startLine, startColumn, lexeme);
+            return factory.makeNumberToken(startLine, startColumn, startOffset, buffer.getTokenWindowLexeme());
         }
-
-
-
 
         // IDENTIFIER?
         if (startChar < 128 && IDENT_START[startChar]) {
             identifierScanner.scan();
-            String lexeme = buffer.getTokenWindowLexeme();
-            return classifyLexeme(startOffset, startLine, startColumn, lexeme);
+            return classifyLexeme(startOffset, startLine, startColumn, buffer.getTokenWindowLexeme());
         }
 
         // ERROR
@@ -377,17 +372,17 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     //
 
     private JsonToken scanStringToken(char quoteChar) {
-        int startOffset = buffer.offset(); // actual position of the quote
-        int startLine   = buffer.line();
-        int startColumn = buffer.column();
+        final int startOffset = buffer.offset(); // actual position of the quote
+        final int startLine   = buffer.line();
+        final int startColumn = buffer.column();
 
         buffer.startTokenWindow();
         buffer.advance(); // consume opening quote
 
         // Call either scanString or scanStringSimd
-        boolean ok = stringScanner.scan(quoteChar);
+        final boolean ok = stringScanner.scan(quoteChar);
 
-        QuoteStyle qs = (quoteChar == '"')
+        final QuoteStyle qs = (quoteChar == '"')
             ? QuoteStyle.DOUBLE
             : QuoteStyle.SINGLE;
 
@@ -399,14 +394,14 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             return makeErrorToken("Unterminated string literal", startLine, startColumn);
         }
 
-        return factory.makeStringToken(startOffset, startLine, startColumn, qs);
+        return factory.makeStringToken(startLine, startColumn, startOffset, qs);
     }
 
     private final boolean scanString(char quoteChar) {
         boolean invalidUnicode = false;
 
         while (!buffer.isAtEnd()) {
-            char next = buffer.advance();
+            final char next = buffer.advance();
 
             // Normal termination
             if (next == quoteChar) {
@@ -421,7 +416,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
             // Escape sequence
             if (next == '\\' && !buffer.isAtEnd()) {
-                char escaped = buffer.advance();
+                final char escaped = buffer.advance();
                 if (escaped == 'u' || escaped == 'x') {
                     int count = (escaped == 'u') ? 4 : 2;
                     for (int i = 0; i < count && !buffer.isAtEnd(); i++) {
@@ -459,7 +454,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             }
 
             // We are now at `next`
-            char c = bb.peek();
+            final char c = bb.peek();
 
             if (c == quoteChar) {
                 // Closing quote → consume and done
@@ -474,7 +469,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
                     return false;
                 }
 
-                char esc = bb.advance(); // escaped char
+                final char esc = bb.advance(); // escaped char
 
                 if (esc == 'u' || esc == 'x') {
                     int count = (esc == 'u') ? 4 : 2;
@@ -617,7 +612,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
         // integer part
         while (!buffer.isAtEnd()) {
-            char c = buffer.peek();
+            final char c = buffer.peek();
             if (Character.isDigit(c)) {
                 buffer.advance();
                 continue;
@@ -652,7 +647,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     private void scanIdentifierAscii() {
         // We already consumed the first character in nextToken()
         while (true) {
-            char c = buffer.peek();
+            final char c = buffer.peek();
             if (c < 128 && IDENT_PART[c]) {
                 buffer.advance();
                 continue;
@@ -749,7 +744,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
     private void scanIdentifierUnicode() {
         while (!buffer.isAtEnd()) {
-            char c = buffer.peek();
+            final char c = buffer.peek();
             if (c <= 127) {
                 if (c < 128 && IDENT_PART[c]) {
                     buffer.advance();
@@ -774,7 +769,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         buffer.advance(); // '/'
 
         while (true) {
-            char c = buffer.peek();
+            final char c = buffer.peek();
             if (c == '\n' || c == '\r' || c == '\0') {
                 break;
             }
@@ -786,7 +781,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         }
 
         // Full lexeme, including slashes
-        String lexeme = buffer.getTokenWindowLexeme();
+        final String lexeme = buffer.getTokenWindowLexeme();
 
         // Value: strip the leading "//"
         String value = lexeme.length() >= 2 ? lexeme.substring(2) : "";
@@ -805,8 +800,8 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         buffer.advance(); // '*'
 
         while (!buffer.isAtEnd()) {
-            char c = buffer.peek();
-            char n = buffer.peekNext();
+            final char c = buffer.peek();
+            final char n = buffer.peekNext();
 
             // End of comment: "*/"
             if (c == '*' && n == '/') {
@@ -819,7 +814,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         }
 
         // Extract inner text: everything between "/*" and "*/"
-        String lexeme = buffer.getTokenWindowLexeme();
+        final String lexeme = buffer.getTokenWindowLexeme();
         if (lexeme.length() >= 4) {
             // strip leading "/*" and trailing "*/"
             return lexeme.substring(2, lexeme.length() - 2);
@@ -834,7 +829,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         final boolean allowUnicode = ALLOW_UNICODE;
 
         while (true) {
-            char c = buffer.peek();
+            final char c = buffer.peek();
             if (c == '\0') return;
 
             // Fast ASCII whitespace
@@ -854,14 +849,14 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
             // Comments
             if (allowComments && c == '/') {
-                char n = buffer.peekNext();
+                final char n = buffer.peekNext();
 
                 // Single-line comment
                 if (n == '/') {
                     if (capture) buffer.startTokenWindow();
-                    int line = buffer.line();
-                    int col  = buffer.column();
-                    String value = scanSingleLineComment();
+                    final int line = buffer.line();
+                    final int col  = buffer.column();
+                    final String value = scanSingleLineComment();
                     if (capture) {
                         String lexeme = buffer.getTokenWindowLexeme();
 
@@ -877,9 +872,9 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
                 // Multi-line comment
                 if (n == '*') {
                     if (capture) buffer.startTokenWindow();
-                    int line = buffer.line();
-                    int col = buffer.column();
-                    String value = scanMultiLineComment();
+                    final int line = buffer.line();
+                    final int col = buffer.column();
+                    final String value = scanMultiLineComment();
                     if (capture) {
                         String lexeme = buffer.getTokenWindowLexeme();
 
@@ -904,17 +899,15 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
     /// Token factory selection
     private TokenFactory setupTokenFactory(SourceBuffer buffer) {
-        TokenFactory factory;
         if (buffer instanceof LexemeProvider lp) {
-            factory = new BufferBackedTokenFactory(buffer, lp);
+            return new BufferBackedTokenFactory(buffer, lp);
         } else {
-            factory = new LexemeBackedTokenFactory(buffer);
+            return new LexemeBackedTokenFactory(buffer);
         }
-        return factory;
     }
 
     private SourceBuffer setupStringBuffer(String text) {
-        SimdCapableBuffer buffer;
+        final SimdCapableBuffer buffer;
 
         // SIMD & no JSON5 unquoted keys - use byte-based buffer
         if (options.useSimd() && !options.allowUnquotedKeys()) {
@@ -973,7 +966,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     }
 
     private SourceBuffer setupStreamBuffer(InputStream stream) {
-        SourceInputStreamBuffer buffer = new SourceInputStreamBuffer(stream);
+        final SourceInputStreamBuffer buffer = new SourceInputStreamBuffer(stream);
 
         // SourceInputStreamBuffer doesn't currently implement SimdCapableBuffer
         // so this will be simpler than setupStringBuffer.
@@ -1043,7 +1036,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
                 );
 
             default:
-                return factory.makeIdentifierToken(startOffset, line, column, lexeme);
+                return factory.makeIdentifierToken(line, column, startOffset, lexeme);
         }
     }
 
@@ -1091,9 +1084,9 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     }
 
     private interface TokenFactory {
-        JsonToken makeNumberToken(int startOffset, int line, int column, String lexeme);
-        JsonToken makeStringToken(int startOffset, int line, int column, QuoteStyle qs);
-        JsonToken makeIdentifierToken(int startOffset, int line, int column, String lexeme);
+        JsonToken makeNumberToken(int line, int column, int startOffset, String lexeme);
+        JsonToken makeStringToken(int line, int column, int startOffset, QuoteStyle qs);
+        JsonToken makeIdentifierToken(int line, int column, int startOffset, String lexeme);
     }
 
     private static class BufferBackedTokenFactory implements TokenFactory {
@@ -1105,38 +1098,38 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             this.lp = lp;
         }
 
-        public JsonBufferBackedToken makeNumberToken(int startOffset, int line, int column, String lexeme) {
-            final int offset = buffer.offset();
+        @Override
+        public JsonBufferBackedToken makeNumberToken(int line, int column, int startOffset, String lexeme) {
             return new JsonBufferBackedToken(
                 lp,
                 line,
                 column,
                 startOffset,
-                offset,
+                buffer.offset(),
                 JsonTokenType.NUMBER
             );
         }
 
-        public JsonBufferBackedToken makeStringToken(int startOffset, int line, int column, QuoteStyle qs) {
-            final int offset = buffer.offset();
+        @Override
+        public JsonBufferBackedToken makeStringToken(int line, int column, int startOffset, QuoteStyle qs) {
             return new JsonBufferBackedToken(
                 lp,
                 line,
                 column,
                 startOffset,
-                offset,
+                buffer.offset(),
                 qs
             );
         }
 
-        public JsonBufferBackedToken makeIdentifierToken(int startOffset, int line, int column, String lexeme) {
-            final int offset = buffer.offset();
+        @Override
+        public JsonBufferBackedToken makeIdentifierToken(int line, int column, int startOffset, String lexeme) {
             return new JsonBufferBackedToken(
                 lp,
                 line,
                 column,
                 startOffset,
-                offset,
+                buffer.offset(),
                 JsonTokenType.IDENTIFIER
             );
         }
@@ -1149,7 +1142,8 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             this.buffer = buffer;
         }
 
-        public JsonLexemeBackedToken makeNumberToken(int startOffset, int line, int column, String lexeme) {
+        @Override
+        public JsonLexemeBackedToken makeNumberToken(int line, int column, int startOffset, String lexeme) {
             return new JsonLexemeBackedToken(
                 line,
                 column,
@@ -1159,24 +1153,22 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             );
         }
 
-        public JsonLexemeBackedToken makeStringToken(int startOffset, int line, int column, QuoteStyle qs) {
-            // TODO: HOTSPOT
-            String lexeme = buffer.getTokenWindowLexeme();
-
-            String content = lexeme.substring(1, lexeme.length() - 1);
-
+        @Override
+        public JsonLexemeBackedToken makeStringToken(int line, int column, int startOffset, QuoteStyle qs) {
+            final String lexeme = buffer.getTokenWindowLexeme();
             return new JsonLexemeBackedToken(
                 line,
                 column,
                 startOffset,
                 JsonTokenType.STRING,
                 lexeme,
-                content,
+                lexeme.substring(1, lexeme.length() - 1),
                 qs
             );
         }
 
-        public JsonLexemeBackedToken makeIdentifierToken(int startOffset, int line, int column, String lexeme) {
+        @Override
+        public JsonLexemeBackedToken makeIdentifierToken(int line, int column, int startOffset, String lexeme) {
             return new JsonLexemeBackedToken(
                 line,
                 column,
