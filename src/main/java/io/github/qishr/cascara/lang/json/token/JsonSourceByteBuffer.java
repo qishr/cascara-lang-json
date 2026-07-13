@@ -5,7 +5,7 @@ import java.nio.charset.StandardCharsets;
 import io.github.qishr.cascara.common.lang.util.LexemeProvider;
 import jdk.incubator.vector.*;
 
-public final class SourceByteBuffer implements JsonSimdCapableBuffer, LexemeProvider {
+public final class JsonSourceByteBuffer implements JsonSimdCapableBuffer, LexemeProvider {
 
     public final byte[] raw; // UTF‑8 bytes
     private int offset = 0;  // byte offset
@@ -16,7 +16,7 @@ public final class SourceByteBuffer implements JsonSimdCapableBuffer, LexemeProv
     private int windowStartLine;
     private int windowStartColumn;
 
-    public SourceByteBuffer(byte[] raw) {
+    public JsonSourceByteBuffer(byte[] raw) {
         this.raw = (raw != null) ? raw : new byte[0];
     }
 

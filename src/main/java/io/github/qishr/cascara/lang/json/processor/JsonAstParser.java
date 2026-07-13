@@ -87,6 +87,14 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
         return parse(tokenizer);
     }
 
+    public JsonNode parse(byte[] data) {
+        JsonTokenizer tokenizer = new JsonTokenizer();
+        tokenizer.setOptions(options);
+        tokenizer.setReporter(reporter);
+        tokenizer.open(data);
+        return parse(tokenizer);
+    }
+
     @Override
     public JsonNode parse(InputStream is) {
         JsonTokenizer tokenizer = new JsonTokenizer();

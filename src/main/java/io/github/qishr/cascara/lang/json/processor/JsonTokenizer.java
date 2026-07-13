@@ -22,7 +22,7 @@ import io.github.qishr.cascara.lang.json.token.JsonStructuralToken;
 import io.github.qishr.cascara.lang.json.token.JsonToken;
 import io.github.qishr.cascara.lang.json.token.JsonLexemeBackedToken;
 import io.github.qishr.cascara.lang.json.token.JsonTokenType;
-import io.github.qishr.cascara.lang.json.token.SourceByteBuffer;
+import io.github.qishr.cascara.lang.json.token.JsonSourceByteBuffer;
 import io.github.qishr.cascara.lang.json.util.JsonOptions;
 import jdk.incubator.vector.ByteVector;
 import jdk.incubator.vector.VectorMask;
@@ -178,6 +178,14 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     public void open(String text) {
         buffer = setupStringBuffer(text);
         factory = setupTokenFactory(buffer);
+        setupHandlers();
+        skipBom();
+    }
+
+    public void open(byte[] data) {
+        buffer = setupByteBuffer(data);
+        factory = setupTokenFactory(buffer);
+        setupHandlers();
         skipBom();
     }
 
@@ -451,6 +459,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
     private final boolean scanString(char quoteChar) {
         boolean invalidUnicode = false;
+        boolean pendingHighSurrogate = false;
 
         while (!buffer.isAtEnd()) {
             final char next = buffer.advance();
@@ -483,20 +492,55 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
                         // simple escape, nothing more to do
                         break;
 
-                    case 'u':
-                        // must have 4 hex digits
+                    // case 'u':
+                    //     // must have 4 hex digits
+                    //     for (int i = 0; i < 4; i++) {
+                    //         if (buffer.isAtEnd()) {
+                    //             return false;
+                    //         }
+                    //         char h = buffer.advance();
+                    //         if (!((h >= '0' && h <= '9') ||
+                    //             (h >= 'A' && h <= 'F') ||
+                    //             (h >= 'a' && h <= 'f'))) {
+                    //             return false;
+                    //         }
+                    //     }
+                    //     break;
+                    case 'u': {
+                        int codeUnit = 0;
                         for (int i = 0; i < 4; i++) {
-                            if (buffer.isAtEnd()) {
+                            if (buffer.isAtEnd()) return false;
+                            char h = buffer.advance();
+                            int v;
+                            if (h >= '0' && h <= '9') v = h - '0';
+                            else if (h >= 'A' && h <= 'F') v = 10 + (h - 'A');
+                            else if (h >= 'a' && h <= 'f') v = 10 + (h - 'a');
+                            else return false;
+                            codeUnit = (codeUnit << 4) | v;
+                        }
+
+                        if (isHighSurrogate(codeUnit)) {
+                            // must be followed by a low surrogate escape
+                            if (pendingHighSurrogate) {
+                                // two highs in a row → invalid
                                 return false;
                             }
-                            char h = buffer.advance();
-                            if (!((h >= '0' && h <= '9') ||
-                                (h >= 'A' && h <= 'F') ||
-                                (h >= 'a' && h <= 'f'))) {
+                            pendingHighSurrogate = true;
+                        } else if (isLowSurrogate(codeUnit)) {
+                            if (!pendingHighSurrogate) {
+                                // lonely low surrogate → invalid
+                                return false;
+                            }
+                            pendingHighSurrogate = false;
+                        } else {
+                            // non‑surrogate code unit
+                            if (pendingHighSurrogate) {
+                                // high surrogate not followed by low → invalid
                                 return false;
                             }
                         }
                         break;
+                    }
 
                     default:
                         // invalid escape: \0, \x, \v, etc.
@@ -510,8 +554,9 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     }
 
     private boolean scanStringSimd(char quoteChar) {
-        final SourceByteBuffer bb = (SourceByteBuffer) buffer;
+        final JsonSourceByteBuffer bb = (JsonSourceByteBuffer) buffer;
         final byte quoteByte = (byte) quoteChar;
+        boolean pendingHighSurrogate = false;
 
         int pos = bb.offset();
         int len = bb.length();
@@ -567,19 +612,55 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
                         // simple escape
                         break;
 
-                    case 'u':
-                        for (int i = 0; i < 4; i++) {
-                            if (bb.isAtEnd()) {
-                                return false;
+                    // case 'u':
+                    //     for (int i = 0; i < 4; i++) {
+                    //         if (bb.isAtEnd()) {
+                    //             return false;
+                    //         }
+                    //         char h = bb.advance();
+                    //         if (!((h >= '0' && h <= '9') ||
+                    //               (h >= 'A' && h <= 'F') ||
+                    //               (h >= 'a' && h <= 'f'))) {
+                    //             return false;
+                    //         }
+                    //     }
+                    //     break;
+
+                        case 'u': {
+                            int codeUnit = 0;
+                            for (int i = 0; i < 4; i++) {
+                                if (bb.isAtEnd()) return false;
+                                char h = bb.advance();
+                                int v;
+                                if (h >= '0' && h <= '9') v = h - '0';
+                                else if (h >= 'A' && h <= 'F') v = 10 + (h - 'A');
+                                else if (h >= 'a' && h <= 'f') v = 10 + (h - 'a');
+                                else return false;
+                                codeUnit = (codeUnit << 4) | v;
                             }
-                            char h = bb.advance();
-                            if (!((h >= '0' && h <= '9') ||
-                                  (h >= 'A' && h <= 'F') ||
-                                  (h >= 'a' && h <= 'f'))) {
-                                return false;
+
+                            if (isHighSurrogate(codeUnit)) {
+                                // must be followed by a low surrogate escape
+                                if (pendingHighSurrogate) {
+                                    // two highs in a row → invalid
+                                    return false;
+                                }
+                                pendingHighSurrogate = true;
+                            } else if (isLowSurrogate(codeUnit)) {
+                                if (!pendingHighSurrogate) {
+                                    // lonely low surrogate → invalid
+                                    return false;
+                                }
+                                pendingHighSurrogate = false;
+                            } else {
+                                // non‑surrogate code unit
+                                if (pendingHighSurrogate) {
+                                    // high surrogate not followed by low → invalid
+                                    return false;
+                                }
                             }
+                            break;
                         }
-                        break;
 
                     default:
                         return false;
@@ -767,7 +848,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     }
 
     private void scanIdentifierSimd() {
-        final SourceByteBuffer bb = (SourceByteBuffer) buffer;
+        final JsonSourceByteBuffer bb = (JsonSourceByteBuffer) buffer;
 
         int pos = bb.offset();
         int len = bb.length();
@@ -1004,6 +1085,18 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     }
 
     //
+    // Helpers
+    //
+
+    private static boolean isHighSurrogate(int codeUnit) {
+        return codeUnit >= 0xD800 && codeUnit <= 0xDBFF;
+    }
+
+    private static boolean isLowSurrogate(int codeUnit) {
+        return codeUnit >= 0xDC00 && codeUnit <= 0xDFFF;
+    }
+
+    //
     // Setup
     //
 
@@ -1016,13 +1109,29 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         }
     }
 
-    private SourceBuffer setupStringBuffer(String text) {
-        final SimdCapableBuffer buffer;
+    private SourceBuffer setupByteBuffer(byte[] data) {
+        // SIMD & no JSON5 unquoted keys - use byte-based buffer
+        if (options.useSimd() && !options.allowUnquotedKeys()) {
+            return new JsonSourceByteBuffer(data);
+        } else {
+            // TODO: A new SourceByteBuffer that's not JSON-specific
+            return new SourceStringBuffer(new String(data));
+        }
+    }
 
+    private SourceBuffer setupStringBuffer(String text) {
         // SIMD & no JSON5 unquoted keys - use byte-based buffer
         if (options.useSimd() && !options.allowUnquotedKeys()) {
             byte[] raw = text.getBytes(StandardCharsets.UTF_8);
-            final SourceByteBuffer byteBuffer = new SourceByteBuffer(raw);
+            return new JsonSourceByteBuffer(raw);
+        } else {
+            return new SourceStringBuffer(text);
+        }
+    }
+
+    private void setupHandlers() {
+        // SIMD & no JSON5 unquoted keys - use byte-based buffer
+        if (buffer instanceof JsonSourceByteBuffer byteBuffer) {
 
             digitScanner = this::scanDigitsSimd;
 
@@ -1050,8 +1159,6 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             buffer = byteBuffer;
         } else {
             // JSON5 identifiers or SIMD disabled - use char-based buffer
-            buffer = new SourceStringBuffer(text);
-
             digitScanner = this::scanDigits;
             triviaHandler = this::advanceWhitespaceAndComments;
 
@@ -1076,8 +1183,6 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             numberScanner = this::scanNumberAscii;
             identifierScanner = this::scanIdentifierUnicode;
         }
-
-        return buffer;
     }
 
     private SourceBuffer setupStreamBuffer(InputStream stream) {
