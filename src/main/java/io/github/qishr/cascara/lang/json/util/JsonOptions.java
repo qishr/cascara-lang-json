@@ -26,7 +26,7 @@ public class JsonOptions extends LanguageOptions<JsonOptions> implements Duplica
     private boolean allowJson5Numbers = false;
     private boolean allowSingleQuotedStrings = false;
     private boolean allowTrailingComma = false;
-    private boolean allowUnicode = true;
+    private boolean allowUnicode = false;
     private boolean allowUnquotedKeys = false;
     private boolean captureComments = false;
     private boolean insertSpaces = true;

@@ -310,15 +310,31 @@ public final class JsonSourceByteBuffer implements JsonSimdCapableBuffer, Lexeme
 
             VectorMask<Byte> isQuote = vec.compare(VectorOperators.EQ, QUOTE);
             VectorMask<Byte> isEsc   = vec.compare(VectorOperators.EQ, ESC);
-            VectorMask<Byte> isCtrl  = vec.compare(VectorOperators.LT, (byte)0x20);
+            VectorMask<Byte> isCtrl =
+                vec.compare(VectorOperators.GE, (byte)0x00)
+                    .and(vec.compare(VectorOperators.LE, (byte)0x1F));
 
             long mask = isQuote.toLong() | isEsc.toLong() | isCtrl.toLong();
+
+
+
 
             if (mask != 0L) {
                 int first = Long.numberOfTrailingZeros(mask);
                 return pos + first;
             }
 
+            // TODO: This is supposed to work, but it breaks a test.
+
+            // // Only lane 0 matters for advancing the string scanner
+            // if ((mask & 1L) != 0L) {
+            //     return pos;   // lane 0 is quote, backslash, or control
+            // }
+
+
+
+
+            // Otherwise skip whole block
             pos += vecLen;
         }
 

@@ -8,6 +8,7 @@ import java.util.Set;
 
 import io.github.qishr.cascara.common.diagnostic.Reporter;
 import io.github.qishr.cascara.common.diagnostic.code.DiagnosticCode;
+import io.github.qishr.cascara.common.diagnostic.code.GenericDiagnosticCode;
 import io.github.qishr.cascara.common.lang.exception.ParserException;
 import io.github.qishr.cascara.common.lang.processor.AstParser;
 import io.github.qishr.cascara.common.lang.processor.Tokenizer;
@@ -23,6 +24,7 @@ import io.github.qishr.cascara.lang.json.ast.JsonNode;
 import io.github.qishr.cascara.lang.json.ast.JsonScalarNode;
 import io.github.qishr.cascara.lang.json.ast.JsonSequenceNode;
 import io.github.qishr.cascara.lang.json.exception.JsonDiagnosticCode;
+import io.github.qishr.cascara.lang.json.token.JsonLiteral;
 import io.github.qishr.cascara.lang.json.token.JsonToken;
 import io.github.qishr.cascara.lang.json.token.JsonTokenType;
 import io.github.qishr.cascara.lang.json.util.JsonOptions;
@@ -293,8 +295,6 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
             }
         }
 
-        // TODO:
-        // attachComments(key);
         return key;
     }
 
@@ -376,8 +376,9 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
                 }
 
                 default -> {
-                    if (tok.getLiteral() != null) {
-                        switch(tok.getLiteral()) {
+                    JsonLiteral literal = tok.getLiteral();
+                    if (literal != null) {
+                        switch(literal) {
                             case TRUE -> {
                                 node = new JsonScalarNode(
                                     tok,
@@ -552,6 +553,13 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
     }
 
     private void error(JsonToken token, DiagnosticCode code, Object... details) {
+
+        if (token.getType() == JsonTokenType.ERROR) {
+            // TODO: extend JsonToken to JsonErrorToken and get a diagnostic code from it.
+            code = GenericDiagnosticCode.ERROR;
+            details = new Object[]{token.getContent()};
+        }
+
         reporter.errorAt(token, code, details);
         if (!reporter.collectsProblems()) {
             throw new ParserException(token, code, details);

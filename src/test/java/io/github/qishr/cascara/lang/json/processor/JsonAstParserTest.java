@@ -489,10 +489,6 @@ class JsonAstParserTest {
         assertThrows(Exception.class, () -> parser.parse("[0.3e]"));
     }
 
-    @Test void test_n_number_0_dot_e1() {
-        assertThrows(Exception.class, () -> parser.parse("[0.e1]"));
-    }
-
     @Test void test_n_number_0E_plus() {
         assertThrows(Exception.class, () -> parser.parse("[0E+]"));
     }
@@ -519,18 +515,6 @@ class JsonAstParserTest {
 
     @Test void test_n_number_1_0e() {
         assertThrows(Exception.class, () -> parser.parse("[1.0e]"));
-    }
-
-    @Test void test_n_number_2_dot_e_plus3() {
-        assertThrows(Exception.class, () -> parser.parse("[2.e+3]"));
-    }
-
-    @Test void test_n_number_2_dot_e_minus3() {
-        assertThrows(Exception.class, () -> parser.parse("[2.e-3]"));
-    }
-
-    @Test void test_n_number_2_dot_e3() {
-        assertThrows(Exception.class, () -> parser.parse("[2.e3]"));
     }
 
     @Test void test_n_number_9_dot_e_plus() {
@@ -569,4 +553,19 @@ class JsonAstParserTest {
         assertThrows(Exception.class, () -> parser.parse("[\"a\tb\"]"));
     }
 
+    @Test void test_n_number_0_dot_e1() {
+        assertThrows(Exception.class, () -> parser.parse("[0.e1]"));
+    }
+
+    @Test void test_n_number_2_dot_e_plus3() {
+        assertThrows(Exception.class, () -> parser.parse("[2.e+3]"));
+    }
+
+    @Test void test_n_number_2_dot_e_minus3() {
+        assertThrows(Exception.class, () -> parser.parse("[2.e-3]"));
+    }
+
+    @Test void test_n_number_2_dot_e3() {
+        assertThrows(Exception.class, () -> parser.parse("[2.e3]"));
+    }
 }

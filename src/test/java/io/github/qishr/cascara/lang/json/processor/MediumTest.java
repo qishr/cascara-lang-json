@@ -43,7 +43,9 @@ public class MediumTest {
 
         JsonAstParser parser = new JsonAstParser()
             .setOptions(new JsonOptions()
-                .setUseSimd(true))
+                .setUseSimd(true)
+                // .setAllowUnicode(true)
+            )
             .setReporter(new StandardReporter().setLevel(Level.TRACE));
 
         JsonNode doc = parser.parse(content);

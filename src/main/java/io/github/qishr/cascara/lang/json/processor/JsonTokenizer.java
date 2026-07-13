@@ -99,7 +99,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
     private boolean ALLOW_COMMENTS;
     private boolean ALLOW_HEXADECIMAL_NUMBERS;
-    private boolean ALLOW_INFINITY_AND_NAN;
+    private boolean ALLOW_JSON5_NUMBERS;
     private boolean ALLOW_UNICODE;
     private boolean CAPTURE_COMMENTS;
 
@@ -167,7 +167,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     private void applyOptions(JsonOptions options) {
         this.ALLOW_COMMENTS              = options.allowComments();
         this.ALLOW_HEXADECIMAL_NUMBERS   = options.allowHexadecimalNumbers();
-        this.ALLOW_INFINITY_AND_NAN      = options.allowJson5Numbers();
+        this.ALLOW_JSON5_NUMBERS      = options.allowJson5Numbers();
         this.ALLOW_UNICODE               = options.allowUnicode();
         this.CAPTURE_COMMENTS            = options.captureComments();
     }
@@ -273,7 +273,11 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
     private void skipBom() {
         if (buffer.peek() == '\uFEFF') {
-            buffer.advance();
+            if (ALLOW_UNICODE) {
+                buffer.advance();
+            } else {
+                throw new IllegalArgumentException("BOM not allowed in strict JSON");
+            }
         }
     }
 
@@ -376,10 +380,6 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             numberScanner.scan(startChar);
             String lexeme = buffer.getTokenWindowLexeme();
 
-
-
-            // TODO: The following code looks rather slow
-
             // Reject numbers with no digits at all: "-", "+", "."
             boolean hasDigit = false;
             for (int i = 0; i < lexeme.length(); i++) {
@@ -391,7 +391,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             }
             if (!hasDigit) {
                 // Allow JSON5 Infinity/NaN forms when enabled
-                if (ALLOW_INFINITY_AND_NAN) {
+                if (ALLOW_JSON5_NUMBERS) {
                     if (lexeme.equals("Infinity") ||
                         lexeme.equals("+Infinity") ||
                         lexeme.equals("-Infinity") ||
@@ -402,7 +402,6 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
                     }
                 }
 
-                // Otherwise: lone '+', '-', '.', or other non‑digit → error
                 return makeErrorToken(
                     "Unexpected character '" + startChar + "'",
                     startLine,
@@ -410,12 +409,67 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
                 );
             }
 
+            // Strict JSON number validation (disallow JSON5 forms when options say so)
+            if (!options.allowJson5Numbers()) {
+                // Leading '+'
+                if (lexeme.charAt(0) == '+') {
+                    return makeErrorToken("Leading '+' not allowed in JSON numbers", startLine, startColumn);
+                }
 
+                // Leading zero on integer part: 012, -012
+                if (lexeme.charAt(0) == '0' && lexeme.length() > 1 && Character.isDigit(lexeme.charAt(1))) {
+                    return makeErrorToken("Leading zero not allowed in JSON numbers", startLine, startColumn);
+                }
+                if (lexeme.startsWith("-0") && lexeme.length() > 2 && Character.isDigit(lexeme.charAt(2))) {
+                    return makeErrorToken("Leading zero not allowed in JSON numbers", startLine, startColumn);
+                }
 
+                // Starting with '.' or '-.' (no integer part)
+                if (lexeme.charAt(0) == '.' || lexeme.startsWith("-.")) {
+                    return makeErrorToken("Missing integer part in JSON number", startLine, startColumn);
+                }
+
+                // Trailing dot: 1., 2., -2.
+                if (lexeme.endsWith(".")) {
+                    return makeErrorToken("Trailing '.' not allowed in JSON numbers", startLine, startColumn);
+                }
+
+                // Fractional part must have at least one digit after '.'
+                int dotPos = lexeme.indexOf('.');
+                if (dotPos >= 0) {
+                    int i = dotPos + 1;
+                    if (i >= lexeme.length()) {
+                        return makeErrorToken("Missing fractional part in JSON number", startLine, startColumn);
+                    }
+                    char c = lexeme.charAt(i);
+                    if (c == 'e' || c == 'E') {
+                        return makeErrorToken("Missing fractional part in JSON number", startLine, startColumn);
+                    }
+                }
+
+                // Exponent must have digits after optional sign
+                int ePos = lexeme.indexOf('e');
+                if (ePos < 0) ePos = lexeme.indexOf('E');
+                if (ePos >= 0) {
+                    int i = ePos + 1;
+                    if (i >= lexeme.length()) {
+                        return makeErrorToken("Exponent missing in JSON number", startLine, startColumn);
+                    }
+                    char c = lexeme.charAt(i);
+                    if (c == '+' || c == '-') {
+                        i++;
+                        if (i >= lexeme.length()) {
+                            return makeErrorToken("Exponent missing in JSON number", startLine, startColumn);
+                        }
+                    }
+                    if (!Character.isDigit(lexeme.charAt(i))) {
+                        return makeErrorToken("Exponent must have digits in JSON number", startLine, startColumn);
+                    }
+                }
+            }
 
             return factory.makeNumberToken(startLine, startColumn, startOffset, lexeme);
         }
-
 
         // IDENTIFIER?
         if (startChar < 128 && IDENT_START[startChar]) {
@@ -471,16 +525,19 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
             // Normal termination
             if (next == quoteChar) {
-                // invalid if we ended with an unmatched high surrogate
                 return !invalidUnicode && !pendingHighSurrogate;
             }
 
-            // Raw unicode check
-            if (!ALLOW_UNICODE && next > 127) {
+            // Only treat BOM as invalid when Unicode is disallowed
+            if (!ALLOW_UNICODE && next == '\uFEFF') {
                 invalidUnicode = true;
             }
 
-            // Escape sequence
+            // Unescaped control chars are always invalid
+            if (next < 0x20) {
+                return false;
+            }
+
             if (next == '\\' && !buffer.isAtEnd()) {
                 final char esc = buffer.advance();
 
@@ -494,23 +551,8 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
                     case 'n':
                     case 'r':
                     case 't':
-                        // simple escape, nothing more to do
                         break;
 
-                    // case 'u':
-                    //     // must have 4 hex digits
-                    //     for (int i = 0; i < 4; i++) {
-                    //         if (buffer.isAtEnd()) {
-                    //             return false;
-                    //         }
-                    //         char h = buffer.advance();
-                    //         if (!((h >= '0' && h <= '9') ||
-                    //             (h >= 'A' && h <= 'F') ||
-                    //             (h >= 'a' && h <= 'f'))) {
-                    //             return false;
-                    //         }
-                    //     }
-                    //     break;
                     case 'u': {
                         int codeUnit = 0;
                         for (int i = 0; i < 4; i++) {
@@ -525,36 +567,23 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
                         }
 
                         if (isHighSurrogate(codeUnit)) {
-                            // must be followed by a low surrogate escape
-                            if (pendingHighSurrogate) {
-                                // two highs in a row → invalid
-                                return false;
-                            }
+                            if (pendingHighSurrogate) return false;
                             pendingHighSurrogate = true;
                         } else if (isLowSurrogate(codeUnit)) {
-                            if (!pendingHighSurrogate) {
-                                // lonely low surrogate → invalid
-                                return false;
-                            }
+                            if (!pendingHighSurrogate) return false;
                             pendingHighSurrogate = false;
                         } else {
-                            // non‑surrogate code unit
-                            if (pendingHighSurrogate) {
-                                // high surrogate not followed by low → invalid
-                                return false;
-                            }
+                            if (pendingHighSurrogate) return false;
                         }
                         break;
                     }
 
                     default:
-                        // invalid escape: \0, \x, \v, etc.
                         return false;
                 }
             }
         }
 
-        // EOF before closing quote - invalid string
         return false;
     }
 
@@ -617,55 +646,41 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
                         // simple escape
                         break;
 
-                    // case 'u':
-                    //     for (int i = 0; i < 4; i++) {
-                    //         if (bb.isAtEnd()) {
-                    //             return false;
-                    //         }
-                    //         char h = bb.advance();
-                    //         if (!((h >= '0' && h <= '9') ||
-                    //               (h >= 'A' && h <= 'F') ||
-                    //               (h >= 'a' && h <= 'f'))) {
-                    //             return false;
-                    //         }
-                    //     }
-                    //     break;
-
-                        case 'u': {
-                            int codeUnit = 0;
-                            for (int i = 0; i < 4; i++) {
-                                if (bb.isAtEnd()) return false;
-                                char h = bb.advance();
-                                int v;
-                                if (h >= '0' && h <= '9') v = h - '0';
-                                else if (h >= 'A' && h <= 'F') v = 10 + (h - 'A');
-                                else if (h >= 'a' && h <= 'f') v = 10 + (h - 'a');
-                                else return false;
-                                codeUnit = (codeUnit << 4) | v;
-                            }
-
-                            if (isHighSurrogate(codeUnit)) {
-                                // must be followed by a low surrogate escape
-                                if (pendingHighSurrogate) {
-                                    // two highs in a row → invalid
-                                    return false;
-                                }
-                                pendingHighSurrogate = true;
-                            } else if (isLowSurrogate(codeUnit)) {
-                                if (!pendingHighSurrogate) {
-                                    // lonely low surrogate → invalid
-                                    return false;
-                                }
-                                pendingHighSurrogate = false;
-                            } else {
-                                // non‑surrogate code unit
-                                if (pendingHighSurrogate) {
-                                    // high surrogate not followed by low → invalid
-                                    return false;
-                                }
-                            }
-                            break;
+                    case 'u': {
+                        int codeUnit = 0;
+                        for (int i = 0; i < 4; i++) {
+                            if (bb.isAtEnd()) return false;
+                            char h = bb.advance();
+                            int v;
+                            if (h >= '0' && h <= '9') v = h - '0';
+                            else if (h >= 'A' && h <= 'F') v = 10 + (h - 'A');
+                            else if (h >= 'a' && h <= 'f') v = 10 + (h - 'a');
+                            else return false;
+                            codeUnit = (codeUnit << 4) | v;
                         }
+
+                        if (isHighSurrogate(codeUnit)) {
+                            // must be followed by a low surrogate escape
+                            if (pendingHighSurrogate) {
+                                // two highs in a row → invalid
+                                return false;
+                            }
+                            pendingHighSurrogate = true;
+                        } else if (isLowSurrogate(codeUnit)) {
+                            if (!pendingHighSurrogate) {
+                                // lonely low surrogate → invalid
+                                return false;
+                            }
+                            pendingHighSurrogate = false;
+                        } else {
+                            // non‑surrogate code unit
+                            if (pendingHighSurrogate) {
+                                // high surrogate not followed by low → invalid
+                                return false;
+                            }
+                        }
+                        break;
+                    }
 
                     default:
                         return false;
@@ -703,7 +718,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         buffer.advance();
 
         // 1. JSON5 signed Infinity/NaN
-        if (ALLOW_INFINITY_AND_NAN && (startChar == '-' || startChar == '+')) {
+        if (ALLOW_JSON5_NUMBERS && (startChar == '-' || startChar == '+')) {
             char c = buffer.peek();
             if (c < 128 && IDENT_START[c]) {
                 do {
@@ -858,17 +873,6 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         int pos = bb.offset();
         int len = bb.length();
 
-        // SIMD classify identifier characters:
-        // IDENT_PART: [A-Za-z0-9_$]
-        final byte A = (byte)'A';
-        final byte Z = (byte)'Z';
-        final byte a = (byte)'a';
-        final byte z = (byte)'z';
-        final byte zero = (byte)'0';
-        final byte nine = (byte)'9';
-        final byte us = (byte)'_';
-        final byte dl = (byte)'$';
-
         final VectorSpecies<Byte> S = ByteVector.SPECIES_128;
 
         while (pos < len) {
@@ -889,50 +893,39 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
             ByteVector vec = ByteVector.fromArray(S, bb.raw, pos);
 
-            // ASCII only (IDENT_PART is ASCII)
-            VectorMask<Byte> mAscii = vec.compare(VectorOperators.LT, (byte)0x80);
-
-            // A–Z
+            // classify identifier chars
             VectorMask<Byte> mAZ =
-                vec.compare(VectorOperators.GE, A)
-                   .and(vec.compare(VectorOperators.LE, Z));
+                vec.compare(VectorOperators.GE, (byte)'A')
+                   .and(vec.compare(VectorOperators.LE, (byte)'Z'));
 
-            // a–z
             VectorMask<Byte> maz =
-                vec.compare(VectorOperators.GE, a)
-                   .and(vec.compare(VectorOperators.LE, z));
+                vec.compare(VectorOperators.GE, (byte)'a')
+                   .and(vec.compare(VectorOperators.LE, (byte)'z'));
 
-            // 0–9
             VectorMask<Byte> m09 =
-                vec.compare(VectorOperators.GE, zero)
-                   .and(vec.compare(VectorOperators.LE, nine));
+                vec.compare(VectorOperators.GE, (byte)'0')
+                   .and(vec.compare(VectorOperators.LE, (byte)'9'));
 
-            // '_' or '$'
-            VectorMask<Byte> mus = vec.compare(VectorOperators.EQ, us);
-            VectorMask<Byte> mdl = vec.compare(VectorOperators.EQ, dl);
+            VectorMask<Byte> mus = vec.compare(VectorOperators.EQ, (byte)'_');
+            VectorMask<Byte> mdl = vec.compare(VectorOperators.EQ, (byte)'$');
 
-            // Combine all identifier masks
-            long maskIdent =
-                mAscii.toLong() &
-                (mAZ.or(maz).or(m09).or(mus).or(mdl)).toLong();
+            long maskIdent = (mAZ.or(maz).or(m09).or(mus).or(mdl)).toLong();
 
-            if (maskIdent == 0L) {
-                // First byte is non-identifier
+            // Only lane 0 matters for the first byte
+            if ((maskIdent & 1L) == 0L) {
                 return;
             }
 
-            // Find first non-identifier byte
+            // find first non-identifier lane
             long maskNonIdent = ~maskIdent;
 
-            if (maskNonIdent != 0L) {
-                int firstBad = Long.numberOfTrailingZeros(maskNonIdent);
-                int end = pos + firstBad;
-
-                bb.advanceBy(end - bb.offset());
+            int firstBad = Long.numberOfTrailingZeros(maskNonIdent);
+            if (firstBad < S.length()) {
+                bb.advanceBy(firstBad);
                 return;
             }
 
-            // All 128 bytes are identifier chars
+            // all 128 bytes are identifier chars
             bb.advanceBy(S.length());
             pos = bb.offset();
         }
@@ -1429,6 +1422,10 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
                 );
 
             default:
+
+                // TODO: if lexeme is empty here, it should be an error.
+                // Should reaching here always be an error? Probably
+
                 return factory.makeIdentifierToken(line, column, startOffset, lexeme);
         }
     }
@@ -1458,8 +1455,8 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             column,
             buffer.windowStartOffset(),
             JsonTokenType.ERROR,
-            message,
             null,
+            message,
             QuoteStyle.PLAIN
         );
     }
