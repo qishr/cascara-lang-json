@@ -64,16 +64,16 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     // Lookup tables for digits and hex digits
     private static final boolean[] DIGIT = new boolean[128];
     private static final boolean[] HEX   = new boolean[128];
-    private static final boolean[] NUM   = new boolean[128];
+    private static final boolean[] NUM_START   = new boolean[128];
     static {
         for (char c = '0'; c <= '9'; c++) DIGIT[c] = true;
         for (char c = '0'; c <= '9'; c++) HEX[c] = true;
         for (char c = 'a'; c <= 'f'; c++) HEX[c] = true;
         for (char c = 'A'; c <= 'F'; c++) HEX[c] = true;
-        for (char c = '0'; c <= '9'; c++) NUM[c] = true;
-        NUM['.'] = true;
-        NUM['+'] = true;
-        NUM['-'] = true;
+        for (char c = '0'; c <= '9'; c++) NUM_START[c] = true;
+        NUM_START['.'] = true;
+        NUM_START['+'] = true;
+        NUM_START['-'] = true;
     }
 
     private static final byte[] STRUCTURAL = new byte[128];
@@ -173,14 +173,6 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     }
 
     @Override protected JsonTokenizer self() { return this; }
-
-    // public int getLine() {
-    //     return buffer.line();
-    // }
-
-    // public int getColumn() {
-    //     return buffer.column();
-    // }
 
     @Override
     public void open(String text) {
@@ -301,6 +293,26 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         }
     }
 
+    // TODO: Make this use SIMD
+    private JsonToken scanTokenAsciiSimd(char c) {
+        // Just use the current char; no SIMD structural skip
+        switch (c) {
+            case '{': return makeStructuralToken(JsonTokenType.LEFT_BRACE);
+            case '}': return makeStructuralToken(JsonTokenType.RIGHT_BRACE);
+            case '[': return makeStructuralToken(JsonTokenType.LEFT_BRACKET);
+            case ']': return makeStructuralToken(JsonTokenType.RIGHT_BRACKET);
+            case ':': return makeStructuralToken(JsonTokenType.COLON);
+            case ',': return makeStructuralToken(JsonTokenType.COMMA);
+
+            case '"':
+            case '\'':
+                return scanStringToken(c);
+
+            default:
+                return scanNumberOrIdentifierOrError(c);
+        }
+    }
+
     private JsonToken scanTokenUnicode(char c) {
         buffer.startTokenWindow();
         final int startOffset = buffer.windowStartOffset();
@@ -347,10 +359,12 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
         buffer.startTokenWindow();
 
-        if (NUM[startChar]) {
+        if (NUM_START[startChar]) {
             numberScanner.scan(startChar);
-            return factory.makeNumberToken(startLine, startColumn, startOffset, buffer.getTokenWindowLexeme());
+            String lexeme = buffer.getTokenWindowLexeme();
+            return factory.makeNumberToken(startLine, startColumn, startOffset, lexeme);
         }
+
 
         // IDENTIFIER?
         if (startChar < 128 && IDENT_START[startChar]) {
@@ -926,6 +940,12 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             }
 
             if (!ALLOW_UNICODE) {
+
+
+                // tokenScanner = this::scanTokenAscii;
+                tokenScanner = this::scanTokenAsciiSimd;
+
+
                 stringScanner = this::scanStringSimd;
                 numberScanner = this::scanNumberAscii;
                 identifierScanner = this::scanIdentifierSimd;
@@ -946,6 +966,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             }
 
             if (!ALLOW_UNICODE) {
+                tokenScanner = this::scanTokenAscii;
                 stringScanner = this::scanString;
                 numberScanner = this::scanNumberAscii;
                 identifierScanner = this::scanIdentifierAscii;
@@ -958,8 +979,6 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             numberScanner = this::scanNumberUnicode;
             numberScanner = this::scanNumberAscii;
             identifierScanner = this::scanIdentifierUnicode;
-        } else {
-            tokenScanner = this::scanTokenAscii;
         }
 
         return buffer;

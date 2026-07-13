@@ -11,6 +11,8 @@ import io.github.qishr.cascara.lang.json.util.JsonOptions;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.List;
 
@@ -296,4 +298,21 @@ class JsonAstParserTest {
         assertEquals("one \"two\" three", name);
     }
 
+    @Test
+    void test_array_justMinus() {
+        String text = "[-]";
+        assertThrows(Exception.class, () -> parser.parse(text), "Should have failed");
+    }
+
+    @Test
+    void test_array_commaAfterClose() {
+        String text = "[\"\"],";
+        assertThrows(Exception.class, () -> parser.parse(text), "Should have failed");
+    }
+
+    @Test
+    void test_string_backslash() {
+        String text = "[\"\\00\"]";
+        assertThrows(Exception.class, () -> parser.parse(text), "Should have failed");
+    }
 }

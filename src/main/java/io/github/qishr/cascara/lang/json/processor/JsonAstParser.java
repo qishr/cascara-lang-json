@@ -132,6 +132,10 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
         }
         pendingComments.clear();
 
+        if (!isAtEnd()) {
+            error(peek(), JsonDiagnosticCode.UNEXPECTED_TOKEN, peek().getType());
+        }
+
         return root;
     }
 
@@ -221,7 +225,8 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
                 String keyString = parseKey(keyTok);
 
                 if (!seenKeys.add(keyString)) {
-                    error(keyTok, JsonDiagnosticCode.DUPLICATE_KEY, keyString);
+                    // error(keyTok, JsonDiagnosticCode.DUPLICATE_KEY, keyString);
+                    warn(keyTok, JsonDiagnosticCode.DUPLICATE_KEY, keyString);
                 }
 
                 // ---- Parse colon ----
@@ -532,6 +537,10 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
         String indent = "  ".repeat(Math.max(0, depth));
         reporter.trace("L%3d C%3d %s%s: %s",
             tok.getStartLine(), tok.getStartColumn(), indent, methodName, tok.getType());
+    }
+
+    private void warn(JsonToken token, DiagnosticCode code, Object... details) {
+        reporter.warnAt(token, code, details);
     }
 
     private void error(JsonToken token, DiagnosticCode code, Object... details) {
