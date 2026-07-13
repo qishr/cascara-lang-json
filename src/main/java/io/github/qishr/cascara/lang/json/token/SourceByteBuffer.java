@@ -193,6 +193,10 @@ public final class SourceByteBuffer implements JsonSimdCapableBuffer, LexemeProv
                 // scalar tail
                 while (offset < len) {
                     byte b = raw[offset];
+
+                    // TODO: FSM table
+                    // There are likely other places we need to check
+
                     if (b != ' ' && b != '\t' && b != '\n' && b != '\r') {
                         return;
                     }
@@ -208,14 +212,28 @@ public final class SourceByteBuffer implements JsonSimdCapableBuffer, LexemeProv
             VectorMask<Byte> isNL    = vec.compare(VectorOperators.EQ, (byte)'\n');
             VectorMask<Byte> isCR    = vec.compare(VectorOperators.EQ, (byte)'\r');
 
-            long mask = isSpace.toLong() | isTab.toLong() | isNL.toLong() | isCR.toLong();
+            long wsMask = isSpace.toLong() | isTab.toLong() | isNL.toLong() | isCR.toLong();
 
-            if (mask == 0L) {
+            // If the very first byte is not whitespace, stop
+            if ((wsMask & 1L) == 0L) {
                 return;
             }
 
-            int first = Long.numberOfTrailingZeros(mask);
-            advanceBy(first + 1);
+            // Compute run of whitespace from the start:
+            // invert mask: bits 1 where NON‑whitespace
+            long nonWsMask = ~wsMask;
+
+            // Find first non‑whitespace bit
+            int firstNon = Long.numberOfTrailingZeros(nonWsMask);
+
+            if (firstNon >= S.length()) {
+                // all bytes in this block are whitespace
+                advanceBy(S.length());
+            } else {
+                // skip up to the first non‑whitespace
+                advanceBy(firstNon);
+                return;
+            }
         }
     }
 

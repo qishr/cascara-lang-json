@@ -11,6 +11,8 @@ import java.nio.charset.StandardCharsets;
 
 import org.junit.jupiter.api.Test;
 
+import io.github.qishr.cascara.common.diagnostic.StandardReporter;
+import io.github.qishr.cascara.common.diagnostic.Diagnostic.Level;
 import io.github.qishr.cascara.lang.json.ast.JsonMapNode;
 import io.github.qishr.cascara.lang.json.ast.JsonNode;
 import io.github.qishr.cascara.lang.json.ast.JsonScalarNode;
@@ -41,7 +43,8 @@ public class MediumTest {
 
         JsonAstParser parser = new JsonAstParser()
             .setOptions(new JsonOptions()
-                .setUseSimd(true));
+                .setUseSimd(true))
+            .setReporter(new StandardReporter().setLevel(Level.TRACE));
 
         JsonNode doc = parser.parse(content);
         if (doc instanceof JsonMapNode map) {

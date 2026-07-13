@@ -4,22 +4,23 @@ import io.github.qishr.cascara.common.diagnostic.Diagnostic.Level;
 import io.github.qishr.cascara.common.diagnostic.SilentCollectingReporter;
 import io.github.qishr.cascara.common.diagnostic.StandardReporter;
 import io.github.qishr.cascara.common.lang.ast.CommentAstNode;
-import io.github.qishr.cascara.common.lang.type.PrimitiveType;
-import io.github.qishr.cascara.common.lang.util.QuoteStyle;
 import io.github.qishr.cascara.lang.json.ast.*;
 import io.github.qishr.cascara.lang.json.util.JsonOptions;
 
-import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class JsonAstParserTest {
-    private final JsonAstParser parser = new JsonAstParser().setReporter(new StandardReporter().setLevel(Level.TRACE));;
+    private JsonAstParser parser;
+
+    @BeforeEach
+    void init() {
+        parser = new JsonAstParser().setReporter(new StandardReporter().setLevel(Level.TRACE));
+    }
 
     @Test
     void testParseObjectWithComments() {
@@ -314,5 +315,97 @@ class JsonAstParserTest {
     void test_string_backslash() {
         String text = "[\"\\00\"]";
         assertThrows(Exception.class, () -> parser.parse(text), "Should have failed");
+    }
+
+    @Test void test_i_object_key_lone_2nd_surrogate() {
+        assertThrows(Exception.class, () -> parser.parse("{\"\\uDFAA\":0}"));
+    }
+
+    @Test void test_i_string_1st_surrogate_but_2nd_missing() {
+        assertThrows(Exception.class, () -> parser.parse("[\"\\uDADA\"]"));
+    }
+
+    @Test void test_i_string_1st_valid_surrogate_2nd_invalid() {
+        assertThrows(Exception.class, () -> parser.parse("[\"\\uD888\\u1234\"]"));
+    }
+
+    @Test void test_i_string_UTF16LE_with_BOM() {
+        assertThrows(Exception.class, () -> parser.parse("\"\uFEFF\""));
+    }
+
+    @Test void test_i_string_UTF8_invalid_sequence() {
+        assertThrows(Exception.class, () -> parser.parse("[\"E697A5D188FA\"]"));
+    }
+
+    @Test void test_i_string_UTF8_surrogate_U_D800() {
+        assertThrows(Exception.class, () -> parser.parse("[\"EDA080\"]"));
+    }
+
+    @Test void test_i_string_incomplete_surrogate_and_escape_valid() {
+        assertThrows(Exception.class, () -> parser.parse("[\"\\uD800\n\"]"));
+    }
+
+    @Test void test_i_string_incomplete_surrogate_pair() {
+        assertThrows(Exception.class, () -> parser.parse("[\"\\uDd1ea\"]"));
+    }
+
+    @Test void test_i_string_incomplete_surrogates_escape_valid() {
+        assertThrows(Exception.class, () -> parser.parse("[\"\\uD800\\uD800\n\"]"));
+    }
+
+    @Test void test_i_string_invalid_lonely_surrogate() {
+        assertThrows(Exception.class, () -> parser.parse("[\"\\ud800\"]"));
+    }
+
+    @Test void test_i_string_invalid_surrogate() {
+        assertThrows(Exception.class, () -> parser.parse("[\"\\ud800abc\"]"));
+    }
+
+    @Test void test_i_string_invalid_utf8() {
+        assertThrows(Exception.class, () -> parser.parse("[\"FF\"]"));
+    }
+
+    @Test void test_i_string_inverted_surrogates_U_1D11E() {
+        assertThrows(Exception.class, () -> parser.parse("[\"\\uDd1e\\uD834\"]"));
+    }
+
+    @Test void test_i_string_iso_latin_1() {
+        assertThrows(Exception.class, () -> parser.parse("[\"E9\"]"));
+    }
+
+    @Test void test_i_string_lone_second_surrogate() {
+        assertThrows(Exception.class, () -> parser.parse("[\"\\uDFAA\"]"));
+    }
+
+    @Test void test_i_string_lone_utf8_continuation_byte() {
+        assertThrows(Exception.class, () -> parser.parse("[\"81\"]"));
+    }
+
+    @Test void test_i_string_not_in_unicode_range() {
+        assertThrows(Exception.class, () -> parser.parse("[\"F4BFBFBF\"]"));
+    }
+
+    @Test void test_i_string_overlong_sequence_2_bytes() {
+        assertThrows(Exception.class, () -> parser.parse("[\"C0AF\"]"));
+    }
+
+    @Test void test_i_string_overlong_sequence_6_bytes() {
+        assertThrows(Exception.class, () -> parser.parse("[\"FC83BFBFBFBF\"]"));
+    }
+
+    @Test void test_i_string_overlong_sequence_6_bytes_null() {
+        assertThrows(Exception.class, () -> parser.parse("[\"FC8080808080\"]"));
+    }
+
+    @Test void test_i_string_truncated_utf8() {
+        assertThrows(Exception.class, () -> parser.parse("[\"E0FF\"]"));
+    }
+
+    @Test void test_i_string_utf16BE_no_BOM() {
+        assertThrows(Exception.class, () -> parser.parse("[\"\\u0000\\u00E9\"]"));
+    }
+
+    @Test void test_i_string_utf16LE_no_BOM() {
+        assertThrows(Exception.class, () -> parser.parse("[\"\\uE900\"]"));
     }
 }

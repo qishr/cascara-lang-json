@@ -293,25 +293,25 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         }
     }
 
-    // TODO: Make this use SIMD
-    private JsonToken scanTokenAsciiSimd(char c) {
-        // Just use the current char; no SIMD structural skip
-        switch (c) {
-            case '{': return makeStructuralToken(JsonTokenType.LEFT_BRACE);
-            case '}': return makeStructuralToken(JsonTokenType.RIGHT_BRACE);
-            case '[': return makeStructuralToken(JsonTokenType.LEFT_BRACKET);
-            case ']': return makeStructuralToken(JsonTokenType.RIGHT_BRACKET);
-            case ':': return makeStructuralToken(JsonTokenType.COLON);
-            case ',': return makeStructuralToken(JsonTokenType.COMMA);
+    // // TODO: Make this use SIMD
+    // private JsonToken scanTokenAsciiSimd(char c) {
+    //     // Just use the current char; no SIMD structural skip
+    //     switch (c) {
+    //         case '{': return makeStructuralToken(JsonTokenType.LEFT_BRACE);
+    //         case '}': return makeStructuralToken(JsonTokenType.RIGHT_BRACE);
+    //         case '[': return makeStructuralToken(JsonTokenType.LEFT_BRACKET);
+    //         case ']': return makeStructuralToken(JsonTokenType.RIGHT_BRACKET);
+    //         case ':': return makeStructuralToken(JsonTokenType.COLON);
+    //         case ',': return makeStructuralToken(JsonTokenType.COMMA);
 
-            case '"':
-            case '\'':
-                return scanStringToken(c);
+    //         case '"':
+    //         case '\'':
+    //             return scanStringToken(c);
 
-            default:
-                return scanNumberOrIdentifierOrError(c);
-        }
-    }
+    //         default:
+    //             return scanNumberOrIdentifierOrError(c);
+    //     }
+    // }
 
     private JsonToken scanTokenUnicode(char c) {
         buffer.startTokenWindow();
@@ -362,6 +362,44 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         if (NUM_START[startChar]) {
             numberScanner.scan(startChar);
             String lexeme = buffer.getTokenWindowLexeme();
+
+
+
+            // TODO: The following code looks rather slow
+
+            // Reject numbers with no digits at all: "-", "+", "."
+            boolean hasDigit = false;
+            for (int i = 0; i < lexeme.length(); i++) {
+                char ch = lexeme.charAt(i);
+                if (ch >= '0' && ch <= '9') {
+                    hasDigit = true;
+                    break;
+                }
+            }
+            if (!hasDigit) {
+                // Allow JSON5 Infinity/NaN forms when enabled
+                if (ALLOW_INFINITY_AND_NAN) {
+                    if (lexeme.equals("Infinity") ||
+                        lexeme.equals("+Infinity") ||
+                        lexeme.equals("-Infinity") ||
+                        lexeme.equals("NaN") ||
+                        lexeme.equals("+NaN") ||
+                        lexeme.equals("-NaN")) {
+                        return factory.makeNumberToken(startLine, startColumn, startOffset, lexeme);
+                    }
+                }
+
+                // Otherwise: lone '+', '-', '.', or other non‑digit → error
+                return makeErrorToken(
+                    "Unexpected character '" + startChar + "'",
+                    startLine,
+                    startColumn
+                );
+            }
+
+
+
+
             return factory.makeNumberToken(startLine, startColumn, startOffset, lexeme);
         }
 
@@ -430,12 +468,39 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
             // Escape sequence
             if (next == '\\' && !buffer.isAtEnd()) {
-                final char escaped = buffer.advance();
-                if (escaped == 'u' || escaped == 'x') {
-                    int count = (escaped == 'u') ? 4 : 2;
-                    for (int i = 0; i < count && !buffer.isAtEnd(); i++) {
-                        buffer.advance();
-                    }
+                final char esc = buffer.advance();
+
+                switch (esc) {
+                    case '"':
+                    case '\'':
+                    case '\\':
+                    case '/':
+                    case 'b':
+                    case 'f':
+                    case 'n':
+                    case 'r':
+                    case 't':
+                        // simple escape, nothing more to do
+                        break;
+
+                    case 'u':
+                        // must have 4 hex digits
+                        for (int i = 0; i < 4; i++) {
+                            if (buffer.isAtEnd()) {
+                                return false;
+                            }
+                            char h = buffer.advance();
+                            if (!((h >= '0' && h <= '9') ||
+                                (h >= 'A' && h <= 'F') ||
+                                (h >= 'a' && h <= 'f'))) {
+                                return false;
+                            }
+                        }
+                        break;
+
+                    default:
+                        // invalid escape: \0, \x, \v, etc.
+                        return false;
                 }
             }
         }
@@ -476,8 +541,12 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
                 return true;
             }
 
+
+
+
+            // TODO: This looks slow...
+
             if (c == '\\') {
-                // SIMD escape detection: we hit a backslash
                 bb.advance(); // consume '\'
                 if (bb.isAtEnd()) {
                     return false;
@@ -485,11 +554,35 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
                 final char esc = bb.advance(); // escaped char
 
-                if (esc == 'u' || esc == 'x') {
-                    int count = (esc == 'u') ? 4 : 2;
-                    for (int i = 0; i < count && !bb.isAtEnd(); i++) {
-                        bb.advance();
-                    }
+                switch (esc) {
+                    case '"':
+                    case '\'':
+                    case '\\':
+                    case '/':
+                    case 'b':
+                    case 'f':
+                    case 'n':
+                    case 'r':
+                    case 't':
+                        // simple escape
+                        break;
+
+                    case 'u':
+                        for (int i = 0; i < 4; i++) {
+                            if (bb.isAtEnd()) {
+                                return false;
+                            }
+                            char h = bb.advance();
+                            if (!((h >= '0' && h <= '9') ||
+                                  (h >= 'A' && h <= 'F') ||
+                                  (h >= 'a' && h <= 'f'))) {
+                                return false;
+                            }
+                        }
+                        break;
+
+                    default:
+                        return false;
                 }
 
                 // Continue SIMD from new position
@@ -497,6 +590,9 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
                 len = bb.length();
                 continue;
             }
+
+
+
 
             if (c < 0x20) {
                 // Control char inside string → invalid
@@ -942,8 +1038,8 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             if (!ALLOW_UNICODE) {
 
 
-                // tokenScanner = this::scanTokenAscii;
-                tokenScanner = this::scanTokenAsciiSimd;
+                tokenScanner = this::scanTokenAscii;
+                // tokenScanner = this::scanTokenAsciiSimd;
 
 
                 stringScanner = this::scanStringSimd;
