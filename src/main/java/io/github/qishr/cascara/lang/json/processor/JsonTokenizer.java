@@ -310,26 +310,6 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         }
     }
 
-    // // TODO: Make this use SIMD
-    // private JsonToken scanTokenAsciiSimd(char c) {
-    //     // Just use the current char; no SIMD structural skip
-    //     switch (c) {
-    //         case '{': return makeStructuralToken(JsonTokenType.LEFT_BRACE);
-    //         case '}': return makeStructuralToken(JsonTokenType.RIGHT_BRACE);
-    //         case '[': return makeStructuralToken(JsonTokenType.LEFT_BRACKET);
-    //         case ']': return makeStructuralToken(JsonTokenType.RIGHT_BRACKET);
-    //         case ':': return makeStructuralToken(JsonTokenType.COLON);
-    //         case ',': return makeStructuralToken(JsonTokenType.COMMA);
-
-    //         case '"':
-    //         case '\'':
-    //             return scanStringToken(c);
-
-    //         default:
-    //             return scanNumberOrIdentifierOrError(c);
-    //     }
-    // }
-
     private JsonToken scanTokenUnicode(char c) {
         buffer.startTokenWindow();
         final int startOffset = buffer.windowStartOffset();
@@ -373,6 +353,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         final int startOffset = buffer.offset();
         final int startLine   = buffer.line();
         final int startColumn = buffer.column();
+        final boolean allowJson5Numbers = ALLOW_JSON5_NUMBERS;
 
         buffer.startTokenWindow();
 
@@ -391,7 +372,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             }
             if (!hasDigit) {
                 // Allow JSON5 Infinity/NaN forms when enabled
-                if (ALLOW_JSON5_NUMBERS) {
+                if (allowJson5Numbers) {
                     if (lexeme.equals("Infinity") ||
                         lexeme.equals("+Infinity") ||
                         lexeme.equals("-Infinity") ||
@@ -410,7 +391,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             }
 
             // Strict JSON number validation (disallow JSON5 forms when options say so)
-            if (!options.allowJson5Numbers()) {
+            if (!allowJson5Numbers) {
                 // Leading '+'
                 if (lexeme.charAt(0) == '+') {
                     return makeErrorToken("Leading '+' not allowed in JSON numbers", startLine, startColumn);
@@ -619,12 +600,6 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
                 return !pendingHighSurrogate;
             }
 
-
-
-
-
-            // TODO: This looks slow...
-
             if (c == '\\') {
                 bb.advance(); // consume '\'
                 if (bb.isAtEnd()) {
@@ -691,9 +666,6 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
                 len = bb.length();
                 continue;
             }
-
-
-
 
             if (c < 0x20) {
                 // Control char inside string → invalid
@@ -873,7 +845,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         int pos = bb.offset();
         int len = bb.length();
 
-        final VectorSpecies<Byte> S = ByteVector.SPECIES_128;
+        final VectorSpecies<Byte> S = ByteVector.SPECIES_256;
 
         while (pos < len) {
             int remaining = len - pos;
@@ -1094,99 +1066,6 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         return codeUnit >= 0xDC00 && codeUnit <= 0xDFFF;
     }
 
-    // private static char[] decodeUtf8Strict(byte[] data) {
-    //     char[] out = new char[data.length]; // worst case
-    //     int o = 0;
-
-    //     for (int i = 0; i < data.length; ) {
-    //         int b = data[i] & 0xFF;
-
-    //         if (b < 0x80) {
-    //             // ASCII
-    //             out[o++] = (char)b;
-    //             i++;
-    //             continue;
-    //         }
-
-    //         // Reject continuation bytes as leading bytes
-    //         if (b >= 0x80 && b < 0xC2) {
-    //             throw new IllegalArgumentException("Invalid UTF-8: lone continuation byte");
-    //         }
-
-    //         // 2-byte sequence
-    //         if (b < 0xE0) {
-    //             if (i + 1 >= data.length) throw new IllegalArgumentException("Truncated UTF-8");
-    //             int b2 = data[i+1] & 0xFF;
-    //             if ((b2 & 0xC0) != 0x80) throw new IllegalArgumentException("Invalid UTF-8 continuation");
-    //             int cp = ((b & 0x1F) << 6) | (b2 & 0x3F);
-    //             if (cp < 0x80) throw new IllegalArgumentException("Overlong UTF-8");
-    //             out[o++] = (char)cp;
-    //             i += 2;
-    //             continue;
-    //         }
-
-    //         // 3-byte sequence
-    //         if (b < 0xF0) {
-    //             if (i + 2 >= data.length) throw new IllegalArgumentException("Truncated UTF-8");
-    //             int b2 = data[i+1] & 0xFF;
-    //             int b3 = data[i+2] & 0xFF;
-    //             if ((b2 & 0xC0) != 0x80 || (b3 & 0xC0) != 0x80)
-    //                 throw new IllegalArgumentException("Invalid UTF-8 continuation");
-
-    //             int cp = ((b & 0x0F) << 12) | ((b2 & 0x3F) << 6) | (b3 & 0x3F);
-
-    //             // Reject surrogates
-    //             if (cp >= 0xD800 && cp <= 0xDFFF)
-    //                 throw new IllegalArgumentException("Invalid UTF-8: surrogate");
-
-    //             // Reject overlong
-    //             if (cp < 0x800)
-    //                 throw new IllegalArgumentException("Overlong UTF-8");
-
-    //             out[o++] = (char)cp;
-    //             i += 3;
-    //             continue;
-    //         }
-
-    //         // 4-byte sequence
-    //         if (b < 0xF5) {
-    //             if (i + 3 >= data.length) throw new IllegalArgumentException("Truncated UTF-8");
-    //             int b2 = data[i+1] & 0xFF;
-    //             int b3 = data[i+2] & 0xFF;
-    //             int b4 = data[i+3] & 0xFF;
-    //             if ((b2 & 0xC0) != 0x80 ||
-    //                 (b3 & 0xC0) != 0x80 ||
-    //                 (b4 & 0xC0) != 0x80)
-    //                 throw new IllegalArgumentException("Invalid UTF-8 continuation");
-
-    //             int cp = ((b & 0x07) << 18) |
-    //                      ((b2 & 0x3F) << 12) |
-    //                      ((b3 & 0x3F) << 6) |
-    //                      (b4 & 0x3F);
-
-    //             if (cp < 0x10000)
-    //                 throw new IllegalArgumentException("Overlong UTF-8");
-
-    //             if (cp > 0x10FFFF)
-    //                 throw new IllegalArgumentException("Invalid UTF-8: out of range");
-
-    //             // Encode surrogate pair
-    //             cp -= 0x10000;
-    //             out[o++] = (char)(0xD800 | (cp >> 10));
-    //             out[o++] = (char)(0xDC00 | (cp & 0x3FF));
-
-    //             i += 4;
-    //             continue;
-    //         }
-
-    //         throw new IllegalArgumentException("Invalid UTF-8 leading byte");
-    //     }
-
-    //     char[] trimmed = new char[o];
-    //     System.arraycopy(out, 0, trimmed, 0, o);
-    //     return trimmed;
-    // }
-
     private static void validateUtf8(byte[] data) {
         int i = 0;
         int len = data.length;
@@ -1313,6 +1192,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             if (!ALLOW_UNICODE) {
 
 
+                // TODO: Make this use SIMD
                 tokenScanner = this::scanTokenAscii;
                 // tokenScanner = this::scanTokenAsciiSimd;
 

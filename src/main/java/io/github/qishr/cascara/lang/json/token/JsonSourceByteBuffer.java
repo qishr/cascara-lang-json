@@ -183,7 +183,7 @@ public final class JsonSourceByteBuffer implements JsonSimdCapableBuffer, Lexeme
     /// JSON Strict
     @Override
     public void skipWhitespaceSimd() {
-        final VectorSpecies<Byte> S = ByteVector.SPECIES_128;
+        final VectorSpecies<Byte> S = ByteVector.SPECIES_256;
         int len = raw.length;
 
         while (offset < len) {
@@ -243,7 +243,7 @@ public final class JsonSourceByteBuffer implements JsonSimdCapableBuffer, Lexeme
 
     @Override
     public int scanDigitsSimd(int pos) {
-        final VectorSpecies<Byte> S = ByteVector.SPECIES_128;
+        final VectorSpecies<Byte> S = ByteVector.SPECIES_256;
         int len = raw.length;
 
         while (pos < len) {
@@ -284,7 +284,7 @@ public final class JsonSourceByteBuffer implements JsonSimdCapableBuffer, Lexeme
 
     @Override
     public int scanStringAsciiSimd(int pos, byte quoteByte) {
-        final VectorSpecies<Byte> S = ByteVector.SPECIES_128;
+        final VectorSpecies<Byte> S = ByteVector.SPECIES_256;
         final int vecLen = S.length();
 
         final byte QUOTE = quoteByte;
@@ -362,7 +362,7 @@ public final class JsonSourceByteBuffer implements JsonSimdCapableBuffer, Lexeme
     }
 
     public int scanStructuralSimd(int pos) {
-        final VectorSpecies<Byte> S = ByteVector.SPECIES_128;
+        final VectorSpecies<Byte> S = ByteVector.SPECIES_256;
         final int len = raw.length;
 
         final byte LBRACE = (byte)'{';
@@ -419,7 +419,7 @@ public final class JsonSourceByteBuffer implements JsonSimdCapableBuffer, Lexeme
         final byte CR    = (byte)'\r';
         final byte LF    = (byte)'\n';
 
-        final VectorSpecies<Byte> S = ByteVector.SPECIES_128;
+        final VectorSpecies<Byte> S = ByteVector.SPECIES_256;
         int pos = offset();
         int len = raw.length;
 
@@ -469,7 +469,7 @@ public final class JsonSourceByteBuffer implements JsonSimdCapableBuffer, Lexeme
     // ------------------------------------------------------------
 
     public int scanAsciiUntilUtf8LeadSimd(int pos) {
-        final VectorSpecies<Byte> S = ByteVector.SPECIES_128;
+        final VectorSpecies<Byte> S = ByteVector.SPECIES_256;
         final int len = raw.length;
 
         // ASCII:        0x00–0x7F
@@ -509,7 +509,7 @@ public final class JsonSourceByteBuffer implements JsonSimdCapableBuffer, Lexeme
     }
 
     public int scanIdentifierStartSimd(int pos) {
-        final VectorSpecies<Byte> S = ByteVector.SPECIES_128;
+        final VectorSpecies<Byte> S = ByteVector.SPECIES_256;
         final int len = raw.length;
 
         // IDENT_START: [A-Za-z_$]
