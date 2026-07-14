@@ -282,60 +282,98 @@ public final class JsonSourceByteBuffer implements JsonSimdCapableBuffer, Lexeme
     // SIMD ASCII string scanning
     // ------------------------------------------------------------
 
+    // @Override
+    // public int scanStringAsciiSimd(int pos, byte quoteByte) {
+    //     final VectorSpecies<Byte> S = ByteVector.SPECIES_256;
+    //     final int vecLen = S.length();
+
+    //     final byte QUOTE = quoteByte;
+    //     final byte ESC   = (byte)'\\';
+
+    //     int len = raw.length;
+
+    //     while (pos < len) {
+    //         int remaining = len - pos;
+
+    //         if (remaining < vecLen) {
+    //             while (pos < len) {
+    //                 byte b = raw[pos];
+    //                 if (b == QUOTE || b == ESC || b < 0x20) {
+    //                     return pos;
+    //                 }
+    //                 pos++;
+    //             }
+    //             return pos;
+    //         }
+
+    //         ByteVector vec = ByteVector.fromArray(S, raw, pos);
+
+    //         VectorMask<Byte> isQuote = vec.compare(VectorOperators.EQ, QUOTE);
+    //         VectorMask<Byte> isEsc   = vec.compare(VectorOperators.EQ, ESC);
+    //         VectorMask<Byte> isCtrl =
+    //             vec.compare(VectorOperators.GE, (byte)0x00)
+    //                 .and(vec.compare(VectorOperators.LE, (byte)0x1F));
+
+    //         long mask = isQuote.toLong() | isEsc.toLong() | isCtrl.toLong();
+
+
+
+
+    //         if (mask != 0L) {
+    //             int first = Long.numberOfTrailingZeros(mask);
+    //             return pos + first;
+    //         }
+
+    //         // TODO: This is supposed to work, but it breaks a test.
+
+    //         // // Only lane 0 matters for advancing the string scanner
+    //         // if ((mask & 1L) != 0L) {
+    //         //     return pos;   // lane 0 is quote, backslash, or control
+    //         // }
+
+
+
+
+    //         // Otherwise skip whole block
+    //         pos += vecLen;
+    //     }
+
+    //     return pos;
+    // }
+
     @Override
     public int scanStringAsciiSimd(int pos, byte quoteByte) {
         final VectorSpecies<Byte> S = ByteVector.SPECIES_256;
         final int vecLen = S.length();
+        final byte ESC = (byte)'\\';
 
-        final byte QUOTE = quoteByte;
-        final byte ESC   = (byte)'\\';
+        final byte[] raw = this.raw;
+        final int len = raw.length;
 
-        int len = raw.length;
-
-        while (pos < len) {
-            int remaining = len - pos;
-
-            if (remaining < vecLen) {
-                while (pos < len) {
-                    byte b = raw[pos];
-                    if (b == QUOTE || b == ESC || b < 0x20) {
-                        return pos;
-                    }
-                    pos++;
-                }
-                return pos;
-            }
-
+        // SIMD blocks
+        while (pos + vecLen <= len) {
             ByteVector vec = ByteVector.fromArray(S, raw, pos);
 
-            VectorMask<Byte> isQuote = vec.compare(VectorOperators.EQ, QUOTE);
-            VectorMask<Byte> isEsc   = vec.compare(VectorOperators.EQ, ESC);
-            VectorMask<Byte> isCtrl =
-                vec.compare(VectorOperators.GE, (byte)0x00)
-                    .and(vec.compare(VectorOperators.LE, (byte)0x1F));
+            VectorMask<Byte> isQuote = vec.compare(VectorOperators.EQ, quoteByte);
+            VectorMask<Byte> isBack  = vec.compare(VectorOperators.EQ, ESC);
 
-            long mask = isQuote.toLong() | isEsc.toLong() | isCtrl.toLong();
-
-
-
+            long mask = isQuote.or(isBack).toLong();
 
             if (mask != 0L) {
                 int first = Long.numberOfTrailingZeros(mask);
                 return pos + first;
             }
 
-            // TODO: This is supposed to work, but it breaks a test.
-
-            // // Only lane 0 matters for advancing the string scanner
-            // if ((mask & 1L) != 0L) {
-            //     return pos;   // lane 0 is quote, backslash, or control
-            // }
-
-
-
-
-            // Otherwise skip whole block
             pos += vecLen;
+        }
+
+        // Scalar tail
+        while (pos < len) {
+            byte b = raw[pos];
+            if (b == quoteByte || b == ESC) {
+                return pos;
+            }
+            pos++;
         }
 
         return pos;

@@ -141,6 +141,11 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         void scan();
     }
 
+    @FunctionalInterface
+    private interface NumberValidator {
+        boolean validate(int start, int end);
+    }
+
     private TokenHandler tokenHandler;
     private TokenScanner tokenScanner;
     private StringScanner stringScanner;
@@ -148,6 +153,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     private DigitScanner digitScanner;
     private IdentifierScanner identifierScanner;
     private Runnable triviaHandler;
+    private NumberValidator numberValidator;
 
     /// Default constructor for SPI
     public JsonTokenizer() {
@@ -214,12 +220,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         while ((token = nextToken()).getType() != JsonTokenType.EOF) {
             this.tokens.add(token);
         }
-        tokens.add(new JsonLexemeBackedToken(
-            buffer.line(),
-            buffer.column(),
-            buffer.offset(),
-            JsonTokenType.EOF
-        ));
+        tokens.add(makeEofToken());
         return this.tokens;
     }
 
@@ -256,7 +257,6 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
         final char c = buffer.peek();
 
-        // Call either scanTokenAscii or scanTokenAsciiOrUnicode
         final JsonToken tok = tokenScanner.scan(c);
 
         if (!pendingComments.isEmpty()) {
@@ -342,8 +342,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         // Unicode digit (JSON5)
         if (Character.isDigit(c)) {
             scanNumberUnicode(c);
-            String lexeme = buffer.getTokenWindowLexeme();
-            return factory.makeNumberToken(line, column, startOffset, lexeme);
+            return factory.makeNumberToken(line, column, startOffset);
         }
 
         // Otherwise - UNKNOWN
@@ -352,114 +351,21 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     }
 
     private JsonToken scanNumberOrIdentifierOrError(char startChar) {
-        final boolean allowJson5Numbers = ALLOW_JSON5_NUMBERS;
         final int startOffset = buffer.offset();
         final int startLine   = buffer.line();
         final int startColumn = buffer.column();
 
         buffer.startTokenWindow();
 
+        // NUMBERS?
         if (NUM_START[startChar]) {
+            int start = buffer.offset();
             numberScanner.scan(startChar);
-            String lexeme = buffer.getTokenWindowLexeme();
-
-            // Reject numbers with no digits at all: "-", "+", "."
-            boolean hasDigit = false;
-            // TODO: Surely we only need to check peek and peekNext?
-            for (int i = 0; i < lexeme.length(); i++) {
-                char ch = lexeme.charAt(i);
-                if (ch >= '0' && ch <= '9') {
-                    hasDigit = true;
-                    break;
-                }
+            int end = buffer.offset();
+            if (!numberValidator.validate(start, end)) {
+                return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.INVALID_NUMBER);
             }
-
-            if (!hasDigit) {
-                // Allow JSON5 Infinity/NaN forms when enabled
-                if (allowJson5Numbers) {
-
-                    // TODO: I think these are treated as identifiers somethere else?
-                    // Should they be identifiers or numbers?
-
-                    if (lexeme.equals("Infinity") ||
-                        lexeme.equals("+Infinity") ||
-                        lexeme.equals("-Infinity") ||
-                        lexeme.equals("NaN") ||
-                        lexeme.equals("+NaN") ||
-                        lexeme.equals("-NaN")) {
-                        return factory.makeNumberToken(startLine, startColumn, startOffset, lexeme);
-                    }
-                }
-
-                return makeErrorToken(
-                    startLine,
-                    startColumn,
-                    JsonDiagnosticCode.UNEXPECTED_CHARACTER,
-                    startChar
-                );
-            }
-
-            // Strict JSON number validation (disallow JSON5 forms when options say so)
-            if (!allowJson5Numbers) {
-                // Leading '+'
-                if (lexeme.charAt(0) == '+') {
-                    return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.NOT_ALLOWED_LEADING_PLUS);
-                }
-
-                // Leading zero on integer part: 012, -012
-                if (lexeme.charAt(0) == '0' && lexeme.length() > 1 && Character.isDigit(lexeme.charAt(1))) {
-                    return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.NOT_ALLOWED_LEADING_ZERO);
-                }
-                if (lexeme.startsWith("-0") && lexeme.length() > 2 && Character.isDigit(lexeme.charAt(2))) {
-                    return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.NOT_ALLOWED_LEADING_ZERO);
-                }
-
-                // Starting with '.' or '-.' (no integer part)
-                if (lexeme.charAt(0) == '.' || lexeme.startsWith("-.")) {
-                    return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.MISSING_INTEGER_PART);
-                }
-
-                // Trailing dot: 1., 2., -2.
-                if (lexeme.endsWith(".")) {
-                    return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.NOT_ALLOWED_TRAILING_DOT);
-                }
-
-                // Fractional part must have at least one digit after '.'
-                int dotPos = lexeme.indexOf('.');
-                if (dotPos >= 0) {
-                    int i = dotPos + 1;
-                    if (i >= lexeme.length()) {
-                        return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.MISSING_FRACTIONAL_PART);
-                    }
-                    char c = lexeme.charAt(i);
-                    if (c == 'e' || c == 'E') {
-                        return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.MISSING_FRACTIONAL_PART);
-                    }
-                }
-
-                // Exponent must have digits after optional sign
-                int ePos = lexeme.indexOf('e');
-                if (ePos < 0) ePos = lexeme.indexOf('E');
-                if (ePos >= 0) {
-                    int i = ePos + 1;
-                    if (i >= lexeme.length()) {
-                        return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.MISSING_EXPONENT);
-                    }
-                    char c = lexeme.charAt(i);
-                    if (c == '+' || c == '-') {
-                        i++;
-                        if (i >= lexeme.length()) {
-                            return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.MISSING_EXPONENT);
-                        }
-                    }
-                    if (!Character.isDigit(lexeme.charAt(i))) {
-                        return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.MISSING_EXPONENT_DIGITS);
-                    }
-                }
-            }
-
-            // TODO: Don't pass lexeme in here
-            return factory.makeNumberToken(startLine, startColumn, startOffset, lexeme);
+            return factory.makeNumberToken(startLine, startColumn, startOffset);
         }
 
         // IDENTIFIER?
@@ -476,6 +382,182 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             JsonDiagnosticCode.UNEXPECTED_CHARACTER,
             startChar
         );
+    }
+
+    private boolean validateNumberLexeme(int start, int end) {
+        final boolean allowJson5Numbers = ALLOW_JSON5_NUMBERS;
+
+        String lexeme = buffer.getTokenWindowLexeme();
+
+        // Reject numbers with no digits at all: "-", "+", "."
+        boolean hasDigit = false;
+
+        for (int i = 0; i < lexeme.length(); i++) {
+            char ch = lexeme.charAt(i);
+            if (ch >= '0' && ch <= '9') {
+                hasDigit = true;
+                break;
+            }
+        }
+
+        if (!hasDigit) {
+            // Allow JSON5 Infinity/NaN forms when enabled
+            if (allowJson5Numbers) {
+
+                // TODO: I think these are treated as identifiers somethere else?
+                // Should they be identifiers or numbers?
+
+                if (lexeme.equals("Infinity") ||
+                    lexeme.equals("+Infinity") ||
+                    lexeme.equals("-Infinity") ||
+                    lexeme.equals("NaN") ||
+                    lexeme.equals("+NaN") ||
+                    lexeme.equals("-NaN")) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        // Strict JSON number validation (disallow JSON5 forms when options say so)
+        if (!allowJson5Numbers) {
+            // Leading '+'
+            if (lexeme.charAt(0) == '+') {
+                return false;
+                // return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.NOT_ALLOWED_LEADING_PLUS);
+            }
+
+            // Leading zero on integer part: 012, -012
+            if (lexeme.charAt(0) == '0' && lexeme.length() > 1 && Character.isDigit(lexeme.charAt(1))) {
+                return false;
+                // return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.NOT_ALLOWED_LEADING_ZERO);
+            }
+            if (lexeme.startsWith("-0") && lexeme.length() > 2 && Character.isDigit(lexeme.charAt(2))) {
+                return false;
+                // return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.NOT_ALLOWED_LEADING_ZERO);
+            }
+
+            // Starting with '.' or '-.' (no integer part)
+            if (lexeme.charAt(0) == '.' || lexeme.startsWith("-.")) {
+                return false;
+                // return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.MISSING_INTEGER_PART);
+            }
+
+            // Trailing dot: 1., 2., -2.
+            if (lexeme.endsWith(".")) {
+                return false;
+                // return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.NOT_ALLOWED_TRAILING_DOT);
+            }
+
+            // Fractional part must have at least one digit after '.'
+            int dotPos = lexeme.indexOf('.');
+            if (dotPos >= 0) {
+                int i = dotPos + 1;
+                if (i >= lexeme.length()) {
+                    return false;
+                    // return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.MISSING_FRACTIONAL_PART);
+                }
+                char c = lexeme.charAt(i);
+                if (c == 'e' || c == 'E') {
+                    return false;
+                    // return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.MISSING_FRACTIONAL_PART);
+                }
+            }
+
+            // Exponent must have digits after optional sign
+            int ePos = lexeme.indexOf('e');
+            if (ePos < 0) ePos = lexeme.indexOf('E');
+            if (ePos >= 0) {
+                int i = ePos + 1;
+                if (i >= lexeme.length()) {
+                    return false;
+                    // return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.MISSING_EXPONENT);
+                }
+                char c = lexeme.charAt(i);
+                if (c == '+' || c == '-') {
+                    i++;
+                    if (i >= lexeme.length()) {
+                        return false;
+                        // return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.MISSING_EXPONENT);
+                    }
+                }
+                if (!Character.isDigit(lexeme.charAt(i))) {
+                    return false;
+                    // return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.MISSING_EXPONENT_DIGITS);
+                }
+            }
+        }
+
+        return true;
+
+    }
+
+
+    private boolean validateNumberBytes(int start, int end) {
+        JsonSourceByteBuffer bb = (JsonSourceByteBuffer) buffer;
+        byte[] raw = bb.raw;
+
+        boolean seenDot = false;
+        boolean seenExp = false;
+        boolean seenExpSign = false;
+
+        int digitsBeforeDot = 0;
+        int digitsAfterDot = 0;
+        int digitsAfterExp = 0;
+
+        int i = start;
+        byte first = raw[i];
+
+        if (!ALLOW_JSON5_NUMBERS && first == '+') return false;
+
+        if (!ALLOW_JSON5_NUMBERS) {
+            if (first == '0' && i + 1 < end) {
+                byte next = raw[i + 1];
+                if (next >= '0' && next <= '9') return false;
+            }
+            if (first == '-' && i + 2 < end && raw[i + 1] == '0') {
+                byte next = raw[i + 2];
+                if (next >= '0' && next <= '9') return false;
+            }
+        }
+
+        for (; i < end; i++) {
+            byte b = raw[i];
+
+            if (b >= '0' && b <= '9') {
+                if (!seenDot && !seenExp) digitsBeforeDot++;
+                else if (seenDot && !seenExp) digitsAfterDot++;
+                else digitsAfterExp++;
+                continue;
+            }
+
+            if (b == '.') {
+                if (seenDot || seenExp) return false;
+                seenDot = true;
+                continue;
+            }
+
+            if (b == 'e' || b == 'E') {
+                if (seenExp) return false;
+                seenExp = true;
+                continue;
+            }
+
+            if (b == '+' || b == '-') {
+                if (!seenExp || seenExpSign) return false;
+                seenExpSign = true;
+                continue;
+            }
+
+            return false;
+        }
+
+        if (digitsBeforeDot == 0) return false;
+        if (seenDot && digitsAfterDot == 0) return false;
+        if (seenExp && digitsAfterExp == 0) return false;
+
+        return true;
     }
 
     //
@@ -1190,6 +1272,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         if (buffer instanceof JsonSourceByteBuffer byteBuffer) {
 
             digitScanner = this::scanDigitsSimd;
+            numberValidator = this::validateNumberBytes;
 
             // Whitespace / trivia skipping
             if (ALLOW_COMMENTS) {
@@ -1217,6 +1300,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         } else {
             // JSON5 identifiers or SIMD disabled - use char-based buffer
             digitScanner = this::scanDigits;
+            numberValidator = this::validateNumberLexeme;
             triviaHandler = this::advanceWhitespaceAndComments;
 
             if (ALLOW_COMMENTS) {
@@ -1366,7 +1450,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     }
 
     private interface TokenFactory {
-        JsonToken makeNumberToken(int line, int column, int startOffset, String lexeme);
+        JsonToken makeNumberToken(int line, int column, int startOffset);
         JsonToken makeStringToken(int line, int column, int startOffset, QuoteStyle qs);
         JsonToken makeIdentifierToken(int line, int column, int startOffset, String lexeme);
     }
@@ -1381,7 +1465,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         }
 
         @Override
-        public JsonBufferBackedToken makeNumberToken(int line, int column, int startOffset, String lexeme) {
+        public JsonBufferBackedToken makeNumberToken(int line, int column, int startOffset) {
             return new JsonBufferBackedToken(
                 lp,
                 line,
@@ -1425,13 +1509,13 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         }
 
         @Override
-        public JsonLexemeBackedToken makeNumberToken(int line, int column, int startOffset, String lexeme) {
+        public JsonLexemeBackedToken makeNumberToken(int line, int column, int startOffset) {
             return new JsonLexemeBackedToken(
                 line,
                 column,
                 startOffset,
                 JsonTokenType.NUMBER,
-                lexeme
+                buffer.getTokenWindowLexeme()
             );
         }
 

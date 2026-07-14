@@ -13,6 +13,7 @@ public enum JsonDiagnosticCode implements DiagnosticCode {
     EXPECTED_CLOSE_BRACKET("JSON-107", "Expected ']'"),
     EXPECTED_OPEN_BRACKET("JSON-108", "Expected '['"),
     EXPECTED_COLON_AFTER_MAP_KEY("JSON-109", "Expected ':' after key"),
+    INVALID_NUMBER("JSON-110", "Invalid number"), // TODO: Put the number in the error message
     UNEXPECTED_UNQUOTED_STRING_VALUE("JSON-112","Unexpected unquoted string value: '{0}'"),
     MISSING_INTEGER_PART("","Missing integer part in JSON numbe"),
     MISSING_FRACTIONAL_PART("","Missing fractional part in JSON number"),
