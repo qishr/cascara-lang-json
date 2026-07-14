@@ -7,6 +7,20 @@ import io.github.qishr.cascara.lang.json.util.JsonOptions;
 import jdk.incubator.vector.*;
 
 public final class JsonSourceByteBuffer implements JsonSimdCapableBuffer, LexemeProvider {
+    private static final VectorSpecies<Byte> SPECIES = ByteVector.SPECIES_128;
+
+    private static final ByteVector ZERO = ByteVector.broadcast(ByteVector.SPECIES_128, (byte)'0');
+    private static final ByteVector NINE = ByteVector.broadcast(ByteVector.SPECIES_128, (byte)'9');
+
+    public static final boolean VECTOR_AVAILABLE = isVectorApiAvailable();
+
+    private static final int[] DIGIT_WEIGHTS = {
+        10000000, 1000000, 100000, 10000,
+        1000, 100, 10, 1
+    };
+
+    private static final IntVector WEIGHTS =
+        IntVector.fromArray(IntVector.SPECIES_256, DIGIT_WEIGHTS, 0);
 
     private final boolean strictAsciiMode;
     private final boolean trackPosition;
@@ -598,4 +612,127 @@ public final class JsonSourceByteBuffer implements JsonSimdCapableBuffer, Lexeme
             advance();
         }
     }
+
+    public int parseEightDigitsSIMD(byte[] raw, int offset) {
+        // Load 8 bytes
+        var bytes = ByteVector.fromArray(ByteVector.SPECIES_128, raw, offset);
+
+        // Convert ASCII → numeric
+        var digits = bytes.sub((byte)'0').reinterpretAsInts();
+
+        // Multiply by weights
+        var products = digits.mul(WEIGHTS);
+
+        // Horizontal sum
+        return products.reduceLanes(VectorOperators.ADD);
+    }
+
+    public static boolean isVectorApiAvailable() {
+        try {
+            Class.forName("jdk.incubator.vector.ByteVector");
+            return true;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    public boolean isEightDigitsSIMD(byte[] raw, int offset, int limit) {
+        // if (offset + 8 > limit) return false;
+        int vecLen = SPECIES.length(); // 16
+
+        // Ensure we can safely load a full vector
+        if (offset + vecLen > limit) {
+            return false;
+        }
+
+        // Load 8 bytes into a 128-bit vector
+        var vec = ByteVector.fromArray(ByteVector.SPECIES_128, raw, offset);
+
+        // vec >= '0'
+        var geZero = vec.compare(VectorOperators.GE, ZERO);
+
+        // vec <= '9'
+        var leNine = vec.compare(VectorOperators.LE, NINE);
+
+        // Combine masks
+        var mask = geZero.and(leNine);
+
+        // All lanes must be digits
+        return mask.allTrue();
+    }
+
+    public boolean isEightDigits(byte[] raw, int offset, int limit) {
+        if (offset + 8 > limit) return false;
+
+        // scalar version first; you can replace with Vector API later
+        for (int i = 0; i < 8; i++) {
+            byte b = raw[offset + i];
+            if (b < '0' || b > '9') {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public int parseEightDigits(byte[] raw, int offset) {
+        int d0 = raw[offset    ] - '0';
+        int d1 = raw[offset + 1] - '0';
+        int d2 = raw[offset + 2] - '0';
+        int d3 = raw[offset + 3] - '0';
+        int d4 = raw[offset + 4] - '0';
+        int d5 = raw[offset + 5] - '0';
+        int d6 = raw[offset + 6] - '0';
+        int d7 = raw[offset + 7] - '0';
+
+        // 8-digit SWAR, no loops
+        return
+            d0 * 10000000 +
+            d1 * 1000000  +
+            d2 * 100000   +
+            d3 * 10000    +
+            d4 * 1000     +
+            d5 * 100      +
+            d6 * 10       +
+            d7;
+    }
+
+    //
+    //
+    //
+
+    public boolean matchKeywordByte(byte[] raw, int offset, String kw) {
+        int n = kw.length();
+
+        // Bounds check
+        if (offset + n > raw.length) {
+            return false;
+        }
+
+        // Compare raw bytes to keyword characters
+        for (int i = 0; i < n; i++) {
+            if (raw[offset + i] != (byte) kw.charAt(i)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public boolean matchKeywordByte(byte[] raw, int offset, String kw, int relativeOffset) {
+        int off = offset + relativeOffset;
+        int n = kw.length();
+
+        if (off + n > raw.length) {
+            return false;
+        }
+
+        for (int i = 0; i < n; i++) {
+            if (raw[off + i] != (byte) kw.charAt(i)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
 }

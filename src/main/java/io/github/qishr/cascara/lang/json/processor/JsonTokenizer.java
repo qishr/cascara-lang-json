@@ -34,6 +34,7 @@ import jdk.incubator.vector.VectorOperators;
 import jdk.incubator.vector.VectorSpecies;
 
 public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implements Tokenizer<JsonToken>{
+
     private static final JsonToken LBRACE  = new JsonStructuralToken(JsonTokenType.LEFT_BRACE);
     private static final JsonToken RBRACE  = new JsonStructuralToken(JsonTokenType.RIGHT_BRACE);
     private static final JsonToken LBRACKET = new JsonStructuralToken(JsonTokenType.LEFT_BRACKET);
@@ -120,65 +121,15 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     private boolean ALLOW_JSON5_NUMBERS;
     private boolean ALLOW_UNICODE;
     private boolean CAPTURE_COMMENTS;
+    private boolean USE_SIMD;
 
     private SourceBuffer buffer;
-
-    // @FunctionalInterface
-    // private interface BufferAdvance {
-    //     char advance();
-    // }
-
-    // private BufferAdvance advance;
 
     private List<JsonToken> tokens;
     private final List<JsonComment> pendingComments = new ArrayList<>();
     private TokenFactory factory;
 
     private boolean usingByteBuffer;
-
-    // @FunctionalInterface
-    // private interface TokenHandler {
-    //     JsonToken handle();
-    // }
-
-    // @FunctionalInterface
-    // private interface TokenScanner {
-    //     JsonToken scan(char c);
-    // }
-
-    // @FunctionalInterface
-    // private interface StringScanner {
-    //     boolean scan(char quoteChar);
-    // }
-
-    // @FunctionalInterface
-    // private interface NumberScanner {
-    //     void scan(char first);
-    // }
-
-    // @FunctionalInterface
-    // private interface DigitScanner {
-    //     void scan();
-    // }
-
-    // @FunctionalInterface
-    // private interface IdentifierScanner {
-    //     void scan();
-    // }
-
-    // @FunctionalInterface
-    // private interface NumberValidator {
-    //     boolean validate(int start, int end);
-    // }
-
-    // private TokenHandler tokenHandler;
-    // private TokenScanner tokenScanner;
-    // private StringScanner stringScanner;
-    // private NumberScanner numberScanner;
-    // private DigitScanner digitScanner;
-    // private IdentifierScanner identifierScanner;
-    // private Runnable triviaHandler;
-    // private NumberValidator numberValidator;
 
     /// Default constructor for SPI
     public JsonTokenizer() {
@@ -203,16 +154,15 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         this.ALLOW_JSON5_NUMBERS      = options.allowJson5Numbers();
         this.ALLOW_UNICODE               = options.allowUnicode();
         this.CAPTURE_COMMENTS            = options.captureComments();
+        this.USE_SIMD            = options.useSimd();
     }
 
     @Override protected JsonTokenizer self() { return this; }
 
     @Override
     public void open(String text) {
-        // buffer = new JsonSourceByteBuffer(text.getBytes(StandardCharsets.UTF_8), options);
         buffer = setupStringBuffer(text);
         factory = setupTokenFactory(buffer);
-        // setupHandlers();
         skipBom();
     }
 
@@ -221,13 +171,10 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         if (options.validateUnicode()) {
             validateUtf8(data);
         }
-        // buffer = new JsonSourceByteBuffer(data, options);
         buffer = setupByteBuffer(data);
         factory = setupTokenFactory(buffer);
-        // setupHandlers();
         skipBom();
     }
-
 
     @Override
     public void open(InputStream stream) {
@@ -258,11 +205,9 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
     public JsonToken nextToken() {
         return ALLOW_COMMENTS ? nextTokenWithComments() : nextTokenWithoutComments();
-        // return tokenHandler.handle();
     }
 
-    public JsonToken nextTokenWithoutComments() {
-        // triviaHandler.run();
+    private JsonToken nextTokenWithoutComments() {
         if (buffer instanceof JsonSourceByteBuffer byteBuffer) {
             byteBuffer.skipWhitespaceSimd();
             if (!ALLOW_UNICODE) {
@@ -271,35 +216,20 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
                 return buffer.isAtEnd() ? makeEofToken() : scanTokenAsciiOrUnicode(buffer.peek());
             }
         } else {
-            advanceWhitespaceAndComments();
+            scanWhitespaceAndComments();
             return buffer.isAtEnd() ? makeEofToken() : scanTokenAsciiOrUnicode(buffer.peek());
         }
-        // return buffer.isAtEnd() ? makeEofToken() : tokenScanner.scan(buffer.peek());
-        // if (!ALLOW_UNICODE) {
-        //     return buffer.isAtEnd() ? makeEofToken() : scanTokenAscii(buffer.peek());
-        // } else {
-        //     return buffer.isAtEnd() ? makeEofToken() : scanTokenAsciiOrUnicode(buffer.peek());
-        // }
     }
 
-    public JsonToken nextByteTokenWithoutComments() {
-        // triviaHandler.run();
-        ((JsonSourceByteBuffer)buffer).skipWhitespaceAndFormattingSimd();
-        return buffer.isAtEnd() ? makeEofToken() : scanTokenByte(((JsonSourceByteBuffer)buffer).peekByte());
-    }
-
-
-    public JsonToken nextTokenWithComments() {
+    private JsonToken nextTokenWithComments() {
         if (!pendingComments.isEmpty()) {
             return toCommentToken(pendingComments.remove(0));
         }
 
-        // triviaHandler.run();
-        // usingByteBuffer ? byteBuffer::skipWhitespaceAndFormattingSimd() : advanceWhitespaceAndComments();
         if (buffer instanceof JsonSourceByteBuffer byteBuffer) {
             byteBuffer.skipWhitespaceAndFormattingSimd();
         } else {
-            advanceWhitespaceAndComments();
+            scanWhitespaceAndComments();
         }
 
         if (!pendingComments.isEmpty()) {
@@ -314,21 +244,12 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             return tok;
         }
 
-
-        // TODO: Work this out later.
         final JsonToken tok;
-        // // if (buffer instanceof JsonSourceByteBuffer byteBuffer) {
-        // //     tok = byteTokenScanner.scan(byteBuffer.peekByte());
-        // // } else {
-        //     tok = tokenScanner.scan(buffer.peek());
-        // // }
-
         if (ALLOW_UNICODE) {
             tok = scanTokenAsciiOrUnicode(buffer.peek());
         } else {
             tok = scanTokenAscii(buffer.peek());
         }
-
 
         if (!pendingComments.isEmpty()) {
             tok.attachComments(pendingComments);
@@ -340,14 +261,12 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
                            " [" + tok.getStartLine() + ":" + tok.getStartColumn() + "] " +
                            (tok.getLexeme() != null ? tok.getLexeme() : ""));
         }
-
         return tok;
     }
 
     private void skipBom() {
         if (buffer.peek() == '\uFEFF') {
             if (ALLOW_UNICODE) {
-                // buffer.advance();
                 buffer.advance();
             } else {
                 throw new IllegalArgumentException("BOM not allowed in strict JSON");
@@ -395,7 +314,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
             case '"':
             case '\'':
-                return scanStringToken((char)b);
+                return scanStringTokenByte(b);
 
             default:
                 return scanNumberOrIdentifierOrErrorByte(b);
@@ -447,110 +366,45 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         return makeErrorToken(line, column, JsonDiagnosticCode.UNEXPECTED_CHARACTER, c);
     }
 
-    private JsonToken scanNumberOrIdentifierOrError(char startChar) {
-        final int startOffset = buffer.offset();
-        final int startLine   = buffer.line();
-        final int startColumn = buffer.column();
-
-        buffer.startTokenWindow();
-
-        // JSON5 Infinity / NaN
-        if (ALLOW_JSON5_NUMBERS) {
-            if (startsWithInfinityOrNaN(startChar)) {
-                buffer.startTokenWindow();
-                ScannedNumber number = scanJson5KeywordNumber(startChar);
-                return factory.makeNumberToken(startLine, startColumn, startOffset, number);
-            }
-        }
-
-        // NUMBERS?
-        if (NUM_START[startChar]) {
-            int start = buffer.offset();
-            // numberScanner.scan(startChar);
-            // scanNumberAscii(startChar);
-            ScannedNumber number = scanNumberAscii(startChar);
-
-            int end = buffer.offset();
-            if (!validateNumberLexeme(start, end)) {
-                return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.INVALID_NUMBER);
-            }
-
-            return factory.makeNumberToken(startLine, startColumn, startOffset, number);
-        }
-
-        // IDENTIFIER?
-        if (startChar < 128 && IDENT_START[startChar]) {
-            // identifierScanner.scan();
-            if (ALLOW_UNICODE) {
-                scanIdentifierUnicode();
-            } else {
-                if (usingByteBuffer) {
-                    scanIdentifierSimd();
-                } else {
-                    scanIdentifierAscii();
-                }
-            }
-            return classifyLexeme(startOffset, startLine, startColumn, buffer.getTokenWindowLexeme());
-        }
-
-        // ERROR
-        buffer.advance();
-        return makeErrorToken(
-            startLine,
-            startColumn,
-            JsonDiagnosticCode.UNEXPECTED_CHARACTER,
-            startChar
-        );
-    }
-
-    private JsonToken scanNumberOrIdentifierOrErrorByte(byte b) {
-        final int startOffset = buffer.offset();
-        final int startLine   = buffer.line();
-        final int startColumn = buffer.column();
-
-        buffer.startTokenWindow();
-
-        // ----- NUMBER? -----
-        if (b < 128 && NUM_START[b]) {
-            // Use the existing numberScanner, but feed it a char
-            // numberScanner.scan((char)b);
-            ScannedNumber number = scanNumberByte(b);
-
-            int end = buffer.offset();
-            if (!validateNumberBytes(startOffset, end)) {
-                return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.INVALID_NUMBER);
-            }
-
-            return factory.makeNumberToken(startLine, startColumn, startOffset, number);
-        }
-
-        // ----- IDENTIFIER? -----
-        if (b < 128 && IDENT_START[b]) {
-            // identifierScanner.scan();
-            if (ALLOW_UNICODE) {
-                scanIdentifierUnicode();
-            } else {
-                scanIdentifierSimd();
-            }
-            String lexeme = buffer.getTokenWindowLexeme();
-            return classifyLexeme(startOffset, startLine, startColumn, lexeme);
-        }
-
-        // ----- ERROR -----
-        buffer.advance(); // same as char path
-        return makeErrorToken(
-            startLine,
-            startColumn,
-            JsonDiagnosticCode.UNEXPECTED_CHARACTER,
-            (char)b
-        );
-    }
-
     //
     // Strings
     //
 
-    private JsonToken scanStringToken(char quoteChar) { // ------------------------___TODOL This is always char, where byte version?
+    private JsonToken scanStringTokenByte(byte quoteByte) {
+        final JsonSourceByteBuffer buffer = (JsonSourceByteBuffer) this.buffer;
+
+        final int startOffset = buffer.offset();
+        final int startLine   = buffer.line();
+        final int startColumn = buffer.column();
+
+        buffer.startTokenWindow();
+        buffer.advanceByte(); // consume opening quote
+
+        final boolean ok;
+        if (USE_SIMD) {
+            ok = scanStringSimd((char) quoteByte); // existing SIMD path
+        } else {
+            ok = scanString((char) quoteByte);     // existing scalar path
+        }
+
+        final QuoteStyle qs = (quoteByte == '"')
+            ? QuoteStyle.DOUBLE
+            : QuoteStyle.SINGLE;
+
+        if (qs == QuoteStyle.SINGLE && !options.allowSingleQuotedStrings()) {
+            return makeErrorToken(startLine, startColumn,
+                                  JsonDiagnosticCode.NOT_ALLOWED_SINGLE_QUOTED_STRING);
+        }
+
+        if (!ok) {
+            return makeErrorToken(startLine, startColumn,
+                                  JsonDiagnosticCode.UNTERMINATED_STRING);
+        }
+
+        return factory.makeStringToken(startLine, startColumn, startOffset, qs);
+    }
+
+    private JsonToken scanStringToken(char quoteChar) {
         final int startOffset = buffer.offset(); // actual position of the quote
         final int startLine   = buffer.line();
         final int startColumn = buffer.column();
@@ -560,7 +414,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
         // Call either scanString or scanStringSimd
         final boolean ok;
-        if (buffer instanceof JsonSourceByteBuffer) {
+        if (USE_SIMD) {
             ok = scanStringSimd(quoteChar);
         } else {
             ok = scanString(quoteChar);
@@ -659,6 +513,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         return false;
     }
 
+    // TODO: Why is a SIMD method taking char instead of byte?
     private boolean scanStringSimd(char quoteChar) {
         final JsonSourceByteBuffer bb = (JsonSourceByteBuffer) buffer;
         final byte quoteByte = (byte) quoteChar;
@@ -780,46 +635,254 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     }
 
     //
+    // Numbers and Identifiers
+    //
+
+    private JsonToken scanNumberOrIdentifierOrErrorByte(byte b) {
+        final int startOffset = buffer.offset();
+        final int startLine   = buffer.line();
+        final int startColumn = buffer.column();
+
+        buffer.startTokenWindow();
+
+        // JSON5 Infinity / NaN
+        if (ALLOW_JSON5_NUMBERS) {
+            if (startsWithInfinityOrNaNByte(b)) {
+                buffer.startTokenWindow();
+                ScannedNumber number = scanJson5KeywordNumberByte(b);
+                return factory.makeNumberToken(startLine, startColumn, startOffset, number);
+            }
+        }
+
+        // ----- NUMBER? -----
+        if (b < 128 && NUM_START[b]) {
+            // Use the existing numberScanner, but feed it a char
+            ScannedNumber number = scanNumberByte(b);
+
+            int end = buffer.offset();
+            if (!validateNumberBytes(startOffset, end)) {
+                return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.INVALID_NUMBER);
+            }
+
+            return factory.makeNumberToken(startLine, startColumn, startOffset, number);
+        }
+
+        // ----- IDENTIFIER? -----
+        if (b < 128 && IDENT_START[b]) {
+            if (ALLOW_UNICODE) {
+                scanIdentifierUnicode();
+            } else {
+                scanIdentifierSimd();
+            }
+            String lexeme = buffer.getTokenWindowLexeme();
+            return classifyLexeme(startOffset, startLine, startColumn, lexeme);
+        }
+
+        // ----- ERROR -----
+        buffer.advance(); // same as char path
+        return makeErrorToken(
+            startLine,
+            startColumn,
+            JsonDiagnosticCode.UNEXPECTED_CHARACTER,
+            (char)b
+        );
+    }
+
+    private JsonToken scanNumberOrIdentifierOrError(char startChar) {
+        final int startOffset = buffer.offset();
+        final int startLine   = buffer.line();
+        final int startColumn = buffer.column();
+
+        buffer.startTokenWindow();
+
+        // JSON5 Infinity / NaN
+        if (ALLOW_JSON5_NUMBERS) {
+            if (startsWithInfinityOrNaN(startChar)) {
+                buffer.startTokenWindow();
+                ScannedNumber number = scanJson5KeywordNumber(startChar);
+                return factory.makeNumberToken(startLine, startColumn, startOffset, number);
+            }
+        }
+
+        // NUMBERS?
+        if (NUM_START[startChar]) {
+            int start = buffer.offset();
+            ScannedNumber number = scanNumberAscii(startChar);
+            int end = buffer.offset();
+            if (!validateNumberLexeme(start, end)) {
+                return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.INVALID_NUMBER);
+            }
+            return factory.makeNumberToken(startLine, startColumn, startOffset, number);
+        }
+
+        // IDENTIFIER?
+        if (startChar < 128 && IDENT_START[startChar]) {
+            if (ALLOW_UNICODE) {
+                scanIdentifierUnicode();
+            } else {
+                if (usingByteBuffer) {
+                    scanIdentifierSimd();
+                } else {
+                    scanIdentifierAscii();
+                }
+            }
+            return classifyLexeme(startOffset, startLine, startColumn, buffer.getTokenWindowLexeme());
+        }
+
+        // ERROR
+        buffer.advance();
+        return makeErrorToken(
+            startLine,
+            startColumn,
+            JsonDiagnosticCode.UNEXPECTED_CHARACTER,
+            startChar
+        );
+    }
+
+    //
     // Numbers
     //
 
-    // private void scanNumberAscii(char startChar) {
-    //     // Always consume the starting character first
-    //     buffer.advance();
+    private ScannedNumber scanNumberByte(byte first) {
+        JsonSourceByteBuffer buffer = (JsonSourceByteBuffer)this.buffer;
 
-    //     // 1. JSON5 signed Infinity/NaN
-    //     if (ALLOW_JSON5_NUMBERS && (startChar == '-' || startChar == '+')) {
-    //         char c = buffer.peek();
-    //         if (c < 128 && IDENT_START[c]) {
-    //             do {
-    //                 buffer.advance();
-    //                 c = buffer.peek();
-    //             } while (c < 128 && IDENT_PART[c]);
-    //             return;
-    //         }
-    //     }
+        final JsonSourceByteBuffer bb = (JsonSourceByteBuffer) buffer;
+        final byte[] raw = bb.raw;
 
-    //     // 2. Hexadecimal 0x...
-    //     if (ALLOW_HEXADECIMAL_NUMBERS && startChar == '0') {
-    //         char c = buffer.peek();
-    //         if (c == 'x' || c == 'X') {
-    //             buffer.advance(); // consume x/X
-    //             do {
-    //                 c = buffer.peek();
-    //                 if (c < 128 && HEX[c]) {
-    //                     buffer.advance();
-    //                     continue;
-    //                 }
-    //                 break;
-    //             } while (true);
-    //             return;
-    //         }
-    //     }
-    //     // digitScanner.scan();
-    //     scanDigits();
-    // }
+        int start = buffer.offset();
+        int i = start;
 
+        boolean negative = false;
+        boolean isInteger = true;
+        boolean isHex = false;
 
+        // Leading sign
+        if (first == '-' || first == '+') {
+            negative = (first == '-');
+            buffer.advanceByte();
+            i++;
+            first = raw[i];
+        }
+
+        // ------------------------------------------------------------
+        // JSON5 Hexadecimal 0x...
+        // ------------------------------------------------------------
+        if (ALLOW_HEXADECIMAL_NUMBERS &&
+            first == '0' &&
+            i + 1 < raw.length &&
+            (raw[i + 1] == 'x' || raw[i + 1] == 'X')) {
+
+            isHex = true;
+            isInteger = true;
+
+            buffer.advanceByte(); // consume '0'
+            buffer.advanceByte(); // consume 'x' or 'X'
+            i += 2;
+
+            long hex = 0;
+            while (i < raw.length) {
+                byte b = raw[i];
+                if (b < 128 && HEX[b]) {
+                    hex = (hex << 4) | HEX_VALUE[b];
+                    buffer.advanceByte();
+                    i++;
+                    continue;
+                }
+                break;
+            }
+
+            double val = negative ? -hex : hex;
+            return new ScannedNumber(val, true, true);
+        }
+
+        // ------------------------------------------------------------
+        // Integer part
+        // ------------------------------------------------------------
+        long intPart = 0;
+        int limit = raw.length;
+        // SIMD fast path
+        while (buffer.isEightDigitsSIMD(raw, i, limit)) {
+            int chunk = buffer.parseEightDigitsSIMD(raw, i);
+            intPart = intPart * 100000000L + chunk;
+
+            // advance 8 bytes
+            for (int k = 0; k < 8; k++) buffer.advanceByte();
+            i += 8;
+        }
+
+        // scalar tail
+        while (i < limit) {
+            byte b = raw[i];
+            if (b < '0' || b > '9') break;
+            intPart = intPart * 10 + (b - '0');
+            buffer.advanceByte();
+            i++;
+        }
+
+        // TODO: Use the above pattern for the fractional part
+
+        // ------------------------------------------------------------
+        // Fractional part
+        // ------------------------------------------------------------
+        double fracPart = 0.0;
+        double divisor = 1.0;
+        if (i < raw.length && raw[i] == '.') {
+            isInteger = false;
+            buffer.advanceByte();
+            i++;
+
+            while (i < raw.length) {
+                byte b = raw[i];
+                if (b >= '0' && b <= '9') {
+                    fracPart = fracPart * 10 + (b - '0');
+                    divisor *= 10;
+                    buffer.advanceByte();
+                    i++;
+                    continue;
+                }
+                break;
+            }
+        }
+
+        // ------------------------------------------------------------
+        // Exponent part
+        // ------------------------------------------------------------
+        int exp = 0;
+        boolean expNeg = false;
+        if (i < raw.length && (raw[i] == 'e' || raw[i] == 'E')) {
+            isInteger = false;
+            buffer.advanceByte();
+            i++;
+
+            if (i < raw.length && raw[i] == '-') {
+                expNeg = true;
+                buffer.advanceByte();
+                i++;
+            } else if (i < raw.length && raw[i] == '+') {
+                buffer.advanceByte();
+                i++;
+            }
+
+            while (i < raw.length) {
+                byte b = raw[i];
+                if (b >= '0' && b <= '9') {
+                    exp = exp * 10 + (b - '0');
+                    buffer.advanceByte();
+                    i++;
+                    continue;
+                }
+                break;
+            }
+        }
+
+        double result = (double) intPart + (fracPart / divisor);
+        if (exp != 0) {
+            result *= Math.pow(10, expNeg ? -exp : exp);
+        }
+        if (negative) result = -result;
+
+        return new ScannedNumber(result, isInteger, isHex);
+    }
 
     private ScannedNumber scanNumberAscii(char first) {
         int start = buffer.windowStartOffset();
@@ -952,142 +1015,8 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         return new ScannedNumber(result, isInteger, isHex);
     }
 
-
-    private ScannedNumber scanNumberByte(byte first) {
-        JsonSourceByteBuffer buffer = (JsonSourceByteBuffer)this.buffer;
-
-        final JsonSourceByteBuffer bb = (JsonSourceByteBuffer) buffer;
-        final byte[] raw = bb.raw;
-
-        int start = buffer.offset();
-        int i = start;
-
-        boolean negative = false;
-        boolean isInteger = true;
-        boolean isHex = false;
-
-        // Leading sign
-        if (first == '-' || first == '+') {
-            negative = (first == '-');
-            buffer.advanceByte();
-            i++;
-            first = raw[i];
-        }
-
-        // ------------------------------------------------------------
-        // JSON5 Hexadecimal 0x...
-        // ------------------------------------------------------------
-        if (ALLOW_HEXADECIMAL_NUMBERS &&
-            first == '0' &&
-            i + 1 < raw.length &&
-            (raw[i + 1] == 'x' || raw[i + 1] == 'X')) {
-
-            isHex = true;
-            isInteger = true;
-
-            buffer.advanceByte(); // consume '0'
-            buffer.advanceByte(); // consume 'x' or 'X'
-            i += 2;
-
-            long hex = 0;
-            while (i < raw.length) {
-                byte b = raw[i];
-                if (b < 128 && HEX[b]) {
-                    hex = (hex << 4) | HEX_VALUE[b];
-                    buffer.advanceByte();
-                    i++;
-                    continue;
-                }
-                break;
-            }
-
-            double val = negative ? -hex : hex;
-            return new ScannedNumber(val, true, true);
-        }
-
-        // ------------------------------------------------------------
-        // Integer part
-        // ------------------------------------------------------------
-        long intPart = 0;
-        while (i < raw.length) {
-            byte b = raw[i];
-            if (b >= '0' && b <= '9') {
-                intPart = intPart * 10 + (b - '0');
-                buffer.advanceByte();
-                i++;
-                continue;
-            }
-            break;
-        }
-
-        // ------------------------------------------------------------
-        // Fractional part
-        // ------------------------------------------------------------
-        double fracPart = 0.0;
-        double divisor = 1.0;
-        if (i < raw.length && raw[i] == '.') {
-            isInteger = false;
-            buffer.advanceByte();
-            i++;
-
-            while (i < raw.length) {
-                byte b = raw[i];
-                if (b >= '0' && b <= '9') {
-                    fracPart = fracPart * 10 + (b - '0');
-                    divisor *= 10;
-                    buffer.advanceByte();
-                    i++;
-                    continue;
-                }
-                break;
-            }
-        }
-
-        // ------------------------------------------------------------
-        // Exponent part
-        // ------------------------------------------------------------
-        int exp = 0;
-        boolean expNeg = false;
-        if (i < raw.length && (raw[i] == 'e' || raw[i] == 'E')) {
-            isInteger = false;
-            buffer.advanceByte();
-            i++;
-
-            if (i < raw.length && raw[i] == '-') {
-                expNeg = true;
-                buffer.advanceByte();
-                i++;
-            } else if (i < raw.length && raw[i] == '+') {
-                buffer.advanceByte();
-                i++;
-            }
-
-            while (i < raw.length) {
-                byte b = raw[i];
-                if (b >= '0' && b <= '9') {
-                    exp = exp * 10 + (b - '0');
-                    buffer.advanceByte();
-                    i++;
-                    continue;
-                }
-                break;
-            }
-        }
-
-        double result = (double) intPart + (fracPart / divisor);
-        if (exp != 0) {
-            result *= Math.pow(10, expNeg ? -exp : exp);
-        }
-        if (negative) result = -result;
-
-        return new ScannedNumber(result, isInteger, isHex);
-    }
-
-
-
-
     private ScannedNumber scanNumberUnicode(char startChar) {
-        boolean negative = false;
+        boolean negative = false; // TODO: This is unused
         boolean isInteger = true;
         boolean isHex = false;
 
@@ -1132,6 +1061,42 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         return new ScannedNumber(Double.NaN, isInteger, isHex);
     }
 
+    private ScannedNumber scanJson5KeywordNumberByte(byte first) {
+        JsonSourceByteBuffer bb = (JsonSourceByteBuffer) buffer;
+        byte[] raw = bb.raw;
+        int off = bb.offset();
+
+        boolean negative = false;
+
+        // Leading sign
+        if (first == '-' || first == '+') {
+            negative = (first == '-');
+            bb.advanceByte();
+            off++;
+            first = raw[off];
+        }
+
+        // Infinity
+        if (first == 'I') {
+            bb.advanceBy(INFINITY.length());
+            return new ScannedNumber(
+                negative ? Double.NEGATIVE_INFINITY : Double.POSITIVE_INFINITY,
+                false,
+                false
+            );
+        }
+
+        // NaN
+        if (first == 'N') {
+            bb.advanceBy(NAN.length());
+            return new ScannedNumber(Double.NaN, false, false);
+        }
+
+        // Should never happen if caller checks startsWithInfinityOrNaNByte
+        bb.advanceByte();
+        return new ScannedNumber(Double.NaN, false, false);
+    }
+
     private ScannedNumber scanJson5KeywordNumber(char first) {
         boolean negative = false;
 
@@ -1169,7 +1134,6 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             }
         }
 
-
         // Should never reach here
         return new ScannedNumber(Double.NaN, false, false);
     }
@@ -1193,10 +1157,6 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         if (!hasDigit) {
             // Allow JSON5 Infinity/NaN forms when enabled
             if (allowJson5Numbers) {
-
-                // TODO: I think these are treated as identifiers somethere else?
-                // Should they be identifiers or numbers?
-
                 if (lexeme.equals("Infinity") ||
                     lexeme.equals("+Infinity") ||
                     lexeme.equals("-Infinity") ||
@@ -1278,11 +1238,8 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
                 }
             }
         }
-
         return true;
-
     }
-
 
     private boolean validateNumberBytes(int start, int end) {
         JsonSourceByteBuffer bb = (JsonSourceByteBuffer) buffer;
@@ -1350,9 +1307,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         return true;
     }
 
-
-
-
+    // TODO: This is not called from anywhere. Remove it?
     private void scanDigits() {
         char c;
         while (true) {
@@ -1396,6 +1351,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         }
     }
 
+    // TODO: This is not called from anywhere. Remove it?
     private void scanDigitsSimd() {
         final SimdCapableBuffer simd = (SimdCapableBuffer)buffer;
 
@@ -1426,18 +1382,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     // Identifiers
     //
 
-    private void scanIdentifierAscii() {
-        // We already consumed the first character in nextToken()
-        while (true) {
-            final char c = buffer.peek();
-            if (c < 128 && IDENT_PART[c]) {
-                buffer.advance();
-                continue;
-            }
-            break;
-        }
-    }
-
+    // TODO: This uses SIMD directly. Move it.
     private void scanIdentifierSimd() {
         final JsonSourceByteBuffer bb = (JsonSourceByteBuffer) buffer;
 
@@ -1502,6 +1447,18 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         }
     }
 
+    private void scanIdentifierAscii() {
+        // We already consumed the first character in nextToken()
+        while (true) {
+            final char c = buffer.peek();
+            if (c < 128 && IDENT_PART[c]) {
+                buffer.advance();
+                continue;
+            }
+            break;
+        }
+    }
+
     private void scanIdentifierUnicode() {
         while (!buffer.isAtEnd()) {
             final char c = buffer.peek();
@@ -1524,66 +1481,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     // Comments
     //
 
-    private String scanSingleLineComment() {
-        buffer.advance(); // '/'
-        buffer.advance(); // '/'
-
-        while (true) {
-            final char c = buffer.peek();
-            if (c == '\n' || c == '\r' || c == '\0') {
-                break;
-            }
-            buffer.advance();
-        }
-
-        if (buffer.peek() == '\n' || buffer.peek() == '\r') {
-            buffer.advance();
-        }
-
-        // Full lexeme, including slashes
-        final String lexeme = buffer.getTokenWindowLexeme();
-
-        // Value: strip the leading "//"
-        String value = lexeme.length() >= 2 ? lexeme.substring(2) : "";
-
-        // remove trailing newline from value
-        if (value.endsWith("\n")) value = value.substring(0, value.length() - 1);
-        if (value.endsWith("\r")) value = value.substring(0, value.length() - 1);
-
-        return value;
-
-    }
-
-    private String scanMultiLineComment() {
-        // Consume the initial "/*"
-        buffer.advance(); // '/'
-        buffer.advance(); // '*'
-
-        while (!buffer.isAtEnd()) {
-            final char c = buffer.peek();
-            final char n = buffer.peekNext();
-
-            // End of comment: "*/"
-            if (c == '*' && n == '/') {
-                buffer.advance(); // '*'
-                buffer.advance(); // '/'
-                break;
-            }
-
-            buffer.advance();
-        }
-
-        // Extract inner text: everything between "/*" and "*/"
-        final String lexeme = buffer.getTokenWindowLexeme();
-        if (lexeme.length() >= 4) {
-            // strip leading "/*" and trailing "*/"
-            return lexeme.substring(2, lexeme.length() - 2);
-        }
-
-        return "";
-    }
-
-    private void advanceWhitespaceAndComments() {
+    private void scanWhitespaceAndComments() {
         final boolean allowComments = ALLOW_COMMENTS;
         final boolean capture = CAPTURE_COMMENTS;
         final boolean allowUnicode = ALLOW_UNICODE;
@@ -1653,9 +1551,113 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         }
     }
 
+    private String scanSingleLineComment() {
+        buffer.advance(); // '/'
+        buffer.advance(); // '/'
+
+        while (true) {
+            final char c = buffer.peek();
+            if (c == '\n' || c == '\r' || c == '\0') {
+                break;
+            }
+            buffer.advance();
+        }
+
+        if (buffer.peek() == '\n' || buffer.peek() == '\r') {
+            buffer.advance();
+        }
+
+        // Full lexeme, including slashes
+        final String lexeme = buffer.getTokenWindowLexeme();
+
+        // Value: strip the leading "//"
+        String value = lexeme.length() >= 2 ? lexeme.substring(2) : "";
+
+        // remove trailing newline from value
+        if (value.endsWith("\n")) value = value.substring(0, value.length() - 1);
+        if (value.endsWith("\r")) value = value.substring(0, value.length() - 1);
+
+        return value;
+
+    }
+
+    private String scanMultiLineComment() {
+        // Consume the initial "/*"
+        buffer.advance(); // '/'
+        buffer.advance(); // '*'
+
+        while (!buffer.isAtEnd()) {
+            final char c = buffer.peek();
+            final char n = buffer.peekNext();
+
+            // End of comment: "*/"
+            if (c == '*' && n == '/') {
+                buffer.advance(); // '*'
+                buffer.advance(); // '/'
+                break;
+            }
+
+            buffer.advance();
+        }
+
+        // Extract inner text: everything between "/*" and "*/"
+        final String lexeme = buffer.getTokenWindowLexeme();
+        if (lexeme.length() >= 4) {
+            // strip leading "/*" and trailing "*/"
+            return lexeme.substring(2, lexeme.length() - 2);
+        }
+
+        return "";
+    }
+
     //
     // Helpers
     //
+
+    private boolean startsWithInfinityOrNaNByte(byte first) {
+        JsonSourceByteBuffer bb = (JsonSourceByteBuffer) buffer;
+        byte[] raw = bb.raw;
+        int off = bb.offset();
+
+        // Unsigned byte check
+        int c = first & 0xFF;
+
+        // Infinity
+        if (c == 'I') {
+            return bb.matchKeywordByte(raw, off, INFINITY);
+        }
+
+        // NaN
+        if (c == 'N') {
+            return bb.matchKeywordByte(raw, off, NAN);
+        }
+
+        // Signed Infinity/NaN
+        if (c == '-' || c == '+') {
+            if (off + 1 < raw.length) {
+                int next = raw[off + 1] & 0xFF;
+                if (next == 'I') {
+                    return bb.matchKeywordByte(raw, off, INFINITY, 1);
+                }
+                if (next == 'N') {
+                    return bb.matchKeywordByte(raw, off, NAN, 1);
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private boolean startsWithInfinityOrNaN(char first) {
+        if (first == 'I') return asciiStartsWith("Infinity");
+        if (first == 'N') return asciiStartsWith("NaN");
+        if (first == '-' || first == '+') {
+            char c = buffer.peekAhead(1);
+            return c == 'I' && charStartsWith("Infinity", 1)
+                || c == 'N' && charStartsWith("NaN", 1);
+        }
+        return false;
+    }
 
     private boolean asciiStartsWith(String kw) {
         int n = kw.length();
@@ -1679,39 +1681,20 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         return true;
     }
 
-    private boolean byteStartsWith(String kw, int relativeOffset) {
-        JsonSourceByteBuffer bb = (JsonSourceByteBuffer) buffer;
-        byte[] raw = bb.raw;
-        int off = buffer.offset() + relativeOffset;
-        int n = kw.length();
+    // // TODO: This is not called from anywhere. Remove it?
+    // private boolean byteStartsWith(String kw, int relativeOffset) {
+    //     JsonSourceByteBuffer bb = (JsonSourceByteBuffer) buffer;
+    //     byte[] raw = bb.raw;
+    //     int off = buffer.offset() + relativeOffset;
+    //     int n = kw.length();
 
-        if (off + n > raw.length) return false;
+    //     if (off + n > raw.length) return false;
 
-        for (int k = 0; k < n; k++) {
-            if (raw[off + k] != (byte) kw.charAt(k)) return false;
-        }
-        return true;
-    }
-
-    private void advanceChars(int count) {
-        for (int i = 0; i < count; i++) buffer.advance();
-    }
-
-    private void advanceBytes(int count) {
-        JsonSourceByteBuffer buffer = (JsonSourceByteBuffer)this.buffer;
-        for (int i = 0; i < count; i++) buffer.advanceByte();
-    }
-
-    private boolean startsWithInfinityOrNaN(char first) {
-        if (first == 'I') return asciiStartsWith("Infinity");
-        if (first == 'N') return asciiStartsWith("NaN");
-        if (first == '-' || first == '+') {
-            char c = buffer.peekAhead(1);
-            return c == 'I' && charStartsWith("Infinity", 1)
-                || c == 'N' && charStartsWith("NaN", 1);
-        }
-        return false;
-    }
+    //     for (int k = 0; k < n; k++) {
+    //         if (raw[off + k] != (byte) kw.charAt(k)) return false;
+    //     }
+    //     return true;
+    // }
 
     private boolean charStartsWith(String kw, int relativeOffset) {
         int n = kw.length();
@@ -1726,41 +1709,34 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         return true;
     }
 
-    private boolean matchKeywordByte(byte[] raw, int offset, String kw) {
-        int n = kw.length();
+    private void advanceChars(int count) {
+        for (int i = 0; i < count; i++) buffer.advance();
+    }
 
-        // Bounds check
-        if (offset + n > raw.length) {
-            return false;
-        }
-
-        // Compare raw bytes to keyword characters
-        for (int i = 0; i < n; i++) {
-            if (raw[offset + i] != (byte) kw.charAt(i)) {
-                return false;
-            }
-        }
-
-        return true;
+    private void advanceBytes(int count) {
+        JsonSourceByteBuffer buffer = (JsonSourceByteBuffer)this.buffer;
+        for (int i = 0; i < count; i++) buffer.advanceByte();
     }
 
 
-    private boolean startsWithInfinityOrNaNByte(byte first) {
-        int off = buffer.offset();
-        byte[] raw = ((JsonSourceByteBuffer)buffer).raw;
 
-        if (first == 'I') return matchKeywordByte(raw, off, "Infinity");
-        if (first == 'N') return matchKeywordByte(raw, off, "NaN");
+    // // TODO: This is not called from anywhere. Remove it?
+    // private boolean startsWithInfinityOrNaNByte(byte first) {
+    //     int off = buffer.offset();
+    //     byte[] raw = ((JsonSourceByteBuffer)buffer).raw;
 
-        if (first == '-' || first == '+') {
-            if (off + 1 < raw.length) {
-                byte c = raw[off + 1];
-                if (c == 'I') return matchKeywordByte(raw, off + 1, "Infinity");
-                if (c == 'N') return matchKeywordByte(raw, off + 1, "NaN");
-            }
-        }
-        return false;
-    }
+    //     if (first == 'I') return matchKeywordByte(raw, off, "Infinity");
+    //     if (first == 'N') return matchKeywordByte(raw, off, "NaN");
+
+    //     if (first == '-' || first == '+') {
+    //         if (off + 1 < raw.length) {
+    //             byte c = raw[off + 1];
+    //             if (c == 'I') return matchKeywordByte(raw, off + 1, "Infinity");
+    //             if (c == 'N') return matchKeywordByte(raw, off + 1, "NaN");
+    //         }
+    //     }
+    //     return false;
+    // }
 
     private static boolean isHighSurrogate(int codeUnit) {
         return codeUnit >= 0xD800 && codeUnit <= 0xDBFF;
@@ -1880,81 +1856,10 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         }
     }
 
-    // private void setupHandlers() {
-    //     // SIMD & no JSON5 unquoted keys - use byte-based buffer
-    //     if (buffer instanceof JsonSourceByteBuffer byteBuffer) {
-
-    //         digitScanner = this::scanDigitsSimd;
-    //         numberValidator = this::validateNumberBytes;
-
-    //         // Whitespace / trivia skipping
-    //         if (ALLOW_COMMENTS) {
-    //             tokenHandler = this::nextTokenWithComments;
-    //             triviaHandler = byteBuffer::skipWhitespaceAndFormattingSimd;
-    //         } else {
-
-
-
-    //             // tokenHandler = this::nextTokenWithoutComments;
-    //             tokenHandler = this::nextByteTokenWithoutComments;
-
-
-
-    //             triviaHandler = byteBuffer::skipWhitespaceSimd;
-    //         }
-
-    //         if (options.trackPosition()) {
-    //             advance = byteBuffer::advanceWithTracking;
-    //         } else {
-    //             advance = byteBuffer::advance;
-    //         }
-
-    //         if (!ALLOW_UNICODE) {
-
-
-    //             // TODO: Make this use SIMD
-    //             tokenScanner = this::scanTokenAscii;
-    //             // tokenScanner = this::scanTokenAsciiSimd;
-
-
-    //             stringScanner = this::scanStringSimd;
-    //             numberScanner = this::scanNumberAscii;
-    //             identifierScanner = this::scanIdentifierSimd;
-    //         }
-
-    //         buffer = byteBuffer;
-    //     } else {
-    //         // JSON5 identifiers or SIMD disabled - use char-based buffer
-    //         digitScanner = this::scanDigits;
-    //         numberValidator = this::validateNumberLexeme;
-    //         triviaHandler = this::advanceWhitespaceAndComments;
-    //         advance = buffer::advance;
-
-    //         if (ALLOW_COMMENTS) {
-    //             tokenHandler = this::nextTokenWithComments;
-    //         } else {
-    //             tokenHandler = this::nextTokenWithoutComments;
-    //         }
-
-    //         if (!ALLOW_UNICODE) {
-    //             tokenScanner = this::scanTokenAscii;
-    //             stringScanner = this::scanString;
-    //             numberScanner = this::scanNumberAscii;
-    //             identifierScanner = this::scanIdentifierAscii;
-    //         }
-    //     }
-
-    //     if (ALLOW_UNICODE) {
-    //         tokenScanner = this::scanTokenAsciiOrUnicode;
-    //         stringScanner = this::scanString;
-    //         numberScanner = this::scanNumberUnicode;
-    //         numberScanner = this::scanNumberAscii;
-    //         identifierScanner = this::scanIdentifierUnicode;
-    //     }
-    // }
-
     private SourceBuffer setupStreamBuffer(InputStream stream) {
         final SourceInputStreamBuffer buffer = new SourceInputStreamBuffer(stream);
+
+        // TODO: Make this work
 
         // SourceInputStreamBuffer doesn't currently implement SimdCapableBuffer
         // so this will be simpler than setupStringBuffer.
@@ -2035,12 +1940,6 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
     private JsonToken makeStructuralToken(JsonTokenType type) {
         buffer.advance();
-        // return new JsonStructuralToken(
-        //     buffer.line(),
-        //     buffer.column(),
-        //     buffer.offset(),
-        //     type
-        // );
         switch (type) {
             case LEFT_BRACE:    return LBRACE;
             case RIGHT_BRACE:   return RBRACE;
@@ -2063,13 +1962,8 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
     private JsonToken makeErrorToken(int line, int column, JsonDiagnosticCode code, Object... details) {
         return new JsonErrorToken(
-            line,
-            column,
+            line, column,
             buffer.windowStartOffset(),
-            // JsonTokenType.ERROR,
-            // null,
-            // message,
-            // QuoteStyle.PLAIN
             code, details
         );
     }
@@ -2104,14 +1998,6 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         @Override
         public JsonToken makeNumberToken(int line, int column, int startOffset, ScannedNumber number) {
             return new JsonNumberToken(lp, line, column, startOffset, buffer.offset(), number);
-            // return new JsonBufferBackedToken(
-            //     lp,
-            //     line,
-            //     column,
-            //     startOffset,
-            //     buffer.offset(),
-            //     JsonTokenType.NUMBER
-            // );
         }
 
         @Override
