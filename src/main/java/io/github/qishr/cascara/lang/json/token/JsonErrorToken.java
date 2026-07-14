@@ -30,14 +30,12 @@ public class JsonErrorToken implements JsonToken {
 
     @Override
     public String getLexeme() {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'getLexeme'");
+        return null;
     }
 
     @Override
     public String getContent() {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'getContent'");
+        return null;
     }
 
     @Override

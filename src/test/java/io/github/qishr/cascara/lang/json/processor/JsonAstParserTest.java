@@ -37,22 +37,19 @@ class JsonAstParserTest {
 
         // 1. Get the Entry so we can see the Key
 
-        // JsonMapEntryNode entry = root.getEntry(new JsonScalarNode(0, 0, PrimitiveType.STRING, "\"port\"", "port", QuoteStyle.DOUBLE, false, null));
-        // JsonMapEntryNode entry = root.getEntry(new JsonScalarNode("port", QuoteStyle.DOUBLE, false, null));
         JsonMapEntryNode entry = root.getEntry("port");
 
         assertNotNull(entry, "Entry for 'port' should exist");
 
-        String keyNode = entry.getKey();
         JsonNode valueNode = entry.getValue();
 
         // 2. Verify Value logic still works
         assertEquals(8080, ((JsonScalarNode) valueNode).asInteger());
 
-        // TODO: comments
-        // 3. Verify Comment is on the KEY (High-Fidelity alignment)
-        // assertFalse(keyNode.getComments().isEmpty(), "Comment should be attached to the KEY node");
-        // assertEquals("// This is a comment", keyNode.getComments().get(0).getLexeme());
+        // TODO: Make this work
+        // // 3. Verify Comment is on the entry
+        // assertFalse(entry.getComments().isEmpty(), "Comment should be attached to the KEY node");
+        // assertEquals("// This is a comment", entry.getComments().get(0).getLexeme());
     }
 
     @Test

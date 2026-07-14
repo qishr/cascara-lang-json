@@ -76,6 +76,14 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
         this(jvmValue, false);
     }
 
+    public JsonScalarNode(JsonToken tok, Object jvmValue) {
+        this.schemaType = PrimitiveType.of(jvmValue);
+        this.jvmValue = jvmValue;
+        this.isJvmValueCached = true;
+        this.options = null;
+        this.isKey = false;
+    }
+
     /// A programmatic and serializer constructor.
     /// Used when building an AST dynamically in code.
     /// Takes a pre-typed Object and skips text-based type inference.
@@ -163,6 +171,11 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
     @Override
     public int asInteger(int defaultValue) {
         Object v = getPrimitive();
+
+        if (v instanceof Number n) {
+            return n.intValue();
+        }
+
         try {
             return Integer.parseInt(String.valueOf(v));
         } catch (Exception e) {

@@ -9,6 +9,7 @@ import jdk.incubator.vector.*;
 public final class JsonSourceByteBuffer implements JsonSimdCapableBuffer, LexemeProvider {
 
     private final boolean strictAsciiMode;
+    private final boolean trackPosition;
 
     public final byte[] raw; // UTF‑8 bytes
     private int offset = 0;  // byte offset
@@ -22,6 +23,7 @@ public final class JsonSourceByteBuffer implements JsonSimdCapableBuffer, Lexeme
     public JsonSourceByteBuffer(byte[] raw, JsonOptions options) {
         this.raw = (raw != null) ? raw : new byte[0];
         this.strictAsciiMode = !options.allowUnicode() && !options.validateUnicode();
+        this.trackPosition = options.trackPosition();
     }
 
     @Override
@@ -106,6 +108,8 @@ public final class JsonSourceByteBuffer implements JsonSimdCapableBuffer, Lexeme
 
     @Override
     public char advance() {
+        if (trackPosition) return advanceWithTracking();
+
         if (offset >= raw.length) return '\0';
 
         char c;
@@ -121,6 +125,10 @@ public final class JsonSourceByteBuffer implements JsonSimdCapableBuffer, Lexeme
 
     @Override
     public void backup() {
+        if (trackPosition) {
+            backupWithTracking();
+            return;
+        }
         offset--;
     }
 

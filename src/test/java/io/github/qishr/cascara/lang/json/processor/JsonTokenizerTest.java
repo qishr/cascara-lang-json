@@ -2,6 +2,7 @@ package io.github.qishr.cascara.lang.json.processor;
 
 import io.github.qishr.cascara.common.diagnostic.StandardReporter;
 import io.github.qishr.cascara.common.diagnostic.Diagnostic.Level;
+import io.github.qishr.cascara.lang.json.token.JsonNumberToken;
 import io.github.qishr.cascara.lang.json.token.JsonToken;
 import io.github.qishr.cascara.lang.json.token.JsonTokenType;
 import io.github.qishr.cascara.lang.json.util.JsonOptions;
@@ -30,7 +31,7 @@ class JsonTokenizerTest {
         assertEquals(10, tokens.size());
         assertEquals(JsonTokenType.LEFT_BRACE, tokens.get(0).getType());
         assertEquals("key", tokens.get(1).getContent());
-        assertEquals("123", tokens.get(3).getContent());
+        assertEquals(123L, ((JsonNumberToken)tokens.get(3)).getNumber());
         assertEquals(JsonTokenType.IDENTIFIER, tokens.get(5).getType());
         assertEquals("unquoted", tokens.get(5).getContent());
         assertEquals(JsonTokenType.EOF, tokens.get(9).getType());

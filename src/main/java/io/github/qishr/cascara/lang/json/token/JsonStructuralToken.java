@@ -19,10 +19,17 @@ public class JsonStructuralToken implements JsonToken {
         this.type = type;
     }
 
-	@Override
-	public String getLexeme() {
+    public JsonStructuralToken(JsonTokenType type) {
+        this.startLine = 0;
+        this.startColumn = 0;
+        this.startOffset = -1;
+        this.type = type;
+    }
+
+    @Override
+    public String getLexeme() {
         return null;
-	}
+    }
 
 	@Override
 	public String getContent() {

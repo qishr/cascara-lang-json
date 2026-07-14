@@ -26,6 +26,7 @@ import io.github.qishr.cascara.lang.json.ast.JsonSequenceNode;
 import io.github.qishr.cascara.lang.json.exception.JsonDiagnosticCode;
 import io.github.qishr.cascara.lang.json.token.JsonErrorToken;
 import io.github.qishr.cascara.lang.json.token.JsonLiteral;
+import io.github.qishr.cascara.lang.json.token.JsonNumberToken;
 import io.github.qishr.cascara.lang.json.token.JsonToken;
 import io.github.qishr.cascara.lang.json.token.JsonTokenType;
 import io.github.qishr.cascara.lang.json.util.JsonOptions;
@@ -368,12 +369,15 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
                 }
 
                 case NUMBER -> {
-                    node = new JsonScalarNode(
-                        tok,
-                        PrimitiveType.ANY, // We don't know if it's NUMBER or INTERGER
-                        false,
-                        options
-                    );
+                    if (tok instanceof JsonNumberToken number) {
+                        node = new JsonScalarNode(tok, number.getNumber());
+                    }
+                    // node = new JsonScalarNode(
+                    //     tok,
+                    //     PrimitiveType.ANY, // We don't know if it's NUMBER or INTERGER
+                    //     false,
+                    //     options
+                    // );
                 }
 
                 default -> {

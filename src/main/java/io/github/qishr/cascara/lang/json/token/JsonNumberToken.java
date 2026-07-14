@@ -6,62 +6,62 @@ import java.util.List;
 import io.github.qishr.cascara.common.lang.util.LexemeProvider;
 import io.github.qishr.cascara.common.lang.util.QuoteStyle;
 
-public final class JsonBufferBackedToken implements JsonToken {
+public class JsonNumberToken implements JsonToken {
     private final LexemeProvider provider;
 
     protected final int startLine;
     protected final int startColumn;
     protected final int startOffset;
     private final int endOffset;
-    private final int startContent;
-    private final int endContent;
-    protected final JsonTokenType type;
-    private final QuoteStyle quoteStyle;
+    // protected final JsonTokenType type;
+
+    private final double value;
+    private final boolean isInteger;
+    private final boolean isHex;
+
     private List<JsonComment> comments;
 
     private String cachedLexeme;
     private boolean isLexemeCached;
-    private String cachedString;
-    private boolean isStringCached;
 
     // Identifiers & Numbers
-    public JsonBufferBackedToken(
+    // public JsonNumberToken(
+    //     LexemeProvider provider,
+    //     int startLine, int startColumn,
+    //     int startOffset, int endOffset,
+    //     JsonTokenType type
+    // ) {
+    //     this.startLine = startLine;
+    //     this.startColumn = startColumn;
+    //     this.startOffset = startOffset;
+    //     this.endOffset = endOffset;
+    //     this.type = type;
+
+    //     this.provider = provider;
+    // }
+
+    public JsonNumberToken(
         LexemeProvider provider,
         int startLine, int startColumn,
         int startOffset, int endOffset,
-        JsonTokenType type
+        ScannedNumber n
     ) {
+        this.provider = provider;
         this.startLine = startLine;
         this.startColumn = startColumn;
         this.startOffset = startOffset;
-        this.type = type;
-        this.quoteStyle = QuoteStyle.PLAIN;
-
-        this.provider = provider;
         this.endOffset = endOffset;
-        this.startContent = startOffset;
-        this.endContent = endOffset;
+        this.value = n.value;
+        this.isInteger = n.isInteger;
+        this.isHex = n.isHex;
+        // this.provider = provider;
     }
 
-    // Strings
-    public JsonBufferBackedToken(
-        LexemeProvider provider,
-        int startLine, int startColumn,
-        int startOffset, int endOffset,
-        QuoteStyle quoteStyle
-    ) {
-        this.startLine = startLine;
-        this.startColumn = startColumn;
-        this.startOffset = startOffset;
-        this.type = JsonTokenType.STRING;
-        this.quoteStyle = quoteStyle;
-
-        this.provider = provider;
-        this.endOffset = endOffset;
-        this.startContent = startOffset + 1;
-        this.endContent = endOffset - 1;
+    public Number getNumber() {
+        if (isHex) return (long)value;
+        if (isInteger) return (long)value;
+        return value;
     }
-
     @Override
     public String getLexeme() {
         if (!isLexemeCached) {
@@ -73,11 +73,7 @@ public final class JsonBufferBackedToken implements JsonToken {
 
     @Override
     public String getContent() {
-        if (!isStringCached) {
-            cachedString = provider.slice(startContent, endContent);
-            isStringCached = true;
-        }
-        return cachedString;
+        return null;
     }
 
     public int getEndOffset() {
@@ -86,7 +82,7 @@ public final class JsonBufferBackedToken implements JsonToken {
 
     @Override
     public JsonTokenType getType() {
-        return type;
+        return JsonTokenType.NUMBER;
     }
 
     public JsonLiteral getLiteral() {
@@ -95,7 +91,7 @@ public final class JsonBufferBackedToken implements JsonToken {
 
     @Override
     public QuoteStyle getQuoteStyle() {
-        return quoteStyle;
+        return QuoteStyle.PLAIN;
     }
 
     @Override
@@ -124,6 +120,6 @@ public final class JsonBufferBackedToken implements JsonToken {
 
     @Override
     public String toString() {
-        return type + "('" + getLexeme() + "')@" + startLine + ":" + startColumn;
+        return "NUMBER('" + value + "')@" + startLine + ":" + startColumn;
     }
 }
