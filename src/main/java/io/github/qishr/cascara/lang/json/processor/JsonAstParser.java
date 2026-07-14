@@ -24,6 +24,7 @@ import io.github.qishr.cascara.lang.json.ast.JsonNode;
 import io.github.qishr.cascara.lang.json.ast.JsonScalarNode;
 import io.github.qishr.cascara.lang.json.ast.JsonSequenceNode;
 import io.github.qishr.cascara.lang.json.exception.JsonDiagnosticCode;
+import io.github.qishr.cascara.lang.json.token.JsonErrorToken;
 import io.github.qishr.cascara.lang.json.token.JsonLiteral;
 import io.github.qishr.cascara.lang.json.token.JsonToken;
 import io.github.qishr.cascara.lang.json.token.JsonTokenType;
@@ -554,10 +555,9 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
 
     private void error(JsonToken token, DiagnosticCode code, Object... details) {
 
-        if (token.getType() == JsonTokenType.ERROR) {
-            // TODO: extend JsonToken to JsonErrorToken and get a diagnostic code from it.
-            code = GenericDiagnosticCode.ERROR;
-            details = new Object[]{token.getContent()};
+        if (token instanceof JsonErrorToken error) {
+            code = error.getCode();
+            details = error.getDetails();
         }
 
         reporter.errorAt(token, code, details);

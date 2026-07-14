@@ -4,25 +4,38 @@ import io.github.qishr.cascara.common.diagnostic.code.DiagnosticCode;
 
 public enum JsonDiagnosticCode implements DiagnosticCode {
 
-    UNEXPECTED_TOKEN("JSON-101", "Unexpected token: {0}"),
-    UNEXPECTED_UNQUOTED_STRING_VALUE("","Unexpected unquoted string value: '{0}'"),
+    // Tokenizer
+    EXPECTED_CLOSE_BRACE("JSON-102", "Expected '}'"),
+    EXPECTED_EOS("JSON-103", "Expected end of stream"),
+    EXPECTED_SCALAR("JSON-104", "Expected scalar."),
+    EXPECTED_COLON_FLOW_MAP("JSON-105", "Expected ':' after key in flow map"),
+    EXPECTED_OPEN_BRACE("JSON-106", "Expected '{'."),
+    EXPECTED_CLOSE_BRACKET("JSON-107", "Expected ']'"),
+    EXPECTED_OPEN_BRACKET("JSON-108", "Expected '['"),
+    EXPECTED_COLON_AFTER_MAP_KEY("JSON-109", "Expected ':' after key"),
+    UNEXPECTED_UNQUOTED_STRING_VALUE("JSON-112","Unexpected unquoted string value: '{0}'"),
+    MISSING_INTEGER_PART("","Missing integer part in JSON numbe"),
+    MISSING_FRACTIONAL_PART("","Missing fractional part in JSON number"),
+    MISSING_EXPONENT("","Exponent missing in JSON number"),
+    MISSING_EXPONENT_DIGITS("","Exponent must have digits in JSON number"),
+    NOT_ALLOWED_SINGLE_QUOTED_STRING("", "Single-quoted strings are not allowed in strict JSON"),
+    NOT_ALLOWED_LEADING_PLUS("","Leading '+' not allowed in JSON number"),
+    NOT_ALLOWED_LEADING_ZERO("","Leading zero not allowed in JSON number"),
+    NOT_ALLOWED_TRAILING_DOT("","Trailing '.' not allowed in JSON number"),
+    EXPECTED_MAP_KEY("JSON-110", "Expected key (string or identifier)"),
+    UNEXPECTED_CHARACTER("JSON-111", "Unexpected character '{0}'"),
+    UNTERMINATED_STRING("JSON-111", "Unterminated string literal"),
 
-    EXPECTED_CLOSE_BRACE("JSON-201", "Expected '}'"),
-    EXPECTED_EOS("JSON-203", "Expected end of stream"),
-    EXPECTED_SCALAR("JSON-204", "Expected scalar."),
-    EXPECTED_COLON_FLOW_MAP("JSON-205", "Expected ':' after key in flow map"),
-    EXPECTED_OPEN_BRACE("YAML-206", "Expected '{'."),
-    EXPECTED_CLOSE_BRACKET("JSON-207", "Expected ']'"),
-    EXPECTED_OPEN_BRACKET("JSON-208", "Expected '['"),
-    EXPECTED_COLON_AFTER_MAP_KEY("JSON-209", "Expected ':' after key"),
-    EXPECTED_MAP_KEY("JSON-210", "Expected key (string or identifier)"),
+    // Parser
+    UNEXPECTED_TOKEN("JSON-201", "Unexpected token: {0}"),
+    DUPLICATE_KEY("JSON-203", "Duplicate key found: '{0}'"),
 
-    MAP_KEY_INDENTATION("JSON-302", "Inconsistent indentation for map key"),
-    EXPECTED_INDENTATION_BLOCK_SCALAR("JSON-303", "Inconsistent indentation for block scalar"),
-    EXPECTED_DEDENT_BLOCK_COMMENT("JSON-304", "Expected dedent after block content"),
+    // MAP_KEY_INDENTATION("JSON-302", "Inconsistent indentation for map key"),
+    // EXPECTED_INDENTATION_BLOCK_SCALAR("JSON-303", "Inconsistent indentation for block scalar"),
+    // EXPECTED_DEDENT_BLOCK_COMMENT("JSON-304", "Expected dedent after block content"),
 
-    DUPLICATE_KEY("JSON-403", "Duplicate key found: '{0}'"),
 
+    // Serializer
     FAILED_TO_MAP_TYPE("JSON-501", "Failed to map {0} to JSON AST: {1}"),
     FAILED_TO_MAP_AST("JSON-502", "Failed to map JSON AST to %s: %s"),
     CLASS_NOT_SERIALIZABLE("JSON-503", "Class {0} is not serializable"),

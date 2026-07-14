@@ -15,8 +15,10 @@ import io.github.qishr.cascara.common.lang.util.SimdCapableBuffer;
 import io.github.qishr.cascara.common.lang.util.SourceBuffer;
 import io.github.qishr.cascara.common.lang.util.SourceInputStreamBuffer;
 import io.github.qishr.cascara.common.lang.util.SourceStringBuffer;
+import io.github.qishr.cascara.lang.json.exception.JsonDiagnosticCode;
 import io.github.qishr.cascara.lang.json.token.JsonBufferBackedToken;
 import io.github.qishr.cascara.lang.json.token.JsonComment;
+import io.github.qishr.cascara.lang.json.token.JsonErrorToken;
 import io.github.qishr.cascara.lang.json.token.JsonLiteral;
 import io.github.qishr.cascara.lang.json.token.JsonStructuralToken;
 import io.github.qishr.cascara.lang.json.token.JsonToken;
@@ -346,14 +348,14 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
         // Otherwise - UNKNOWN
         buffer.advance();
-        return makeErrorToken("Unexpected character '" + c + "'", line, column);
+        return makeErrorToken(line, column, JsonDiagnosticCode.UNEXPECTED_CHARACTER, c);
     }
 
     private JsonToken scanNumberOrIdentifierOrError(char startChar) {
+        final boolean allowJson5Numbers = ALLOW_JSON5_NUMBERS;
         final int startOffset = buffer.offset();
         final int startLine   = buffer.line();
         final int startColumn = buffer.column();
-        final boolean allowJson5Numbers = ALLOW_JSON5_NUMBERS;
 
         buffer.startTokenWindow();
 
@@ -363,6 +365,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
             // Reject numbers with no digits at all: "-", "+", "."
             boolean hasDigit = false;
+            // TODO: Surely we only need to check peek and peekNext?
             for (int i = 0; i < lexeme.length(); i++) {
                 char ch = lexeme.charAt(i);
                 if (ch >= '0' && ch <= '9') {
@@ -370,9 +373,14 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
                     break;
                 }
             }
+
             if (!hasDigit) {
                 // Allow JSON5 Infinity/NaN forms when enabled
                 if (allowJson5Numbers) {
+
+                    // TODO: I think these are treated as identifiers somethere else?
+                    // Should they be identifiers or numbers?
+
                     if (lexeme.equals("Infinity") ||
                         lexeme.equals("+Infinity") ||
                         lexeme.equals("-Infinity") ||
@@ -384,9 +392,10 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
                 }
 
                 return makeErrorToken(
-                    "Unexpected character '" + startChar + "'",
                     startLine,
-                    startColumn
+                    startColumn,
+                    JsonDiagnosticCode.UNEXPECTED_CHARACTER,
+                    startChar
                 );
             }
 
@@ -394,25 +403,25 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             if (!allowJson5Numbers) {
                 // Leading '+'
                 if (lexeme.charAt(0) == '+') {
-                    return makeErrorToken("Leading '+' not allowed in JSON numbers", startLine, startColumn);
+                    return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.NOT_ALLOWED_LEADING_PLUS);
                 }
 
                 // Leading zero on integer part: 012, -012
                 if (lexeme.charAt(0) == '0' && lexeme.length() > 1 && Character.isDigit(lexeme.charAt(1))) {
-                    return makeErrorToken("Leading zero not allowed in JSON numbers", startLine, startColumn);
+                    return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.NOT_ALLOWED_LEADING_ZERO);
                 }
                 if (lexeme.startsWith("-0") && lexeme.length() > 2 && Character.isDigit(lexeme.charAt(2))) {
-                    return makeErrorToken("Leading zero not allowed in JSON numbers", startLine, startColumn);
+                    return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.NOT_ALLOWED_LEADING_ZERO);
                 }
 
                 // Starting with '.' or '-.' (no integer part)
                 if (lexeme.charAt(0) == '.' || lexeme.startsWith("-.")) {
-                    return makeErrorToken("Missing integer part in JSON number", startLine, startColumn);
+                    return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.MISSING_INTEGER_PART);
                 }
 
                 // Trailing dot: 1., 2., -2.
                 if (lexeme.endsWith(".")) {
-                    return makeErrorToken("Trailing '.' not allowed in JSON numbers", startLine, startColumn);
+                    return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.NOT_ALLOWED_TRAILING_DOT);
                 }
 
                 // Fractional part must have at least one digit after '.'
@@ -420,11 +429,11 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
                 if (dotPos >= 0) {
                     int i = dotPos + 1;
                     if (i >= lexeme.length()) {
-                        return makeErrorToken("Missing fractional part in JSON number", startLine, startColumn);
+                        return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.MISSING_FRACTIONAL_PART);
                     }
                     char c = lexeme.charAt(i);
                     if (c == 'e' || c == 'E') {
-                        return makeErrorToken("Missing fractional part in JSON number", startLine, startColumn);
+                        return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.MISSING_FRACTIONAL_PART);
                     }
                 }
 
@@ -434,21 +443,22 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
                 if (ePos >= 0) {
                     int i = ePos + 1;
                     if (i >= lexeme.length()) {
-                        return makeErrorToken("Exponent missing in JSON number", startLine, startColumn);
+                        return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.MISSING_EXPONENT);
                     }
                     char c = lexeme.charAt(i);
                     if (c == '+' || c == '-') {
                         i++;
                         if (i >= lexeme.length()) {
-                            return makeErrorToken("Exponent missing in JSON number", startLine, startColumn);
+                            return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.MISSING_EXPONENT);
                         }
                     }
                     if (!Character.isDigit(lexeme.charAt(i))) {
-                        return makeErrorToken("Exponent must have digits in JSON number", startLine, startColumn);
+                        return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.MISSING_EXPONENT_DIGITS);
                     }
                 }
             }
 
+            // TODO: Don't pass lexeme in here
             return factory.makeNumberToken(startLine, startColumn, startOffset, lexeme);
         }
 
@@ -461,9 +471,10 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         // ERROR
         buffer.advance();
         return makeErrorToken(
-            "Unexpected character '" + startChar + "'",
             startLine,
-            startColumn
+            startColumn,
+            JsonDiagnosticCode.UNEXPECTED_CHARACTER,
+            startChar
         );
     }
 
@@ -487,11 +498,11 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             : QuoteStyle.SINGLE;
 
         if (qs == QuoteStyle.SINGLE && !options.allowSingleQuotedStrings()) {
-            return makeErrorToken("Single-quoted strings are not allowed in strict JSON", startLine, startColumn);
+            return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.NOT_ALLOWED_SINGLE_QUOTED_STRING);
         }
 
         if (!ok) {
-            return makeErrorToken("Unterminated string literal", startLine, startColumn);
+            return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.UNTERMINATED_STRING);
         }
 
         return factory.makeStringToken(startLine, startColumn, startOffset, qs);
@@ -1329,19 +1340,20 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         );
     }
 
-    private JsonLexemeBackedToken makeErrorToken(String message, int line, int column) {
-        return new JsonLexemeBackedToken(
+    private JsonToken makeErrorToken(int line, int column, JsonDiagnosticCode code, Object... details) {
+        return new JsonErrorToken(
             line,
             column,
             buffer.windowStartOffset(),
-            JsonTokenType.ERROR,
-            null,
-            message,
-            QuoteStyle.PLAIN
+            // JsonTokenType.ERROR,
+            // null,
+            // message,
+            // QuoteStyle.PLAIN
+            code, details
         );
     }
 
-    private JsonLexemeBackedToken toCommentToken(JsonComment c) {
+    private JsonToken toCommentToken(JsonComment c) {
         return new JsonLexemeBackedToken(
             c.getLine(),
             c.getColumn(),
