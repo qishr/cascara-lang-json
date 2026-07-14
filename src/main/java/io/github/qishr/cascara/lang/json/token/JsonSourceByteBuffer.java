@@ -3,9 +3,12 @@ package io.github.qishr.cascara.lang.json.token;
 import java.nio.charset.StandardCharsets;
 
 import io.github.qishr.cascara.common.lang.util.LexemeProvider;
+import io.github.qishr.cascara.lang.json.util.JsonOptions;
 import jdk.incubator.vector.*;
 
 public final class JsonSourceByteBuffer implements JsonSimdCapableBuffer, LexemeProvider {
+
+    private final boolean strictAsciiMode;
 
     public final byte[] raw; // UTF‑8 bytes
     private int offset = 0;  // byte offset
@@ -16,8 +19,9 @@ public final class JsonSourceByteBuffer implements JsonSimdCapableBuffer, Lexeme
     private int windowStartLine;
     private int windowStartColumn;
 
-    public JsonSourceByteBuffer(byte[] raw) {
+    public JsonSourceByteBuffer(byte[] raw, JsonOptions options) {
         this.raw = (raw != null) ? raw : new byte[0];
+        this.strictAsciiMode = !options.allowUnicode() && !options.validateUnicode();
     }
 
     @Override
@@ -26,9 +30,9 @@ public final class JsonSourceByteBuffer implements JsonSimdCapableBuffer, Lexeme
         return new String(part, StandardCharsets.UTF_8);
     }
 
-    // ------------------------------------------------------------
+    //
     // UTF‑8 decoding
-    // ------------------------------------------------------------
+    //
 
     private char decodeUtf8(int pos) {
         int b = raw[pos] & 0xFF;
@@ -54,18 +58,23 @@ public final class JsonSourceByteBuffer implements JsonSimdCapableBuffer, Lexeme
         return '\uFFFD';
     }
 
-    // ------------------------------------------------------------
+    //
     // Core navigation
-    // ------------------------------------------------------------
+    //
 
     @Override
     public boolean isAtEnd() {
         return offset >= raw.length;
     }
 
-    @Override
-    public char peek() {
-        return isAtEnd() ? '\0' : decodeUtf8(offset);
+    // TODO: Add to interface or just replace the String buffer with this byte[] based one
+    public byte peekByte() {
+        return raw[offset];
+    }
+
+    // TODO: Add to interface or just replace the String buffer with this byte[] based one
+    public byte advanceByte() {
+        return raw[offset++];
     }
 
     @Override
@@ -81,7 +90,46 @@ public final class JsonSourceByteBuffer implements JsonSimdCapableBuffer, Lexeme
     }
 
     @Override
+    public char peek() {
+        if (isAtEnd()) return '\0';
+
+        if (strictAsciiMode) {
+            return (char)(raw[offset] & 0xFF); // raw byte → char
+        }
+
+        return decodeUtf8(offset);
+    }
+
+    //
+    // Without position tracking
+    //
+
+    @Override
     public char advance() {
+        if (offset >= raw.length) return '\0';
+
+        char c;
+        if (strictAsciiMode) {
+            c = (char)(raw[offset] & 0xFF);
+        } else {
+            c = decodeUtf8(offset);
+        }
+
+        offset++;
+        return c;
+    }
+
+    @Override
+    public void backup() {
+        offset--;
+    }
+
+    //
+    // With position tracking
+    //
+
+    // @Override
+    public char advanceWithTracking() {
         if (isAtEnd()) return '\0';
 
         char c = decodeUtf8(offset);
@@ -97,8 +145,8 @@ public final class JsonSourceByteBuffer implements JsonSimdCapableBuffer, Lexeme
         return c;
     }
 
-    @Override
-    public void backup() {
+    // @Override
+    public void backupWithTracking() {
         if (offset == windowStartOffset) {
             throw new IllegalStateException("Cannot backup past token window start");
         }
@@ -115,9 +163,9 @@ public final class JsonSourceByteBuffer implements JsonSimdCapableBuffer, Lexeme
         }
     }
 
-    // ------------------------------------------------------------
+    //
     // Offset + length
-    // ------------------------------------------------------------
+    //
 
     @Override
     public int offset() {
@@ -145,9 +193,9 @@ public final class JsonSourceByteBuffer implements JsonSimdCapableBuffer, Lexeme
         return new String(raw, start, end - start, StandardCharsets.UTF_8);
     }
 
-    // ------------------------------------------------------------
+    //
     // Token window
-    // ------------------------------------------------------------
+    //
 
     @Override
     public void startTokenWindow() {
@@ -176,9 +224,19 @@ public final class JsonSourceByteBuffer implements JsonSimdCapableBuffer, Lexeme
         return windowStartColumn;
     }
 
-    // ------------------------------------------------------------
+    @Override
+    public int line() {
+        return line;
+    }
+
+    @Override
+    public int column() {
+        return column;
+    }
+
+    //
     // SIMD whitespace
-    // ------------------------------------------------------------
+    //
 
     /// JSON Strict
     @Override
@@ -237,9 +295,9 @@ public final class JsonSourceByteBuffer implements JsonSimdCapableBuffer, Lexeme
         }
     }
 
-    // ------------------------------------------------------------
+    //
     // SIMD digits
-    // ------------------------------------------------------------
+    //
 
     @Override
     public int scanDigitsSimd(int pos) {
@@ -278,69 +336,6 @@ public final class JsonSourceByteBuffer implements JsonSimdCapableBuffer, Lexeme
         return pos;
     }
 
-    // ------------------------------------------------------------
-    // SIMD ASCII string scanning
-    // ------------------------------------------------------------
-
-    // @Override
-    // public int scanStringAsciiSimd(int pos, byte quoteByte) {
-    //     final VectorSpecies<Byte> S = ByteVector.SPECIES_256;
-    //     final int vecLen = S.length();
-
-    //     final byte QUOTE = quoteByte;
-    //     final byte ESC   = (byte)'\\';
-
-    //     int len = raw.length;
-
-    //     while (pos < len) {
-    //         int remaining = len - pos;
-
-    //         if (remaining < vecLen) {
-    //             while (pos < len) {
-    //                 byte b = raw[pos];
-    //                 if (b == QUOTE || b == ESC || b < 0x20) {
-    //                     return pos;
-    //                 }
-    //                 pos++;
-    //             }
-    //             return pos;
-    //         }
-
-    //         ByteVector vec = ByteVector.fromArray(S, raw, pos);
-
-    //         VectorMask<Byte> isQuote = vec.compare(VectorOperators.EQ, QUOTE);
-    //         VectorMask<Byte> isEsc   = vec.compare(VectorOperators.EQ, ESC);
-    //         VectorMask<Byte> isCtrl =
-    //             vec.compare(VectorOperators.GE, (byte)0x00)
-    //                 .and(vec.compare(VectorOperators.LE, (byte)0x1F));
-
-    //         long mask = isQuote.toLong() | isEsc.toLong() | isCtrl.toLong();
-
-
-
-
-    //         if (mask != 0L) {
-    //             int first = Long.numberOfTrailingZeros(mask);
-    //             return pos + first;
-    //         }
-
-    //         // TODO: This is supposed to work, but it breaks a test.
-
-    //         // // Only lane 0 matters for advancing the string scanner
-    //         // if ((mask & 1L) != 0L) {
-    //         //     return pos;   // lane 0 is quote, backslash, or control
-    //         // }
-
-
-
-
-    //         // Otherwise skip whole block
-    //         pos += vecLen;
-    //     }
-
-    //     return pos;
-    // }
-
     @Override
     public int scanStringAsciiSimd(int pos, byte quoteByte) {
         final VectorSpecies<Byte> S = ByteVector.SPECIES_256;
@@ -377,26 +372,6 @@ public final class JsonSourceByteBuffer implements JsonSimdCapableBuffer, Lexeme
         }
 
         return pos;
-    }
-
-    // ------------------------------------------------------------
-    // Utility: advanceBy
-    // ------------------------------------------------------------
-
-    public void advanceBy(int n) {
-        for (int i = 0; i < n; i++) {
-            advance();
-        }
-    }
-
-    @Override
-    public int line() {
-        return line;
-    }
-
-    @Override
-    public int column() {
-        return column;
     }
 
     public int scanStructuralSimd(int pos) {
@@ -502,9 +477,9 @@ public final class JsonSourceByteBuffer implements JsonSimdCapableBuffer, Lexeme
         this.advanceBy(pos - offset());
     }
 
-    // ------------------------------------------------------------
+    //
     // SIMD ASCII / UTF‑8 lead-byte scanning
-    // ------------------------------------------------------------
+    //
 
     public int scanAsciiUntilUtf8LeadSimd(int pos) {
         final VectorSpecies<Byte> S = ByteVector.SPECIES_256;
@@ -606,4 +581,13 @@ public final class JsonSourceByteBuffer implements JsonSimdCapableBuffer, Lexeme
         return -1;
     }
 
+    //
+    // Utility
+    //
+
+    public void advanceBy(int n) {
+        for (int i = 0; i < n; i++) {
+            advance();
+        }
+    }
 }

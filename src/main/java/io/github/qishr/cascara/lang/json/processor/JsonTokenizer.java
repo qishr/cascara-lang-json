@@ -106,9 +106,16 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     private boolean CAPTURE_COMMENTS;
 
     private SourceBuffer buffer;
+
+    @FunctionalInterface
+    private interface BufferAdvance {
+        char advance();
+    }
+
+    private BufferAdvance advance;
+
     private List<JsonToken> tokens;
     private final List<JsonComment> pendingComments = new ArrayList<>();
-
     private TokenFactory factory;
 
     @FunctionalInterface
@@ -120,6 +127,11 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     private interface TokenScanner {
         JsonToken scan(char c);
     }
+
+    // @FunctionalInterface
+    // private interface ByteTokenScanner {
+    //     JsonToken scan(byte c);
+    // }
 
     @FunctionalInterface
     private interface StringScanner {
@@ -148,6 +160,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
     private TokenHandler tokenHandler;
     private TokenScanner tokenScanner;
+    // private ByteTokenScanner byteTokenScanner;
     private StringScanner stringScanner;
     private NumberScanner numberScanner;
     private DigitScanner digitScanner;
@@ -184,6 +197,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
     @Override
     public void open(String text) {
+        // buffer = new JsonSourceByteBuffer(text.getBytes(StandardCharsets.UTF_8), options);
         buffer = setupStringBuffer(text);
         factory = setupTokenFactory(buffer);
         setupHandlers();
@@ -191,10 +205,11 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     }
 
     public void open(byte[] data) {
-        // Strict UTF‑8 validation (no conversion to String)
-        validateUtf8(data);
-
-        // Keep SIMD path fully active
+        // Strict UTF‑8 validation
+        if (options.validateUnicode()) {
+            validateUtf8(data);
+        }
+        // buffer = new JsonSourceByteBuffer(data, options);
         buffer = setupByteBuffer(data);
         factory = setupTokenFactory(buffer);
         setupHandlers();
@@ -238,6 +253,11 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         return buffer.isAtEnd() ? makeEofToken() : tokenScanner.scan(buffer.peek());
     }
 
+    public JsonToken nextByteTokenWithoutComments() {
+        triviaHandler.run();
+        return buffer.isAtEnd() ? makeEofToken() : scanTokenByte(((JsonSourceByteBuffer)buffer).peekByte());
+    }
+
     public JsonToken nextTokenWithComments() {
         if (!pendingComments.isEmpty()) {
             return toCommentToken(pendingComments.remove(0));
@@ -255,9 +275,15 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             return tok;
         }
 
-        final char c = buffer.peek();
 
-        final JsonToken tok = tokenScanner.scan(c);
+        // TODO: Work this out later.
+        final JsonToken tok;
+        // if (buffer instanceof JsonSourceByteBuffer byteBuffer) {
+        //     tok = byteTokenScanner.scan(byteBuffer.peekByte());
+        // } else {
+            tok = tokenScanner.scan(buffer.peek());
+        // }
+
 
         if (!pendingComments.isEmpty()) {
             tok.attachComments(pendingComments);
@@ -276,7 +302,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     private void skipBom() {
         if (buffer.peek() == '\uFEFF') {
             if (ALLOW_UNICODE) {
-                buffer.advance();
+                advance.advance();
             } else {
                 throw new IllegalArgumentException("BOM not allowed in strict JSON");
             }
@@ -312,16 +338,41 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         }
     }
 
+    private JsonToken scanTokenByte(byte b) {
+        switch (b) {
+            case '{': return makeStructuralToken(JsonTokenType.LEFT_BRACE);
+            case '}': return makeStructuralToken(JsonTokenType.RIGHT_BRACE);
+            case '[': return makeStructuralToken(JsonTokenType.LEFT_BRACKET);
+            case ']': return makeStructuralToken(JsonTokenType.RIGHT_BRACKET);
+            case ':': return makeStructuralToken(JsonTokenType.COLON);
+            case ',': return makeStructuralToken(JsonTokenType.COMMA);
+
+            case '"':
+            case '\'':
+                return scanStringToken((char)b);
+
+            default:
+                return scanNumberOrIdentifierOrError((char)b);
+        }
+    }
+
     private JsonToken scanTokenUnicode(char c) {
         buffer.startTokenWindow();
         final int startOffset = buffer.windowStartOffset();
         final int line        = buffer.windowStartLine();
         final int column      = buffer.windowStartColumn();
 
+        // Are we really sure we need to check validateUnicode in this path which is only taken when useUnicode is true?
+        if (!options.validateUnicode()) {
+            // Unicode path disabled → treat all non‑ASCII as error
+            advance.advance();
+            return makeErrorToken(line, column, JsonDiagnosticCode.UNEXPECTED_CHARACTER, c);
+        }
+
         // Unicode whitespace (JSON5)
         if (Character.isWhitespace(c)) {
             // skip it
-            buffer.advance();
+            advance.advance();
             return null; // caller will continue skipping trivia
         }
 
@@ -346,7 +397,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         }
 
         // Otherwise - UNKNOWN
-        buffer.advance();
+        advance.advance();
         return makeErrorToken(line, column, JsonDiagnosticCode.UNEXPECTED_CHARACTER, c);
     }
 
@@ -375,7 +426,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         }
 
         // ERROR
-        buffer.advance();
+        advance.advance();
         return makeErrorToken(
             startLine,
             startColumn,
@@ -383,6 +434,45 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             startChar
         );
     }
+
+    private JsonToken scanNumberOrIdentifierOrErrorByte(byte b) {
+        final int startOffset = buffer.offset();
+        final int startLine   = buffer.line();
+        final int startColumn = buffer.column();
+
+        buffer.startTokenWindow();
+
+        // ----- NUMBER? -----
+        if (b < 128 && NUM_START[b]) {
+            // Use the existing numberScanner, but feed it a char
+            numberScanner.scan((char)b);
+
+            int end = buffer.offset();
+            if (!numberValidator.validate(startOffset, end)) {
+                return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.INVALID_NUMBER);
+            }
+
+            return factory.makeNumberToken(startLine, startColumn, startOffset);
+        }
+
+        // ----- IDENTIFIER? -----
+        if (b < 128 && IDENT_START[b]) {
+            identifierScanner.scan();
+            String lexeme = buffer.getTokenWindowLexeme();
+            return classifyLexeme(startOffset, startLine, startColumn, lexeme);
+        }
+
+        // ----- ERROR -----
+        advance.advance(); // same as char path
+        return makeErrorToken(
+            startLine,
+            startColumn,
+            JsonDiagnosticCode.UNEXPECTED_CHARACTER,
+            (char)b
+        );
+    }
+
+
 
     private boolean validateNumberLexeme(int start, int end) {
         final boolean allowJson5Numbers = ALLOW_JSON5_NUMBERS;
@@ -570,7 +660,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         final int startColumn = buffer.column();
 
         buffer.startTokenWindow();
-        buffer.advance(); // consume opening quote
+        advance.advance(); // consume opening quote
 
         // Call either scanString or scanStringSimd
         final boolean ok = stringScanner.scan(quoteChar);
@@ -595,7 +685,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         boolean pendingHighSurrogate = false;
 
         while (!buffer.isAtEnd()) {
-            final char next = buffer.advance();
+            final char next = advance.advance();
 
             // Normal termination
             if (next == quoteChar) {
@@ -613,7 +703,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             }
 
             if (next == '\\' && !buffer.isAtEnd()) {
-                final char esc = buffer.advance();
+                final char esc = advance.advance();
 
                 switch (esc) {
                     case '"':
@@ -628,15 +718,22 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
                         break;
 
                     case 'u': {
+                        if (!options.validateUnicode()) {
+                            // Fast path: skip surrogate correctness entirely
+                            for (int i = 0; i < 4; i++) {
+                                char h = advance.advance();
+                                if (!HEX[h]) return false;
+                            }
+                            break;
+                        }
                         int codeUnit = 0;
                         for (int i = 0; i < 4; i++) {
                             if (buffer.isAtEnd()) return false;
-                            char h = buffer.advance();
-                            int v;
-                            if (h >= '0' && h <= '9') v = h - '0';
-                            else if (h >= 'A' && h <= 'F') v = 10 + (h - 'A');
-                            else if (h >= 'a' && h <= 'f') v = 10 + (h - 'a');
-                            else return false;
+                            char h = advance.advance();
+                            if (!HEX[h]) return false;
+                            int v = (h <= '9')
+                                ? (h - '0')
+                                : 10 + ((h & 0xDF) - 'A');
                             codeUnit = (codeUnit << 4) | v;
                         }
 
@@ -689,17 +786,17 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             final char c = bb.peek();
 
             if (c == quoteChar) {
-                bb.advance();
+                advance.advance();
                 return !pendingHighSurrogate;
             }
 
             if (c == '\\') {
-                bb.advance(); // consume '\'
+                advance.advance(); // consume '\'
                 if (bb.isAtEnd()) {
                     return false;
                 }
 
-                final char esc = bb.advance(); // escaped char
+                final char esc = advance.advance(); // escaped char
 
                 switch (esc) {
                     case '"':
@@ -715,15 +812,22 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
                         break;
 
                     case 'u': {
+                        if (!options.validateUnicode()) {
+                            // Fast path: skip surrogate correctness entirely
+                            for (int i = 0; i < 4; i++) {
+                                char h = advance.advance();
+                                if (!HEX[h]) return false;
+                            }
+                            break;
+                        }
                         int codeUnit = 0;
                         for (int i = 0; i < 4; i++) {
                             if (bb.isAtEnd()) return false;
-                            char h = bb.advance();
-                            int v;
-                            if (h >= '0' && h <= '9') v = h - '0';
-                            else if (h >= 'A' && h <= 'F') v = 10 + (h - 'A');
-                            else if (h >= 'a' && h <= 'f') v = 10 + (h - 'a');
-                            else return false;
+                            char h = advance.advance();
+                            if (!HEX[h]) return false;
+                            int v = (h <= '9')
+                                ? (h - '0')
+                                : 10 + ((h & 0xDF) - 'A');
                             codeUnit = (codeUnit << 4) | v;
                         }
 
@@ -766,7 +870,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             }
 
             // Should not happen (non‑interesting byte), but advance conservatively
-            bb.advance();
+            advance.advance();
             pos = bb.offset();
         }
 
@@ -780,14 +884,14 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
     private void scanNumberAscii(char startChar) {
         // Always consume the starting character first
-        buffer.advance();
+        advance.advance();
 
         // 1. JSON5 signed Infinity/NaN
         if (ALLOW_JSON5_NUMBERS && (startChar == '-' || startChar == '+')) {
             char c = buffer.peek();
             if (c < 128 && IDENT_START[c]) {
                 do {
-                    buffer.advance();
+                    advance.advance();
                     c = buffer.peek();
                 } while (c < 128 && IDENT_PART[c]);
                 return;
@@ -798,11 +902,11 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         if (ALLOW_HEXADECIMAL_NUMBERS && startChar == '0') {
             char c = buffer.peek();
             if (c == 'x' || c == 'X') {
-                buffer.advance(); // consume x/X
+                advance.advance(); // consume x/X
                 do {
                     c = buffer.peek();
                     if (c < 128 && HEX[c]) {
-                        buffer.advance();
+                        advance.advance();
                         continue;
                     }
                     break;
@@ -819,7 +923,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         while (true) {
             c = buffer.peek();
             if (c < 128 && DIGIT[c]) {
-                buffer.advance();
+                advance.advance();
                 continue;
             }
             break;
@@ -827,11 +931,11 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
         // 4. Fractional part
         if (buffer.peek() == '.') {
-            buffer.advance();
+            advance.advance();
             while (true) {
                 c = buffer.peek();
                 if (c < 128 && DIGIT[c]) {
-                    buffer.advance();
+                    advance.advance();
                     continue;
                 }
                 break;
@@ -841,15 +945,15 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         // 5. Exponent part
         c = buffer.peek();
         if (c == 'e' || c == 'E') {
-            buffer.advance();
+            advance.advance();
             c = buffer.peek();
             if (c == '+' || c == '-') {
-                buffer.advance();
+                advance.advance();
             }
             while (true) {
                 c = buffer.peek();
                 if (c < 128 && DIGIT[c]) {
-                    buffer.advance();
+                    advance.advance();
                     continue;
                 }
                 break;
@@ -865,7 +969,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
         // 4. Fractional part
         if (buffer.peek() == '.') {
-            buffer.advance();
+            advance.advance();
             pos = simd.scanDigitsSimd(buffer.offset());
             buffer.setOffset(pos);
         }
@@ -873,10 +977,10 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         // 5. Exponent part
         char c = buffer.peek();
         if (c == 'e' || c == 'E') {
-            buffer.advance();
+            advance.advance();
             c = buffer.peek();
             if (c == '+' || c == '-') {
-                buffer.advance();
+                advance.advance();
             }
             pos = simd.scanDigitsSimd(buffer.offset());
             buffer.setOffset(pos);
@@ -884,13 +988,13 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     }
 
     private void scanNumberUnicode(char startChar) {
-        buffer.advance(); // consume first digit
+        advance.advance(); // consume first digit
 
         // integer part
         while (!buffer.isAtEnd()) {
             final char c = buffer.peek();
             if (Character.isDigit(c)) {
-                buffer.advance();
+                advance.advance();
                 continue;
             }
             break;
@@ -898,20 +1002,20 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
         // fractional part
         if (buffer.peek() == '.') {
-            buffer.advance();
+            advance.advance();
             while (!buffer.isAtEnd() && Character.isDigit(buffer.peek())) {
-                buffer.advance();
+                advance.advance();
             }
         }
 
         // exponent part
         char c = buffer.peek();
         if (c == 'e' || c == 'E') {
-            buffer.advance();
+            advance.advance();
             c = buffer.peek();
-            if (c == '+' || c == '-') buffer.advance();
+            if (c == '+' || c == '-') advance.advance();
             while (!buffer.isAtEnd() && Character.isDigit(buffer.peek())) {
-                buffer.advance();
+                advance.advance();
             }
         }
     }
@@ -925,7 +1029,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         while (true) {
             final char c = buffer.peek();
             if (c < 128 && IDENT_PART[c]) {
-                buffer.advance();
+                advance.advance();
                 continue;
             }
             break;
@@ -948,7 +1052,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
                 while (!bb.isAtEnd()) {
                     char c = bb.peek();
                     if (c < 128 && IDENT_PART[c]) {
-                        bb.advance();
+                        advance.advance();
                         continue;
                     }
                     return;
@@ -1001,13 +1105,13 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             final char c = buffer.peek();
             if (c <= 127) {
                 if (c < 128 && IDENT_PART[c]) {
-                    buffer.advance();
+                    advance.advance();
                     continue;
                 }
                 break;
             }
             if (Character.isUnicodeIdentifierPart(c)) {
-                buffer.advance();
+                advance.advance();
                 continue;
             }
             break;
@@ -1019,19 +1123,19 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     //
 
     private String scanSingleLineComment() {
-        buffer.advance(); // '/'
-        buffer.advance(); // '/'
+        advance.advance(); // '/'
+        advance.advance(); // '/'
 
         while (true) {
             final char c = buffer.peek();
             if (c == '\n' || c == '\r' || c == '\0') {
                 break;
             }
-            buffer.advance();
+            advance.advance();
         }
 
         if (buffer.peek() == '\n' || buffer.peek() == '\r') {
-            buffer.advance();
+            advance.advance();
         }
 
         // Full lexeme, including slashes
@@ -1050,8 +1154,8 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
     private String scanMultiLineComment() {
         // Consume the initial "/*"
-        buffer.advance(); // '/'
-        buffer.advance(); // '*'
+        advance.advance(); // '/'
+        advance.advance(); // '*'
 
         while (!buffer.isAtEnd()) {
             final char c = buffer.peek();
@@ -1059,12 +1163,12 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
             // End of comment: "*/"
             if (c == '*' && n == '/') {
-                buffer.advance(); // '*'
-                buffer.advance(); // '/'
+                advance.advance(); // '*'
+                advance.advance(); // '/'
                 break;
             }
 
-            buffer.advance();
+            advance.advance();
         }
 
         // Extract inner text: everything between "/*" and "*/"
@@ -1088,7 +1192,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
             // Fast ASCII whitespace
             if (c < 128 && WS[c]) {
-                buffer.advance();
+                advance.advance();
                 continue;
             }
 
@@ -1096,7 +1200,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             if (c > 127) {
                 if (!allowUnicode) return;
                 if (Character.isWhitespace(c)) {
-                    buffer.advance();
+                    advance.advance();
                     continue;
                 }
             }
@@ -1247,12 +1351,12 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         }
     }
 
+    // TODO: The following 2 methods should be replaced by a single JsonSourceByteBuffer instantiation.
     private SourceBuffer setupByteBuffer(byte[] data) {
         // SIMD & no JSON5 unquoted keys - use byte-based buffer
         if (options.useSimd() && !options.allowUnquotedKeys()) {
-            return new JsonSourceByteBuffer(data);
+            return new JsonSourceByteBuffer(data, options);
         } else {
-            // TODO: A new SourceByteBuffer that's not JSON-specific
             return new SourceStringBuffer(new String(data));
         }
     }
@@ -1260,8 +1364,8 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     private SourceBuffer setupStringBuffer(String text) {
         // SIMD & no JSON5 unquoted keys - use byte-based buffer
         if (options.useSimd() && !options.allowUnquotedKeys()) {
-            byte[] raw = text.getBytes(StandardCharsets.UTF_8);
-            return new JsonSourceByteBuffer(raw);
+            byte[] data = text.getBytes(StandardCharsets.UTF_8);
+            return new JsonSourceByteBuffer(data, options);
         } else {
             return new SourceStringBuffer(text);
         }
@@ -1279,8 +1383,21 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
                 tokenHandler = this::nextTokenWithComments;
                 triviaHandler = byteBuffer::skipWhitespaceAndFormattingSimd;
             } else {
-                tokenHandler = this::nextTokenWithoutComments;
+
+
+
+                // tokenHandler = this::nextTokenWithoutComments;
+                tokenHandler = this::nextByteTokenWithoutComments;
+
+
+
                 triviaHandler = byteBuffer::skipWhitespaceSimd;
+            }
+
+            if (options.trackPosition()) {
+                advance = byteBuffer::advanceWithTracking;
+            } else {
+                advance = byteBuffer::advance;
             }
 
             if (!ALLOW_UNICODE) {
@@ -1302,6 +1419,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             digitScanner = this::scanDigits;
             numberValidator = this::validateNumberLexeme;
             triviaHandler = this::advanceWhitespaceAndComments;
+            advance = buffer::advance;
 
             if (ALLOW_COMMENTS) {
                 tokenHandler = this::nextTokenWithComments;
@@ -1334,6 +1452,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
         digitScanner = this::scanDigits;
         triviaHandler = this::advanceWhitespaceAndComments;
+        advance = buffer::advance;
 
         if (ALLOW_COMMENTS) {
             tokenHandler = this::nextTokenWithComments;
@@ -1406,7 +1525,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     }
 
     private JsonToken makeStructuralToken(JsonTokenType type) {
-        buffer.advance();
+        advance.advance();
         return new JsonStructuralToken(
             buffer.line(),
             buffer.column(),

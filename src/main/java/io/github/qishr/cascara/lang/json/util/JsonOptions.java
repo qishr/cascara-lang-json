@@ -32,6 +32,8 @@ public class JsonOptions extends LanguageOptions<JsonOptions> implements Duplica
     private boolean insertSpaces = true;
     private boolean prettyPrint = false;
     private boolean useSimd = false;
+    private boolean validateUnicode = false;
+    private boolean trackPosition = false;
 
     public JsonOptions() {}
 
@@ -48,6 +50,8 @@ public class JsonOptions extends LanguageOptions<JsonOptions> implements Duplica
         insertSpaces = original.insertSpaces;
         prettyPrint = original.prettyPrint;
         useSimd = original.useSimd;
+        validateUnicode = original.validateUnicode;
+        trackPosition = original.trackPosition;
     }
 
     // public boolean allowBooleanKeys() { return allowBooleanKeys; }
@@ -62,6 +66,8 @@ public class JsonOptions extends LanguageOptions<JsonOptions> implements Duplica
     public boolean insertSpaces() { return insertSpaces; }
     public boolean prettyPrint() { return prettyPrint; }
     public boolean useSimd() { return useSimd; }
+    public boolean validateUnicode() { return validateUnicode; }
+    public boolean trackPosition() { return trackPosition; }
 
     public JsonOptions setAllowBooleanKeys(boolean val) {
         this.allowBooleanKeys = val;
@@ -121,6 +127,16 @@ public class JsonOptions extends LanguageOptions<JsonOptions> implements Duplica
 
     public JsonOptions setUseSimd(boolean v) {
         this.useSimd = v;
+        return this;
+    }
+
+    public JsonOptions setValidateUnicode(boolean v) {
+        this.validateUnicode = v;
+        return this;
+    }
+
+    public JsonOptions setTrackPosition(boolean v) {
+        this.trackPosition = v;
         return this;
     }
 
