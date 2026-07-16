@@ -1,0 +1,6 @@
+{
+  unquotedKey: "valid in JSON5",
+  _leadingUnderscore: true,
+  $dollarSign: 100,
+  alpha123: "alphanumeric"
+}

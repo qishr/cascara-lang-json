@@ -1,77 +1,69 @@
+// # License & Terms
+//
+// This file is part of **Cascara**.
+//
+// **Cascara** is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+//
+// ---
+//
+// ## Special Runtime Exception
+//
+// As a special exception, the copyright holders of this library give you
+// permission to link this library with independent modules to produce an
+// executable, regardless of the license terms of these independent modules,
+// and to copy and distribute the resulting executable under terms of your
+// choice, provided that you also meet, for each linked independent module,
+// the terms and conditions of the license of that module.
+//
+// An independent module is a module which is not derived from or based on
+// this library. If you modify this library, you may extend this exception
+// to your version of the library, but you are not obligated to do so. If
+// you do not wish to do so, delete this exception statement from your
+// version.
+
+
 package io.github.qishr.cascara.lang.json.processor;
 
 import io.github.qishr.cascara.common.util.ContentType;
 import io.github.qishr.cascara.common.diagnostic.Reporter;
-import io.github.qishr.cascara.common.lang.LanguageOptions;
+import io.github.qishr.cascara.common.lang.util.LanguageOptions;
 import io.github.qishr.cascara.common.lang.processor.Emitter;
-import io.github.qishr.cascara.lang.json.JsonDocument;
-import io.github.qishr.cascara.lang.json.JsonOptions;
 import io.github.qishr.cascara.lang.json.ast.JsonMapEntryNode;
 import io.github.qishr.cascara.lang.json.ast.JsonMapNode;
 import io.github.qishr.cascara.lang.json.ast.JsonNode;
 import io.github.qishr.cascara.lang.json.ast.JsonScalarNode;
 import io.github.qishr.cascara.lang.json.ast.JsonSequenceNode;
+import io.github.qishr.cascara.lang.json.util.JsonOptions;
 
 public class JsonEmitter extends AbstractJsonProcessor<JsonEmitter>  implements Emitter {
     private final StringBuilder output = new StringBuilder();
     private int indentLevel = 0;
 
+    // TODO: I suspect the emitter always assumes prettyPrint is on
+
     @Override protected JsonEmitter self() { return this; }
 
     @Override
     public ContentType getContentType() {
-        return JsonParser.contentType;
-    }
-
-    public String emit(JsonDocument doc) {
-        if (doc == null) return "";
-        output.setLength(0);
-        if (doc.getRoot() != null) {
-            emitNode(doc.getRoot());
-        }
-        return output.toString();
+        return JsonAstParser.JSON_CONTENT_TYPE;
     }
 
     public String emit(JsonNode root) {
-        if (root instanceof JsonDocument doc) return emit(doc);
         output.setLength(0);
         emitNode(root);
         return output.toString();
     }
-
-    // private void emitNode(JsonNode node) {
-    //     if (node instanceof JsonScalarNode scalar) {
-    //         // Use getRawValue to preserve the original quoting/formatting
-    //         emitScalar(scalar.getRawValue());
-    //     } else if (node instanceof JsonMapNode map) {
-    //         emitMapStart();
-    //         var entries = map.getEntries();
-    //         for (int i = 0; i < entries.size(); i++) {
-    //             JsonMapEntryNode entry = (JsonMapEntryNode) entries.get(i);
-
-    //             emitNode(entry.getKey());
-    //             emitPropertySeparator();
-    //             emitNode(entry.getValue());
-
-    //             if (i < entries.size() - 1) {
-    //                 emitItemSeparator();
-    //             }
-    //         }
-    //         emitMapEnd();
-    //     } else if (node instanceof JsonSequenceNode seq) {
-    //         emitSequenceStart();
-    //         int total = seq.size();
-    //         int index = 0;
-    //         for (JsonNode item : seq.items()) {
-    //             emitNode(item);
-
-    //             if (++index < total) {
-    //                 emitItemSeparator();
-    //             }
-    //         }
-    //         emitSequenceEnd();
-    //     }
-    // }
 
     @Override
     public void emitScalar(String value) {
@@ -83,7 +75,7 @@ public class JsonEmitter extends AbstractJsonProcessor<JsonEmitter>  implements 
         // Handle Comments before the node
         if (node.getComments() != null) {
             for (var comment : node.getComments()) {
-                emitScalar(comment.getRawValue());
+                emitScalar(comment.getLexeme());
                 emitNewLine();
             }
         }
@@ -96,7 +88,14 @@ public class JsonEmitter extends AbstractJsonProcessor<JsonEmitter>  implements 
             for (int i = 0; i < entries.size(); i++) {
                 JsonMapEntryNode entry = (JsonMapEntryNode) entries.get(i);
 
-                emitNode(entry.getKey());
+
+
+                //
+                // emitNode(entry.getKey());
+                emitScalar(formatKey(entry.getKey()));
+
+
+
                 emitPropertySeparator();
                 emitNode(entry.getValue());
 
@@ -121,16 +120,30 @@ public class JsonEmitter extends AbstractJsonProcessor<JsonEmitter>  implements 
     }
 
     private String formatScalar(JsonScalarNode scalar) {
-        String value = scalar.getString();
+        String value = scalar.asString();
         if (value == null) return "null";
 
         return switch (scalar.getQuoteStyle()) {
             case DOUBLE -> "\"" + escapeJson(value) + "\"";
             case SINGLE -> "'" + escapeJson(value) + "'";
-            case LITERAL, FOLDED -> value; // Usually used for multi-line or raw blocks
+            case LITERAL_BLOCK, FOLDED -> value; // Usually used for multi-line or raw blocks
             case PLAIN -> value; // For numbers, booleans, or unquoted keys
             default -> value;
         };
+    }
+
+    private String formatKey(String value) {
+        if (value == null) return "null";
+
+        return "\"" + escapeJson(value) + "\"";
+
+        // return switch (scalar.getQuoteStyle()) {
+        //     case DOUBLE -> "\"" + escapeJson(value) + "\"";
+        //     case SINGLE -> "'" + escapeJson(value) + "'";
+        //     case LITERAL_BLOCK, FOLDED -> value; // Usually used for multi-line or raw blocks
+        //     case PLAIN -> value; // For numbers, booleans, or unquoted keys
+        //     default -> value;
+        // };
     }
 
     private String escapeJson(String input) {
@@ -175,7 +188,7 @@ public class JsonEmitter extends AbstractJsonProcessor<JsonEmitter>  implements 
     @Override
     public void emitPropertySeparator() {
         output.append(":");
-        if (options.isInsertSpaces()) {
+        if (options.insertSpaces()) {
             output.append(" ");
         }
     }
@@ -225,7 +238,7 @@ public class JsonEmitter extends AbstractJsonProcessor<JsonEmitter>  implements 
 
     private void writePadding() {
         int spaceCount = indentLevel * options.getIndentSize();
-        if (options.isInsertSpaces()) {
+        if (options.insertSpaces()) {
             output.append(" ".repeat(spaceCount));
         } else {
             output.append("\t".repeat(indentLevel));

@@ -1,0 +1,685 @@
+// # License & Terms
+//
+// This file is part of **Cascara**.
+//
+// **Cascara** is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+//
+// ---
+//
+// ## Special Runtime Exception
+//
+// As a special exception, the copyright holders of this library give you
+// permission to link this library with independent modules to produce an
+// executable, regardless of the license terms of these independent modules,
+// and to copy and distribute the resulting executable under terms of your
+// choice, provided that you also meet, for each linked independent module,
+// the terms and conditions of the license of that module.
+//
+// An independent module is a module which is not derived from or based on
+// this library. If you modify this library, you may extend this exception
+// to your version of the library, but you are not obligated to do so. If
+// you do not wish to do so, delete this exception statement from your
+// version.
+
+
+package io.github.qishr.cascara.lang.json.processor;
+
+import java.io.InputStream;
+import java.io.Reader;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+import io.github.qishr.cascara.common.diagnostic.Reporter;
+import io.github.qishr.cascara.common.diagnostic.code.DiagnosticCode;
+import io.github.qishr.cascara.common.lang.exception.ParserException;
+import io.github.qishr.cascara.common.lang.processor.AstParser;
+import io.github.qishr.cascara.common.lang.processor.Tokenizer;
+import io.github.qishr.cascara.common.lang.type.PrimitiveType;
+import io.github.qishr.cascara.common.lang.util.LanguageOptions;
+import io.github.qishr.cascara.common.lang.util.QuoteStyle;
+import io.github.qishr.cascara.common.util.ContentType;
+import io.github.qishr.cascara.common.util.Properties;
+import io.github.qishr.cascara.lang.json.ast.JsonCommentNode;
+import io.github.qishr.cascara.lang.json.ast.JsonMapEntryNode;
+import io.github.qishr.cascara.lang.json.ast.JsonMapNode;
+import io.github.qishr.cascara.lang.json.ast.JsonNode;
+import io.github.qishr.cascara.lang.json.ast.JsonScalarNode;
+import io.github.qishr.cascara.lang.json.ast.JsonSequenceNode;
+import io.github.qishr.cascara.lang.json.exception.JsonDiagnosticCode;
+import io.github.qishr.cascara.lang.json.token.JsonErrorToken;
+import io.github.qishr.cascara.lang.json.token.JsonLiteral;
+import io.github.qishr.cascara.lang.json.token.JsonNumberToken;
+import io.github.qishr.cascara.lang.json.token.JsonToken;
+import io.github.qishr.cascara.lang.json.token.JsonTokenType;
+import io.github.qishr.cascara.lang.json.util.JsonOptions;
+import io.github.qishr.cascara.lang.json.util.JsonStringUnescaper;
+
+/// A recursive descent parser for JSON/JSON5.
+public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
+        implements AstParser<JsonNode, JsonToken> {
+
+    private static final String INFINITY = "Infinity";
+    private static final String NAN = "NaN";
+
+    /// Buffer to hold comments until a data node is created to claim them.
+    private final List<JsonCommentNode> pendingComments = new ArrayList<>();
+
+    // Note: Keep this in alphabetical order,
+    // or it will become time consuming to maintain
+    private boolean ALLOW_COMMENTS;
+    private boolean ALLOW_INFINITY_AND_NAN;
+    private boolean ALLOW_TRAILING_COMMA;
+    private boolean ALLOW_UNQUOTED_KEYS;
+    private boolean CAPTURE_COMMENTS;
+    private int DEPTH_LIMIT;
+
+    private JsonTokenizer tokenizer;
+    private int depth = 0;
+
+    private JsonToken currentToken;
+    private JsonToken lookaheadToken;
+
+    /// Default constructor for SPI
+    public JsonAstParser() {
+        applyOptions(new JsonOptions());
+    }
+
+    public JsonAstParser setOptions(JsonOptions options) {
+        super.setOptions(options);
+        applyOptions(options);
+        return this;
+    }
+
+    private void applyOptions(JsonOptions options) {
+        this.ALLOW_COMMENTS         = options.allowComments();
+        this.ALLOW_INFINITY_AND_NAN = options.allowJson5Numbers();
+        this.ALLOW_TRAILING_COMMA   = options.allowTrailingComma();
+        this.ALLOW_UNQUOTED_KEYS    = options.allowUnquotedKeys();
+        this.CAPTURE_COMMENTS       = options.captureComments();
+        this.DEPTH_LIMIT            = options.getDepthLimit();
+    }
+
+    @Override
+    protected JsonAstParser self() { return this; }
+
+    //
+    // High-level API: String / InputStream
+    //
+
+    @Override
+    public JsonNode parse(String text) {
+        JsonTokenizer tokenizer = new JsonTokenizer();
+        tokenizer.setOptions(options);
+        tokenizer.setReporter(reporter);
+        tokenizer.open(text);
+        return parse(tokenizer);
+    }
+
+    public JsonNode parse(byte[] data) {
+        JsonTokenizer tokenizer = new JsonTokenizer();
+        tokenizer.setOptions(options);
+        tokenizer.setReporter(reporter);
+        tokenizer.open(data);
+        return parse(tokenizer);
+    }
+
+    @Override
+    public JsonNode parse(Reader reader) {
+        JsonTokenizer tokenizer = new JsonTokenizer();
+        tokenizer.setOptions(options);
+        tokenizer.setReporter(reporter);
+        tokenizer.open(reader);
+        return parse(tokenizer);
+    }
+
+    @Override
+    public JsonNode parse(InputStream is) {
+        JsonTokenizer tokenizer = new JsonTokenizer();
+        tokenizer.setOptions(options);
+        tokenizer.setReporter(reporter);
+        tokenizer.open(is);
+        return parse(tokenizer);
+    }
+
+    //
+    // Eager API: List<JsonToken> (adapter to streaming)
+    //
+
+    @Override
+    public JsonNode parse(List<JsonToken> tokens) {
+        return parse(new ListBackedJsonTokenizer(tokens));
+    }
+
+    //
+    // Streaming API: Tokenizer<JsonToken>
+    //
+
+    @Override
+    public JsonNode parse(Tokenizer<JsonToken> tokenizer) {
+        this.tokenizer = (JsonTokenizer) tokenizer;
+        this.currentToken = null;
+        this.depth = 0;
+        pendingComments.clear();
+
+        // Headers and structural trivia
+        skipTrivia();
+
+        JsonNode root = null;
+        if (!isAtEnd()) {
+            root = parseValue();
+        }
+
+        skipTrivia();
+
+        // Header comments stay in the document
+        if (root != null) {
+            root.getComments().addAll(pendingComments);
+        }
+        pendingComments.clear();
+
+        if (!isAtEnd()) {
+            error(peek(), JsonDiagnosticCode.UNEXPECTED_TOKEN, peek().getType());
+        }
+
+        return root;
+    }
+
+    //
+    // Core parsing
+    //
+
+    private JsonNode parseValue() {
+        depth++;
+        trace("parseValue");
+
+        try {
+            skipTrivia();
+
+            JsonToken token = peek();
+            JsonTokenType type = token.getType();
+
+            // Structural values first (most common in real JSON)
+            if (type == JsonTokenType.LEFT_BRACE) {
+                return parseMap();
+            }
+            if (type == JsonTokenType.LEFT_BRACKET) {
+                return parseSequence();
+            }
+
+            // Primitive values (second most common)
+            if (type == JsonTokenType.STRING ||
+                type == JsonTokenType.NUMBER ||
+                type == JsonTokenType.BOOLEAN ||
+                type == JsonTokenType.NULL ||
+                type == JsonTokenType.IDENTIFIER) {
+                return parseScalar();
+            }
+
+            // Unexpected token
+            error(token, JsonDiagnosticCode.UNEXPECTED_TOKEN, type);
+            return new JsonScalarNode(
+                token,
+                PrimitiveType.ANY,
+                false,
+                options
+            );
+
+        } finally {
+            depth--;
+        }
+    }
+
+    private JsonMapNode parseMap() {
+        depth++;
+        trace("parseMap");
+
+        try {
+            JsonToken start = consume(JsonTokenType.LEFT_BRACE, JsonDiagnosticCode.EXPECTED_OPEN_BRACE);
+            JsonMapNode map = new JsonMapNode(start.getStartLine(), start.getStartColumn());
+
+            attachComments(map);
+
+            // Fast exit for empty object: {}
+            if (check(JsonTokenType.RIGHT_BRACE)) {
+                consume(JsonTokenType.RIGHT_BRACE, JsonDiagnosticCode.EXPECTED_CLOSE_BRACE);
+                return map;
+            }
+
+            // Track unique keys
+            Set<String> seenKeys = new HashSet<>();
+
+            while (!isAtEnd()) {
+
+                // Consume comments only (skipTrivia is cheap)
+                skipTrivia();
+
+                // JSON5 trailing comma: allow { key: value, }
+                if (ALLOW_TRAILING_COMMA && check(JsonTokenType.RIGHT_BRACE)) {
+                    break;
+                }
+
+                // ---- Parse key ----
+                JsonToken keyTok = advance();
+
+                // JSON5: unquoted keys allowed only when configured
+                if (!ALLOW_UNQUOTED_KEYS && keyTok.getQuoteStyle() != QuoteStyle.DOUBLE) {
+                    error(keyTok, JsonDiagnosticCode.EXPECTED_MAP_KEY);
+                }
+
+                // Duplicate key detection
+                String keyString = parseKey(keyTok);
+
+                if (!seenKeys.add(keyString)) {
+                    // error(keyTok, JsonDiagnosticCode.DUPLICATE_KEY, keyString);
+                    warn(keyTok, JsonDiagnosticCode.DUPLICATE_KEY, keyString);
+                }
+
+                // ---- Parse colon ----
+                consume(JsonTokenType.COLON, JsonDiagnosticCode.EXPECTED_COLON_AFTER_MAP_KEY);
+
+                // ---- Parse value ----
+                JsonNode value = parseValue();
+
+                // map.put(keyString, value);
+                JsonMapEntryNode entry = new JsonMapEntryNode(
+                    keyTok.getStartLine(),
+                    keyTok.getStartColumn(),
+                    keyString,
+                    value
+                );
+                attachComments(entry);
+                map.put(entry);
+
+                // Consume comments only
+                skipTrivia();
+
+                // ---- Comma or end ----
+                if (!match(JsonTokenType.COMMA)) {
+                    break;
+                }
+            }
+
+            consume(JsonTokenType.RIGHT_BRACE, JsonDiagnosticCode.EXPECTED_CLOSE_BRACE);
+            return map;
+
+        } finally {
+            depth--;
+        }
+    }
+
+    private String parseKey(JsonToken tok) {
+        String key;
+        switch (tok.getType()) {
+
+            case STRING -> {
+                key = JsonStringUnescaper.unescape(tok.getContent());
+            }
+
+            case IDENTIFIER -> {
+                if (ALLOW_UNQUOTED_KEYS) {
+                    key = tok.getLexeme();
+                } else {
+                    error(tok, JsonDiagnosticCode.EXPECTED_MAP_KEY);
+                    key = null;
+                }
+            }
+
+            default -> {
+                error(tok, JsonDiagnosticCode.EXPECTED_MAP_KEY);
+                key = null;
+            }
+        }
+
+        return key;
+    }
+
+    private JsonSequenceNode parseSequence() {
+        depth++;
+        if (depth > DEPTH_LIMIT) {
+            error(peek(),JsonDiagnosticCode.DEPTH_LIMIT);
+        }
+        trace("parseSequence");
+
+        try {
+            JsonToken start = consume(JsonTokenType.LEFT_BRACKET, JsonDiagnosticCode.EXPECTED_OPEN_BRACKET);
+            JsonSequenceNode seq = new JsonSequenceNode(start.getStartLine(), start.getStartColumn());
+
+            attachComments(seq);
+
+            // Fast exit for empty array: []
+            if (check(JsonTokenType.RIGHT_BRACKET)) {
+                consume(JsonTokenType.RIGHT_BRACKET, JsonDiagnosticCode.EXPECTED_CLOSE_BRACKET);
+                return seq;
+            }
+
+            while (!isAtEnd()) {
+
+                // Consume comments only
+                skipTrivia();
+
+                // JSON5 trailing comma: allow [ value, ]
+                if (ALLOW_TRAILING_COMMA && check(JsonTokenType.RIGHT_BRACKET)) {
+                    break;
+                }
+
+                // ---- Parse value ----
+                JsonNode value = parseValue();
+                seq.add(value);
+
+                // Consume comments only
+                skipTrivia();
+
+                // ---- Comma or end ----
+                if (!match(JsonTokenType.COMMA)) {
+                    break;
+                }
+            }
+
+            consume(JsonTokenType.RIGHT_BRACKET, JsonDiagnosticCode.EXPECTED_CLOSE_BRACKET);
+            return seq;
+
+        } finally {
+            depth--;
+        }
+    }
+
+    private JsonScalarNode parseScalar() {
+        depth++;
+        trace("parseScalar");
+
+        try {
+            skipTrivia();
+            JsonToken tok = advance(); // consume the scalar token
+            JsonTokenType type = tok.getType();
+            JsonScalarNode node = null;
+
+            switch (type) {
+
+                case STRING -> {
+                    node = new JsonScalarNode(
+                        tok,
+                        PrimitiveType.STRING,
+                        false,
+                        options
+                    );
+                }
+
+                case NUMBER -> {
+                    if (tok instanceof JsonNumberToken number) {
+                        node = new JsonScalarNode(tok, number.getNumber());
+                    }
+                    // node = new JsonScalarNode(
+                    //     tok,
+                    //     PrimitiveType.ANY, // We don't know if it's NUMBER or INTERGER
+                    //     false,
+                    //     options
+                    // );
+                }
+
+                default -> {
+                    JsonLiteral literal = tok.getLiteral();
+                    if (literal != null) {
+                        switch(literal) {
+                            case TRUE -> {
+                                node = new JsonScalarNode(
+                                    tok,
+                                    PrimitiveType.BOOLEAN,
+                                    false,
+                                    options
+                                );
+                            }
+                            case FALSE -> {
+                                node = new JsonScalarNode(
+                                    tok,
+                                    PrimitiveType.BOOLEAN,
+                                    false,
+                                    options
+                                );
+                            }
+                            case NULL -> {
+                                node = new JsonScalarNode(
+                                    tok,
+                                    PrimitiveType.NULL,
+                                    false,
+                                    options
+                                );
+                            }
+                            case NAN -> {
+                                if (ALLOW_INFINITY_AND_NAN) {
+                                    node = new JsonScalarNode(
+                                        tok,
+                                        PrimitiveType.STRING,
+                                        false,
+                                        options
+                                    );
+                                } else {
+                                    error(tok, JsonDiagnosticCode.UNEXPECTED_UNQUOTED_STRING_VALUE, NAN);
+                                    node = new JsonScalarNode();
+                                }
+                            }
+                            case INFINITY -> {
+                                if (ALLOW_INFINITY_AND_NAN) {
+                                    node = new JsonScalarNode(
+                                        tok,
+                                        PrimitiveType.STRING,
+                                        false,
+                                        options
+                                    );
+                                } else {
+                                    error(tok, JsonDiagnosticCode.UNEXPECTED_UNQUOTED_STRING_VALUE, INFINITY);
+                                    node = new JsonScalarNode();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (node == null) {
+                error(tok, JsonDiagnosticCode.UNEXPECTED_TOKEN, type);
+                node = new JsonScalarNode(
+                    tok,
+                    PrimitiveType.ANY,
+                    false,
+                    options
+                );
+            }
+
+            attachComments(node);
+            return node;
+
+        } finally {
+            depth--;
+        }
+    }
+
+    //
+    // Trivia / comments
+    //
+
+    private void skipTrivia() {
+        if (!ALLOW_COMMENTS) return;
+
+        while (peek().getType() == JsonTokenType.COMMENT) {
+            JsonToken tok = advance();
+
+            // Avoid startsWith() cost when comment type is already known
+            boolean isBlock = tok.getLexeme().length() > 1 && tok.getLexeme().charAt(1) == '*';
+
+            pendingComments.add(new JsonCommentNode(
+                tok.getStartLine(),
+                tok.getStartColumn(),
+                tok.getLexeme(),
+                tok.getContent(),
+                isBlock
+            ));
+        }
+    }
+
+    private <T extends JsonNode> T attachComments(T node) {
+        if (node == null) return null;
+        if (!(ALLOW_COMMENTS && CAPTURE_COMMENTS)) return node;
+        for (JsonCommentNode comment : pendingComments) {
+            node.addComment(comment);
+        }
+        pendingComments.clear();
+        return node;
+    }
+
+    //
+    // Token navigation (streaming)
+    //
+
+    private JsonToken peek() {
+        if (currentToken == null) {
+            if (lookaheadToken != null) {
+                currentToken = lookaheadToken;
+                lookaheadToken = null;
+            } else {
+                currentToken = tokenizer.nextToken();
+            }
+        }
+        return currentToken;
+    }
+
+    private JsonToken advance() {
+        JsonToken prev = peek();
+        currentToken = null;
+        return prev;
+    }
+
+    private boolean isAtEnd() {
+        return peek().getType() == JsonTokenType.EOF;
+    }
+
+    private boolean check(JsonTokenType type) {
+        return peek().getType() == type;
+    }
+
+    private boolean match(JsonTokenType... types) {
+        for (JsonTokenType type : types) {
+            if (check(type)) {
+                advance();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private JsonToken consume(JsonTokenType type, DiagnosticCode code, Object... details) {
+        if (check(type)) return advance();
+
+        // Report the error but don't crash
+        error(peek(), code, details);
+
+        // Return the current token anyway to avoid crashing the caller,
+        // or return a dummy token.
+        return peek();
+    }
+
+    //
+    // Diagnostics
+    //
+
+    private void trace(String methodName) {
+        if (reporter == null || reporter.isSilent()) return;
+        JsonToken tok = peek();
+        String indent = "  ".repeat(Math.max(0, depth));
+        reporter.trace("L%3d C%3d %s%s: %s",
+            tok.getStartLine(), tok.getStartColumn(), indent, methodName, tok.getType());
+    }
+
+    private void warn(JsonToken token, DiagnosticCode code, Object... details) {
+        reporter.warnAt(token, code, details);
+    }
+
+    private void error(JsonToken token, DiagnosticCode code, Object... details) {
+
+        if (token instanceof JsonErrorToken error) {
+            code = error.getCode();
+            details = error.getDetails();
+        }
+
+        reporter.errorAt(token, code, details);
+        if (!reporter.collectsProblems()) {
+            throw new ParserException(token, code, details);
+        }
+    }
+
+    //
+    // Adapter: List<JsonToken> → Tokenizer<JsonToken>
+    //
+
+    private static final class ListBackedJsonTokenizer implements Tokenizer<JsonToken> {
+
+        private final List<JsonToken> tokens;
+        private int index = 0;
+
+        ListBackedJsonTokenizer(List<JsonToken> tokens) {
+            this.tokens = tokens;
+        }
+
+        @Override
+        public void open(String text) {
+            throw new UnsupportedOperationException("List-backed tokenizer does not support open(String)");
+        }
+
+        @Override
+        public void open(InputStream is) {
+            throw new UnsupportedOperationException("List-backed tokenizer does not support open(InputStream)");
+        }
+
+        @Override
+        public JsonToken nextToken() {
+            if (index >= tokens.size()) {
+                // Return last token (EOF) repeatedly
+                return tokens.get(tokens.size() - 1);
+            }
+            return tokens.get(index++);
+        }
+
+        @Override
+        public Set<? extends JsonTokenType> getTokenTypes() {
+            return Set.of(JsonTokenType.values());
+        }
+
+        @Override
+        public ListBackedJsonTokenizer setReporter(Reporter reporter) {
+            return this;
+        }
+
+        @Override
+        public ListBackedJsonTokenizer setOptions(LanguageOptions<?> options) {
+            return this;
+        }
+
+        @Override
+        public Properties getServiceProperties() {
+            return new Properties(); // no properties needed
+        }
+
+        @Override
+        public ContentType getContentType() {
+            return null; // safe default
+        }
+
+		@Override
+		public void open(Reader reader) {
+			// TODO Auto-generated method stub
+			throw new UnsupportedOperationException("Unimplemented method 'open'");
+		}
+    }
+}

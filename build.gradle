@@ -1,4 +1,5 @@
 plugins {
+    id 'application'
     id "io.github.qishr.cascara-meta.java-library" version "0.1.0"
     id "io.github.qishr.cascara-meta.publish" version "0.1.0"
 }
@@ -11,7 +12,9 @@ repositories {
 
 
 dependencies {
-    implementation(platform("io.github.qishr:cascara-meta-bom:0.1.6"))
+    // Cascara
+    implementation(platform("io.github.qishr:cascara-meta-bom:0.1.18"))
+    implementation "io.github.qishr:cascara-common"
 
     // JUnit
     testImplementation 'org.junit.jupiter:junit-jupiter-api'
@@ -22,7 +25,21 @@ dependencies {
     // Mockito
     testImplementation 'org.mockito:mockito-core'
     testImplementation 'org.mockito:mockito-junit-jupiter'
-
-    // Cascara
-    implementation "io.github.qishr:cascara-common"
 }
+
+
+// tasks.withType(Test).configureEach {
+//     jvmArgs '--add-modules=jdk.incubator.vector'
+// }
+
+
+test {
+    jvmArgs += ["--add-modules=jdk.incubator.vector"]
+}
+
+
+application {
+    mainClass.set("io.github.qishr.cascara.lang.json.util.ProfilingHarness")
+    applicationDefaultJvmArgs = ["--add-modules=jdk.incubator.vector"]
+}
+

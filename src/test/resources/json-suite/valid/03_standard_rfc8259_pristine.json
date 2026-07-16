@@ -1,0 +1,10 @@
+{
+    "string": "Cascara UI",
+    "number": 101,
+    "boolean": true,
+    "nullValue": null,
+    "array": [1, 2, 3],
+    "object": {
+      "nested": "value"
+    }
+  }
