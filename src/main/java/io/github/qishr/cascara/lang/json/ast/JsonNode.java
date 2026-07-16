@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Objects;
 import io.github.qishr.cascara.common.lang.ast.AstNode;
 import io.github.qishr.cascara.common.lang.ast.CommentAstNode;
+import io.github.qishr.cascara.lang.json.token.JsonLexemeBackedToken;
 import io.github.qishr.cascara.lang.json.token.JsonToken;
 
 public abstract class JsonNode implements AstNode {
@@ -13,16 +14,22 @@ public abstract class JsonNode implements AstNode {
     private int endLine = 0;
     private int endColumn = 0;
     private final List<CommentAstNode> comments = new ArrayList<>();
-    private JsonToken token;
+    protected JsonToken token;
 
     protected JsonNode() {
-        this.startLine = 1;
-        this.startColumn = 1;
+        this.startLine = -1;
+        this.startColumn = -1;
     }
 
     protected JsonNode(int line, int column) {
         this.startLine = line;
         this.startColumn = column;
+    }
+
+    protected JsonNode(JsonToken token) {
+        this.token = token;
+        this.startLine = token.getStartLine();
+        this.startColumn = token.getStartColumn();
     }
 
     @Override public abstract List<? extends JsonNode> getChildren();
@@ -32,7 +39,7 @@ public abstract class JsonNode implements AstNode {
     @Override public int getEndColumn() { return endColumn; }
     @Override public List<CommentAstNode> getComments() { return comments; }
     @Override public JsonToken getToken() { return token; }
-    public void setToken(JsonToken token) { this.token = token; }
+    public void setToken(JsonLexemeBackedToken token) { this.token = token; }
 
     public void addComment(CommentAstNode comment) {
         this.comments.add(comment);

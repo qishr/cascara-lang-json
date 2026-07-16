@@ -1,6 +1,9 @@
 package io.github.qishr.cascara.lang.json.processor;
 
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.Reader;
+import java.io.Writer;
 
 import io.github.qishr.cascara.common.diagnostic.NoOpReporter;
 import io.github.qishr.cascara.common.diagnostic.Reporter;
@@ -9,29 +12,39 @@ import io.github.qishr.cascara.common.lang.util.LanguageOptions;
 import io.github.qishr.cascara.common.lang.exception.SerializerException;
 import io.github.qishr.cascara.common.lang.processor.AbstractSerializer;
 import io.github.qishr.cascara.common.lang.processor.AstParser;
+import io.github.qishr.cascara.common.lang.type.TypeReference;
 import io.github.qishr.cascara.common.util.ContentType;
-import io.github.qishr.cascara.lang.json.JsonOptions;
-import io.github.qishr.cascara.lang.json.JsonPrimitiveDelegate;
 import io.github.qishr.cascara.lang.json.ast.JsonMapEntryNode;
 import io.github.qishr.cascara.lang.json.ast.JsonMapNode;
 import io.github.qishr.cascara.lang.json.ast.JsonNode;
+import io.github.qishr.cascara.lang.json.ast.JsonNodeFactory;
 import io.github.qishr.cascara.lang.json.ast.JsonScalarNode;
 import io.github.qishr.cascara.lang.json.ast.JsonSequenceNode;
+import io.github.qishr.cascara.lang.json.util.JsonOptions;
 
 /// Standard implementation for JSON serialization.
-public class JsonSerializer extends AbstractSerializer<JsonSerializer,JsonNode,JsonScalarNode,JsonSequenceNode,JsonMapNode,JsonMapEntryNode> {
+public class JsonSerializer extends AbstractSerializer<JsonSerializer,JsonNode,JsonScalarNode,JsonSequenceNode,JsonMapNode,JsonMapEntryNode,String> {
 
     private JsonAstParser parser;
     private JsonOptions options = new JsonOptions();
     private Reporter reporter = new NoOpReporter();
 
     public JsonSerializer() {
-        super(AbstractJsonProcessor.JSON_CONTENT_TYPE_STRING, new JsonNodeFactory(), new JsonPrimitiveDelegate());
+        // This constructor is for SPI and cannot take a parameter.
+        super(AbstractJsonProcessor.JSON_CONTENT_TYPE_STRING, new JsonNodeFactory(), new JsonOptions());
     }
 
     @Override
-    public JsonSerializer self() {
+    protected JsonSerializer self() {
         return this;
+    }
+
+    @Override
+    protected String serializeKey(Object key) {
+        if (key instanceof String s) {
+            return s;
+        }
+        return String.valueOf(key);
     }
 
     @Override
@@ -53,6 +66,7 @@ public class JsonSerializer extends AbstractSerializer<JsonSerializer,JsonNode,J
         return this;
     }
 
+    /// {@inheritDoc}
     @Override
     public JsonSerializer setParser(AstParser<JsonNode,?> parser) {
         if (!(parser instanceof JsonAstParser JsonAstParser)) {
@@ -62,33 +76,83 @@ public class JsonSerializer extends AbstractSerializer<JsonSerializer,JsonNode,J
         return this;
     }
 
+    /// {@inheritDoc}
     @Override
     public String toText(Object jvmInstance) {
         JsonNode ast = toAst(jvmInstance);
         return new JsonEmitter().setOptions(options).emit(ast);
     }
 
+    /// {@inheritDoc}
+    @Override
+    public JsonNode toAst(Object jvmInstance) {
+        return serialize(jvmInstance);
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void toWriter(Object jvmInstance, Writer writer) throws IOException {
+        JsonNode ast = toAst(jvmInstance);
+        String text = new JsonEmitter().setOptions(options).emit(ast);
+        writer.write(text);
+    }
+
+    /// {@inheritDoc}
     @Override
     public <C> C fromText(String text, Class<C> jvmType) {
         JsonNode ast = getParser().parse(text);
         return fromAst(ast, jvmType);
     }
 
+    /// {@inheritDoc}
+    @Override
+    public <C> C fromText(String text, TypeReference<C> typeRef) {
+        JsonNode ast = getParser().parse(text);
+        return fromAst(ast, typeRef);
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public <C> C fromReader(Reader reader, Class<C> jvmType) {
+        JsonNode ast = getParser().parse(reader);
+        return fromAst(ast, jvmType);
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public <C> C fromReader(Reader reader, TypeReference<C> typeRef) {
+        JsonNode ast = getParser().parse(reader);
+        return fromAst(ast, typeRef);
+    }
+
+    /// {@inheritDoc}
     @Override
     public <C> C fromStream(InputStream is, Class<C> jvmType) {
         JsonNode ast = getParser().parse(is);
         return fromAst(ast, jvmType);
     }
 
+    /// {@inheritDoc}
     @Override
-    public JsonNode toAst(Object jvmInstance) {
-        return serialize(jvmInstance);
+    public <C> C fromStream(InputStream is, TypeReference<C> typeRef) {
+        JsonNode ast = getParser().parse(is);
+        return fromAst(ast, typeRef);
     }
 
+    /// {@inheritDoc}
     @Override
     public <C> C fromAst(JsonNode astNode, Class<C> jvmType) {
         return (C) deserialize(astNode, jvmType);
     }
+
+    /// {@inheritDoc}
+    @Override
+    public <C> C fromAst(JsonNode astNode, TypeReference<C> typeRef) {
+        return (C) deserialize(astNode, typeRef);
+    }
+
+
+
 
     private JsonAstParser getParser() {
         if (parser == null) {

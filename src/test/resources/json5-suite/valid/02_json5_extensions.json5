@@ -1,0 +1,15 @@
+// Structural configuration header
+{
+  unquotedKey: 'single quotes work too',
+  /* Multi-line comments are completely
+     stripped out by the tokenizer */
+  numericVariations: [
+    +.5,
+    -42,
+    0xDEADBEEF,
+    1e10,
+  ],
+  trailingCommaObj: {
+    nested: true,
+  }
+}

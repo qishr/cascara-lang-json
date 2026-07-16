@@ -4,16 +4,18 @@ import io.github.qishr.cascara.common.util.ContentType;
 import io.github.qishr.cascara.common.diagnostic.Reporter;
 import io.github.qishr.cascara.common.lang.util.LanguageOptions;
 import io.github.qishr.cascara.common.lang.processor.Emitter;
-import io.github.qishr.cascara.lang.json.JsonOptions;
 import io.github.qishr.cascara.lang.json.ast.JsonMapEntryNode;
 import io.github.qishr.cascara.lang.json.ast.JsonMapNode;
 import io.github.qishr.cascara.lang.json.ast.JsonNode;
 import io.github.qishr.cascara.lang.json.ast.JsonScalarNode;
 import io.github.qishr.cascara.lang.json.ast.JsonSequenceNode;
+import io.github.qishr.cascara.lang.json.util.JsonOptions;
 
 public class JsonEmitter extends AbstractJsonProcessor<JsonEmitter>  implements Emitter {
     private final StringBuilder output = new StringBuilder();
     private int indentLevel = 0;
+
+    // TODO: I suspect the emitter always assumes prettyPrint is on
 
     @Override protected JsonEmitter self() { return this; }
 
@@ -38,7 +40,7 @@ public class JsonEmitter extends AbstractJsonProcessor<JsonEmitter>  implements 
         // Handle Comments before the node
         if (node.getComments() != null) {
             for (var comment : node.getComments()) {
-                emitScalar(comment.getRaw());
+                emitScalar(comment.getLexeme());
                 emitNewLine();
             }
         }
@@ -51,7 +53,14 @@ public class JsonEmitter extends AbstractJsonProcessor<JsonEmitter>  implements 
             for (int i = 0; i < entries.size(); i++) {
                 JsonMapEntryNode entry = (JsonMapEntryNode) entries.get(i);
 
-                emitNode(entry.getKey());
+
+
+                //
+                // emitNode(entry.getKey());
+                emitScalar(formatKey(entry.getKey()));
+
+
+
                 emitPropertySeparator();
                 emitNode(entry.getValue());
 
@@ -86,6 +95,20 @@ public class JsonEmitter extends AbstractJsonProcessor<JsonEmitter>  implements 
             case PLAIN -> value; // For numbers, booleans, or unquoted keys
             default -> value;
         };
+    }
+
+    private String formatKey(String value) {
+        if (value == null) return "null";
+
+        return "\"" + escapeJson(value) + "\"";
+
+        // return switch (scalar.getQuoteStyle()) {
+        //     case DOUBLE -> "\"" + escapeJson(value) + "\"";
+        //     case SINGLE -> "'" + escapeJson(value) + "'";
+        //     case LITERAL_BLOCK, FOLDED -> value; // Usually used for multi-line or raw blocks
+        //     case PLAIN -> value; // For numbers, booleans, or unquoted keys
+        //     default -> value;
+        // };
     }
 
     private String escapeJson(String input) {
@@ -130,7 +153,7 @@ public class JsonEmitter extends AbstractJsonProcessor<JsonEmitter>  implements 
     @Override
     public void emitPropertySeparator() {
         output.append(":");
-        if (options.isInsertSpaces()) {
+        if (options.insertSpaces()) {
             output.append(" ");
         }
     }
@@ -180,7 +203,7 @@ public class JsonEmitter extends AbstractJsonProcessor<JsonEmitter>  implements 
 
     private void writePadding() {
         int spaceCount = indentLevel * options.getIndentSize();
-        if (options.isInsertSpaces()) {
+        if (options.insertSpaces()) {
             output.append(" ".repeat(spaceCount));
         } else {
             output.append("\t".repeat(indentLevel));

@@ -12,6 +12,7 @@ public class JsonCommentNode extends JsonNode implements ScalarAstNode<JsonNode>
     private final boolean multiLine;
 
     public JsonCommentNode(int line, int column, String rawValue, String stringValue, boolean multiLine) {
+        super(line, column);
         this.value = stringValue;
         this.rawValue = rawValue;
         this.multiLine = multiLine;
@@ -43,7 +44,8 @@ public class JsonCommentNode extends JsonNode implements ScalarAstNode<JsonNode>
     }
 
     /// Returns the original raw string as seen in the source file.
-    public String getRaw() {
+    @Override
+    public String getLexeme() {
         return (rawValue != null) ? rawValue : value;
     }
 
@@ -82,11 +84,11 @@ public class JsonCommentNode extends JsonNode implements ScalarAstNode<JsonNode>
         return null;
     }
 
-    @Override
-    public JsonCommentNode setPrimitive(Object value) {
-        this.value = String.valueOf(value);
-        return this;
-    }
+    // @Override
+    // public JsonCommentNode setPrimitive(Object value) {
+    //     this.value = String.valueOf(value);
+    //     return this;
+    // }
 
     @Override
     public String asString() {

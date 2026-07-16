@@ -1,40 +1,14 @@
-package io.github.qishr.cascara.lang.json;
+package io.github.qishr.cascara.lang.json.util;
 
-import io.github.qishr.cascara.common.lang.util.QuoteStyle;
-import io.github.qishr.cascara.common.lang.type.PrimitiveDelegate;
+public class JsonStringUnescaper {
+    public static String unescape(String text) {
+        if (text == null) return null;
+        // , QuoteStyle style) {
+        // if (style != QuoteStyle.DOUBLE || text == null || text.isEmpty()) {
+        //     return text;
+        // }
 
-public class JsonPrimitiveDelegate implements PrimitiveDelegate {
-    @Override
-    public QuoteStyle inferQuoteStyle(Object value) {
-        QuoteStyle style = QuoteStyle.PLAIN;
-        if (value instanceof CharSequence || value instanceof Character) {
-            style = QuoteStyle.DOUBLE;
-        }
-        return style;
-    }
-
-    /// Converts JSON primitive literal values into native Java types.
-    /// Handles case-sensitive 'true', 'false', 'null', and JSON5 floating-point literals.
-    @Override
-    public Object coerceLiteralValue(String text) {
-        if ("true".equals(text)) return Boolean.TRUE;
-        if ("false".equals(text)) return Boolean.FALSE;
-        if ("null".equals(text)) return null;
-
-        // JSON5 Numeric Extensions
-        if ("Infinity".equals(text) || "+Infinity".equals(text)) return Double.POSITIVE_INFINITY;
-        if ("-Infinity".equals(text)) return Double.NEGATIVE_INFINITY;
-        if ("NaN".equals(text)) return Double.NaN;
-
-        return null; // Fallback to base number parsing or fallback types
-    }
-
-    /// Handles strict JSON string unescaping mechanics for double-quoted strings.
-    @Override
-    public String unescapeQuotedString(String text, QuoteStyle style) {
-        if (style != QuoteStyle.DOUBLE || text == null || text.isEmpty()) {
-            return text;
-        }
+        if (text.indexOf("\\") == -1) return text;
 
         StringBuilder sb = new StringBuilder();
         int len = text.length();
@@ -76,4 +50,5 @@ public class JsonPrimitiveDelegate implements PrimitiveDelegate {
         }
         return sb.toString();
     }
+
 }

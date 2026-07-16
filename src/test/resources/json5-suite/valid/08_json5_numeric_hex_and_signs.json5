@@ -1,0 +1,11 @@
+{
+  "hex": 0xDEADBEEF,
+  "positive": +42,
+  "negative": -0.5,
+  "leadingDot": .123,
+  "normal": 0.123,
+  "trailingDot": 42.,
+  "infinity": Infinity,
+  "negativeInfinity": -Infinity,
+  "nan": NaN
+}

@@ -1,15 +1,24 @@
 package io.github.qishr.cascara.lang.json.processor;
 
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.lang.module.ModuleDescriptor;
+import java.util.stream.Collectors;
+
 import io.github.qishr.cascara.common.diagnostic.NoOpReporter;
 import io.github.qishr.cascara.common.diagnostic.Reporter;
 import io.github.qishr.cascara.common.lang.util.LanguageOptions;
+import io.github.qishr.cascara.common.semver.SemVer;
 import io.github.qishr.cascara.common.lang.processor.Processor;
 import io.github.qishr.cascara.common.util.ContentType;
+import io.github.qishr.cascara.common.util.JarManifest;
 import io.github.qishr.cascara.common.util.Properties;
-import io.github.qishr.cascara.lang.json.JsonOptions;
+import io.github.qishr.cascara.lang.json.util.JsonOptions;
 
 public abstract class AbstractJsonProcessor<P extends Processor> implements Processor {
     static final String JSON_CONTENT_TYPE_STRING = "application/json";
+    static final Reporter NO_OP_REPORTER = new NoOpReporter();
 
     static final ContentType JSON_CONTENT_TYPE = new ContentType("JSON")
             .withType("text/json")
@@ -17,8 +26,8 @@ public abstract class AbstractJsonProcessor<P extends Processor> implements Proc
             .withType("application/schema+json")
             .withSuffix(".json");
 
-    protected JsonOptions options = new JsonOptions();
-    protected Reporter reporter = new NoOpReporter();
+    protected JsonOptions options = JsonOptions.STRICT;
+    protected Reporter reporter = NO_OP_REPORTER;
     private Properties capabilities;
 
     protected abstract P self();
@@ -40,7 +49,7 @@ public abstract class AbstractJsonProcessor<P extends Processor> implements Proc
     /// {@inheritDoc}
     @Override
     public P setReporter(Reporter reporter) {
-        this.reporter = reporter;
+        this.reporter = (reporter == null ? NO_OP_REPORTER : reporter);
         return self();
     }
 
@@ -50,4 +59,26 @@ public abstract class AbstractJsonProcessor<P extends Processor> implements Proc
         this.options = (JsonOptions) options;
         return self();
     }
+
+    public JsonOptions getOptions() {
+        return options;
+    }
+
+    public Reporter getReporter() {
+        return reporter;
+    }
+
+    public SemVer getVersion() {
+        return JarManifest.of(getClass()).getVersion();
+    }
+
+    public String getTextResource(String resourcePath) {
+        InputStream is = AbstractJsonProcessor.class.getResourceAsStream(resourcePath);
+        try (BufferedReader br = new BufferedReader(new InputStreamReader(is))) {
+            return br.lines().collect(Collectors.joining("\n"));
+        } catch (Exception _) {
+            return "";
+        }
+    }
+
 }

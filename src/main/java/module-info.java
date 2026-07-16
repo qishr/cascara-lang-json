@@ -1,13 +1,14 @@
 module cascara.lang.json {
     requires transitive cascara.common;
+    requires jdk.incubator.vector;
 
-    exports io.github.qishr.cascara.lang.json;
     exports io.github.qishr.cascara.lang.json.ast;
     exports io.github.qishr.cascara.lang.json.processor;
     exports io.github.qishr.cascara.lang.json.token;
+    exports io.github.qishr.cascara.lang.json.util;
 
     // For testing
-    opens io.github.qishr.cascara.lang.json;
+    opens io.github.qishr.cascara.lang.json.processor;
 
     provides io.github.qishr.cascara.common.lang.processor.AstConverter
         with io.github.qishr.cascara.lang.json.processor.JsonConverter;

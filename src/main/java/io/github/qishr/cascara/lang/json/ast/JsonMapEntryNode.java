@@ -2,27 +2,26 @@ package io.github.qishr.cascara.lang.json.ast;
 
 import java.util.List;
 import io.github.qishr.cascara.common.lang.ast.MapEntryAstNode;
-import io.github.qishr.cascara.common.lang.reference.ReferenceNode;
 
 /// Represents the structural pairing of a key and a value in a JSON object.
-public class JsonMapEntryNode extends JsonNode implements MapEntryAstNode<JsonNode> {
-    private final JsonNode key;
+public class JsonMapEntryNode extends JsonNode implements MapEntryAstNode<String,JsonNode> {
+    private final String key;
     private JsonNode value;
 
-    public JsonMapEntryNode(int line, int column, JsonNode key, JsonNode value) {
+    public JsonMapEntryNode(int line, int column, String key, JsonNode value) {
         super(line, column);
         this.key = key;
         this.value = value;
     }
 
     /// Convenience constructor for programmatic node creation.
-    public JsonMapEntryNode(JsonNode key, JsonNode value) {
+    public JsonMapEntryNode(String key, JsonNode value) {
         super(0, 0);
         this.key = key;
         this.value = value;
     }
 
-    @Override public JsonNode getKey() { return key; }
+    @Override public String getKey() { return key; }
 
     @Override public JsonNode getValue() { return value; }
 
@@ -32,7 +31,9 @@ public class JsonMapEntryNode extends JsonNode implements MapEntryAstNode<JsonNo
     }
 
     @Override public List<JsonNode> getChildren() {
-        return List.of(key, value);
+        // TODO:
+        // return List.of(key, value);
+        return List.of(value);
     }
 
     @Override
