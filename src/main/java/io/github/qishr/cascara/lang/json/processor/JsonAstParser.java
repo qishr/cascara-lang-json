@@ -1,6 +1,7 @@
 package io.github.qishr.cascara.lang.json.processor;
 
 import java.io.InputStream;
+import java.io.Reader;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -97,6 +98,15 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
         tokenizer.setOptions(options);
         tokenizer.setReporter(reporter);
         tokenizer.open(data);
+        return parse(tokenizer);
+    }
+
+    @Override
+    public JsonNode parse(Reader reader) {
+        JsonTokenizer tokenizer = new JsonTokenizer();
+        tokenizer.setOptions(options);
+        tokenizer.setReporter(reporter);
+        tokenizer.open(reader);
         return parse(tokenizer);
     }
 
@@ -630,6 +640,11 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
         public ContentType getContentType() {
             return null; // safe default
         }
-    }
 
+		@Override
+		public void open(Reader reader) {
+			// TODO Auto-generated method stub
+			throw new UnsupportedOperationException("Unimplemented method 'open'");
+		}
+    }
 }

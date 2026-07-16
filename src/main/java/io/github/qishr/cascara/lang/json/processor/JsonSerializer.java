@@ -1,6 +1,9 @@
 package io.github.qishr.cascara.lang.json.processor;
 
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.Reader;
+import java.io.Writer;
 
 import io.github.qishr.cascara.common.diagnostic.NoOpReporter;
 import io.github.qishr.cascara.common.diagnostic.Reporter;
@@ -88,6 +91,14 @@ public class JsonSerializer extends AbstractSerializer<JsonSerializer,JsonNode,J
 
     /// {@inheritDoc}
     @Override
+    public void toWriter(Object jvmInstance, Writer writer) throws IOException {
+        JsonNode ast = toAst(jvmInstance);
+        String text = new JsonEmitter().setOptions(options).emit(ast);
+        writer.write(text);
+    }
+
+    /// {@inheritDoc}
+    @Override
     public <C> C fromText(String text, Class<C> jvmType) {
         JsonNode ast = getParser().parse(text);
         return fromAst(ast, jvmType);
@@ -97,6 +108,20 @@ public class JsonSerializer extends AbstractSerializer<JsonSerializer,JsonNode,J
     @Override
     public <C> C fromText(String text, TypeReference<C> typeRef) {
         JsonNode ast = getParser().parse(text);
+        return fromAst(ast, typeRef);
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public <C> C fromReader(Reader reader, Class<C> jvmType) {
+        JsonNode ast = getParser().parse(reader);
+        return fromAst(ast, jvmType);
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public <C> C fromReader(Reader reader, TypeReference<C> typeRef) {
+        JsonNode ast = getParser().parse(reader);
         return fromAst(ast, typeRef);
     }
 
@@ -125,6 +150,9 @@ public class JsonSerializer extends AbstractSerializer<JsonSerializer,JsonNode,J
     public <C> C fromAst(JsonNode astNode, TypeReference<C> typeRef) {
         return (C) deserialize(astNode, typeRef);
     }
+
+
+
 
     private JsonAstParser getParser() {
         if (parser == null) {

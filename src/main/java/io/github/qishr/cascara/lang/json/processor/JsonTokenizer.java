@@ -1,6 +1,7 @@
 package io.github.qishr.cascara.lang.json.processor;
 
 import java.io.InputStream;
+import java.io.Reader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -11,7 +12,6 @@ import io.github.qishr.cascara.common.lang.processor.Tokenizer;
 import io.github.qishr.cascara.common.lang.util.LanguageOptions;
 import io.github.qishr.cascara.common.lang.util.LexemeProvider;
 import io.github.qishr.cascara.common.lang.util.QuoteStyle;
-import io.github.qishr.cascara.common.lang.util.SimdCapableBuffer;
 import io.github.qishr.cascara.common.lang.util.SourceBuffer;
 import io.github.qishr.cascara.common.lang.util.SourceInputStreamBuffer;
 import io.github.qishr.cascara.common.lang.util.SourceStringBuffer;
@@ -172,6 +172,13 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             validateUtf8(data);
         }
         buffer = setupByteBuffer(data);
+        factory = setupTokenFactory(buffer);
+        skipBom();
+    }
+
+    @Override
+    public void open(Reader reader) {
+        buffer = new SourceInputStreamBuffer(reader);
         factory = setupTokenFactory(buffer);
         skipBom();
     }
@@ -1016,12 +1023,10 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     }
 
     private ScannedNumber scanNumberUnicode(char startChar) {
-        boolean negative = false; // TODO: This is unused
         boolean isInteger = true;
         boolean isHex = false;
 
         if (startChar == '-' || startChar == '+') {
-            negative = (startChar == '-');
             buffer.advance();
             startChar = buffer.peek();
         }
@@ -1305,77 +1310,6 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         if (seenExp && digitsAfterExp == 0) return false;
 
         return true;
-    }
-
-    // TODO: This is not called from anywhere. Remove it?
-    private void scanDigits() {
-        char c;
-        while (true) {
-            c = buffer.peek();
-            if (c < 128 && DIGIT[c]) {
-                buffer.advance();
-                continue;
-            }
-            break;
-        }
-
-        // 4. Fractional part
-        if (buffer.peek() == '.') {
-            buffer.advance();
-            while (true) {
-                c = buffer.peek();
-                if (c < 128 && DIGIT[c]) {
-                    buffer.advance();
-                    continue;
-                }
-                break;
-            }
-            }
-
-        // 5. Exponent part
-        c = buffer.peek();
-        if (c == 'e' || c == 'E') {
-            buffer.advance();
-            c = buffer.peek();
-            if (c == '+' || c == '-') {
-                buffer.advance();
-            }
-            while (true) {
-                c = buffer.peek();
-                if (c < 128 && DIGIT[c]) {
-                    buffer.advance();
-                    continue;
-                }
-                break;
-            }
-        }
-    }
-
-    // TODO: This is not called from anywhere. Remove it?
-    private void scanDigitsSimd() {
-        final SimdCapableBuffer simd = (SimdCapableBuffer)buffer;
-
-        int pos = simd.scanDigitsSimd(buffer.offset());
-        buffer.setOffset(pos);
-
-        // 4. Fractional part
-        if (buffer.peek() == '.') {
-            buffer.advance();
-            pos = simd.scanDigitsSimd(buffer.offset());
-            buffer.setOffset(pos);
-        }
-
-        // 5. Exponent part
-        char c = buffer.peek();
-        if (c == 'e' || c == 'E') {
-            buffer.advance();
-            c = buffer.peek();
-            if (c == '+' || c == '-') {
-                buffer.advance();
-            }
-            pos = simd.scanDigitsSimd(buffer.offset());
-            buffer.setOffset(pos);
-        }
     }
 
     //
