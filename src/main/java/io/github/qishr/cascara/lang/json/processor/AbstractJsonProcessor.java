@@ -1,10 +1,18 @@
 package io.github.qishr.cascara.lang.json.processor;
 
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.lang.module.ModuleDescriptor;
+import java.util.stream.Collectors;
+
 import io.github.qishr.cascara.common.diagnostic.NoOpReporter;
 import io.github.qishr.cascara.common.diagnostic.Reporter;
 import io.github.qishr.cascara.common.lang.util.LanguageOptions;
+import io.github.qishr.cascara.common.semver.SemVer;
 import io.github.qishr.cascara.common.lang.processor.Processor;
 import io.github.qishr.cascara.common.util.ContentType;
+import io.github.qishr.cascara.common.util.JarManifest;
 import io.github.qishr.cascara.common.util.Properties;
 import io.github.qishr.cascara.lang.json.util.JsonOptions;
 
@@ -59,4 +67,18 @@ public abstract class AbstractJsonProcessor<P extends Processor> implements Proc
     public Reporter getReporter() {
         return reporter;
     }
+
+    public SemVer getVersion() {
+        return JarManifest.of(getClass()).getVersion();
+    }
+
+    public String getTextResource(String resourcePath) {
+        InputStream is = AbstractJsonProcessor.class.getResourceAsStream(resourcePath);
+        try (BufferedReader br = new BufferedReader(new InputStreamReader(is))) {
+            return br.lines().collect(Collectors.joining("\n"));
+        } catch (Exception _) {
+            return "";
+        }
+    }
+
 }

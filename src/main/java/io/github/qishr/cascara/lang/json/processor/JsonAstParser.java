@@ -8,7 +8,6 @@ import java.util.Set;
 
 import io.github.qishr.cascara.common.diagnostic.Reporter;
 import io.github.qishr.cascara.common.diagnostic.code.DiagnosticCode;
-import io.github.qishr.cascara.common.diagnostic.code.GenericDiagnosticCode;
 import io.github.qishr.cascara.common.lang.exception.ParserException;
 import io.github.qishr.cascara.common.lang.processor.AstParser;
 import io.github.qishr.cascara.common.lang.processor.Tokenizer;
@@ -49,6 +48,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
     private boolean ALLOW_TRAILING_COMMA;
     private boolean ALLOW_UNQUOTED_KEYS;
     private boolean CAPTURE_COMMENTS;
+    private int DEPTH_LIMIT;
 
     private JsonTokenizer tokenizer;
     private int depth = 0;
@@ -73,6 +73,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
         this.ALLOW_TRAILING_COMMA   = options.allowTrailingComma();
         this.ALLOW_UNQUOTED_KEYS    = options.allowUnquotedKeys();
         this.CAPTURE_COMMENTS       = options.captureComments();
+        this.DEPTH_LIMIT            = options.getDepthLimit();
     }
 
     @Override
@@ -302,6 +303,9 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
 
     private JsonSequenceNode parseSequence() {
         depth++;
+        if (depth > DEPTH_LIMIT) {
+            error(peek(),JsonDiagnosticCode.DEPTH_LIMIT);
+        }
         trace("parseSequence");
 
         try {

@@ -35,6 +35,8 @@ public class JsonOptions extends LanguageOptions<JsonOptions> implements Duplica
     private boolean validateUnicode = false;
     private boolean trackPosition = false;
 
+    private int depthLimit = 500;
+
     public JsonOptions() {}
 
     public JsonOptions(JsonOptions original) {
@@ -52,6 +54,8 @@ public class JsonOptions extends LanguageOptions<JsonOptions> implements Duplica
         useSimd = original.useSimd;
         validateUnicode = original.validateUnicode;
         trackPosition = original.trackPosition;
+
+        depthLimit = original.depthLimit;
     }
 
     // public boolean allowBooleanKeys() { return allowBooleanKeys; }
@@ -68,6 +72,15 @@ public class JsonOptions extends LanguageOptions<JsonOptions> implements Duplica
     public boolean useSimd() { return useSimd; }
     public boolean validateUnicode() { return validateUnicode; }
     public boolean trackPosition() { return trackPosition; }
+
+    public int getDepthLimit() {
+        return depthLimit;
+    }
+
+    public JsonOptions setDepthLimit(int limit) {
+        depthLimit = limit;
+        return this;
+    }
 
     public JsonOptions setAllowBooleanKeys(boolean val) {
         this.allowBooleanKeys = val;

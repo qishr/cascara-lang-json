@@ -28,7 +28,8 @@ public enum JsonDiagnosticCode implements DiagnosticCode {
     UNTERMINATED_STRING("JSON-111", "Unterminated string literal"),
 
     // Parser
-    UNEXPECTED_TOKEN("JSON-201", "Unexpected token: {0}"),
+    DEPTH_LIMIT("JSON-201", "Depth limit exceeded"),
+    UNEXPECTED_TOKEN("JSON-202", "Unexpected token: {0}"),
     DUPLICATE_KEY("JSON-203", "Duplicate key found: '{0}'"),
 
     // MAP_KEY_INDENTATION("JSON-302", "Inconsistent indentation for map key"),
