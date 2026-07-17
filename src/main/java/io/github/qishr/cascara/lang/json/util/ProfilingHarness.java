@@ -38,8 +38,10 @@ package io.github.qishr.cascara.lang.json.util;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 
+import io.github.qishr.cascara.common.lang.annotation.Experimental;
 import io.github.qishr.cascara.lang.json.processor.JsonAstParser;
 
+@Experimental
 public class ProfilingHarness {
 
     public static void main(String[] args) throws Exception {
