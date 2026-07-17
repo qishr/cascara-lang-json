@@ -20,15 +20,25 @@
 
 - **Clean integration with Cascara language tooling** — Designed to plug directly into Cascara’s [AST](https://qishr.github.io/javadoc/cascara.common/lang/ast/), [Schema](https://qishr.github.io/cascara/schema/), and [diagnostic](https://qishr.github.io/cascara/diagnostics/) systems.
 
-- **Configurable behavior** — Toggle JSON5 features, Unicode validation, comment handling, and strictness levels.
+- **Configurable behavior** — Toggle JSON5 features, Unicode validation, comment handling, and strictness levels via [JsonOptions](https://qishr.github.io/javadoc/cascara.lang.json/json/util/JsonOptions/).
 
 - **Lightweight and embeddable** — No external dependencies, small footprint, and easy to integrate into editors, compilers, and configuration systems.
 
 - **Serialization** - Convert between POJOs, text, and AST nodes.
 
+- **Fluent API** - Easily configure JSON processors or construct AST nodes.
+
+## Examples
+
+For examples, see the [Cascara Language Processors Collection](http://127.0.0.1:8000/cascara/language-processors/) page.
 ## Javadoc
 
-[CascaraJson](https://qishr.github.io/javadoc/cascara.lang.json/json/CascaraJson/)
+- [CascaraJson](https://qishr.github.io/javadoc/cascara.lang.json/json/CascaraJson/)
+- [JsonSerializer](https://qishr.github.io/javadoc/cascara.lang.json/json/processor/JsonSerializer/)
+- [JsonAstParser](https://qishr.github.io/javadoc/cascara.lang.json/json/processor/JsonAstParser/)
+- [JsonTokenizer](https://qishr.github.io/javadoc/cascara.lang.json/json/processor/JsonTokenizer/)
+- [JsonEmitter](https://qishr.github.io/javadoc/cascara.lang.json/json/processor/JsonEmitter/)
+- [JsonConverter](https://qishr.github.io/javadoc/cascara.lang.json/json/processor/JsonConverter/)
 
 ## Compliance
 
