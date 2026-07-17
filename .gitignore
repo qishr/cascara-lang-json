@@ -13,3 +13,5 @@ tree.text
 list.text
 /.settings
 .project
+*.jfr
+*.sh
