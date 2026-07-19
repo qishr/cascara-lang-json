@@ -36,6 +36,8 @@
 package io.github.qishr.cascara.lang.json.ast;
 
 import java.util.List;
+import java.util.Objects;
+
 import io.github.qishr.cascara.common.lang.ast.MapEntryAstNode;
 
 /// Represents the structural pairing of a key and a value in a JSON object.
@@ -76,4 +78,18 @@ public class JsonMapEntryNode extends JsonNode implements MapEntryAstNode<String
         this.value = value;
         return this;
     }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof JsonMapEntryNode other)) return false;
+        return Objects.equals(value, other.value) &&
+               key.equals(other.key);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(getChildren());
+    }
+
 }

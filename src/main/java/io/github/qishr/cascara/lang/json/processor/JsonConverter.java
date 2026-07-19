@@ -36,6 +36,8 @@
 package io.github.qishr.cascara.lang.json.processor;
 
 import io.github.qishr.cascara.common.util.ContentType;
+import io.github.qishr.cascara.common.diagnostic.code.LangDiagnosticCode;
+import io.github.qishr.cascara.common.lang.annotation.Nullable;
 import io.github.qishr.cascara.common.lang.ast.AstNode;
 import io.github.qishr.cascara.common.lang.ast.MapAstNode;
 import io.github.qishr.cascara.common.lang.ast.MapEntryAstNode;
@@ -47,6 +49,7 @@ import io.github.qishr.cascara.lang.json.ast.JsonMapNode;
 import io.github.qishr.cascara.lang.json.ast.JsonNode;
 import io.github.qishr.cascara.lang.json.ast.JsonScalarNode;
 import io.github.qishr.cascara.lang.json.ast.JsonSequenceNode;
+import io.github.qishr.cascara.lang.json.exception.JsonConverterException;
 
 public class JsonConverter extends AbstractJsonProcessor<JsonConverter> implements AstConverter<JsonNode> {
     @Override protected JsonConverter self() { return this; }
@@ -62,7 +65,10 @@ public class JsonConverter extends AbstractJsonProcessor<JsonConverter> implemen
         return emitter.emit(jsonNode);
     }
 
+    @Nullable
     public JsonNode fromAst(AstNode from) {
+        if (from == null) return null;
+
         // System.out.println("fromAst");
         if (from instanceof MapAstNode fromMap) {
             // System.out.println("  map");
@@ -96,25 +102,25 @@ public class JsonConverter extends AbstractJsonProcessor<JsonConverter> implemen
 
             // TODO: Tests for this
 
-            JsonScalarNode scalar = new JsonScalarNode(astScalar.getPrimitive(), false);
+            return new JsonScalarNode(astScalar.getPrimitive(), false);
             // scalar.setPrimitive(astScalar.getPrimitive());
             // scalar.setRaw(astScalar.getString());
-            Object value = scalar.getPrimitive();
-            if (value == null
-                || value instanceof Integer
-                || value instanceof Double
-                || value instanceof Boolean
-            ) {
-                scalar.setQuoteStyle(QuoteStyle.PLAIN);
-            } else {
-                scalar.setQuoteStyle(QuoteStyle.DOUBLE);
-            }
-            return scalar;
+            // Object value = scalar.getPrimitive();
+            // if (value == null
+            //     || value instanceof Integer
+            //     || value instanceof Double
+            //     || value instanceof Boolean
+            // ) {
+            //     scalar.setQuoteStyle(QuoteStyle.PLAIN);
+            // } else {
+            //     scalar.setQuoteStyle(QuoteStyle.DOUBLE);
+            // }
+            // return scalar;
 
 
         } else {
-            System.err.println("Unknown AST node");
-            return null;
+            String name = (from == null) ? "null" : from.getClass().getSimpleName();
+            throw new JsonConverterException(LangDiagnosticCode.UNKNOWN_NODE_TYPE, name);
         }
     }
 }

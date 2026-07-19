@@ -146,6 +146,7 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
             switch (schemaType) {
                 case INTEGER, NULL, NUMBER, BOOLEAN:
                     quoteStyle = QuoteStyle.PLAIN;
+                    break;
                 default:
                     quoteStyle = QuoteStyle.DOUBLE;
             }

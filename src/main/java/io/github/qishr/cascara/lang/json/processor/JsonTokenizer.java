@@ -173,6 +173,11 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         applyOptions(new JsonOptions());
     }
 
+    @Override
+    public int getOffset() {
+        return buffer.offset();
+    }
+
     public int getLine() {
         return buffer.line();
     }
@@ -228,7 +233,8 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
     @Override
     public void open(InputStream stream) {
-        buffer = setupStreamBuffer(stream);
+        buffer = new SourceInputStreamBuffer(stream);
+        // buffer = setupStreamBuffer(stream);
         factory = setupTokenFactory(buffer);
         skipBom();
     }
@@ -1658,21 +1664,6 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         return true;
     }
 
-    // // TODO: This is not called from anywhere. Remove it?
-    // private boolean byteStartsWith(String kw, int relativeOffset) {
-    //     JsonSourceByteBuffer bb = (JsonSourceByteBuffer) buffer;
-    //     byte[] raw = bb.raw;
-    //     int off = buffer.offset() + relativeOffset;
-    //     int n = kw.length();
-
-    //     if (off + n > raw.length) return false;
-
-    //     for (int k = 0; k < n; k++) {
-    //         if (raw[off + k] != (byte) kw.charAt(k)) return false;
-    //     }
-    //     return true;
-    // }
-
     private boolean charStartsWith(String kw, int relativeOffset) {
         int n = kw.length();
 
@@ -1694,26 +1685,6 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         JsonSourceByteBuffer buffer = (JsonSourceByteBuffer)this.buffer;
         for (int i = 0; i < count; i++) buffer.advanceByte();
     }
-
-
-
-    // // TODO: This is not called from anywhere. Remove it?
-    // private boolean startsWithInfinityOrNaNByte(byte first) {
-    //     int off = buffer.offset();
-    //     byte[] raw = ((JsonSourceByteBuffer)buffer).raw;
-
-    //     if (first == 'I') return matchKeywordByte(raw, off, "Infinity");
-    //     if (first == 'N') return matchKeywordByte(raw, off, "NaN");
-
-    //     if (first == '-' || first == '+') {
-    //         if (off + 1 < raw.length) {
-    //             byte c = raw[off + 1];
-    //             if (c == 'I') return matchKeywordByte(raw, off + 1, "Infinity");
-    //             if (c == 'N') return matchKeywordByte(raw, off + 1, "NaN");
-    //         }
-    //     }
-    //     return false;
-    // }
 
     private static boolean isHighSurrogate(int codeUnit) {
         return codeUnit >= 0xD800 && codeUnit <= 0xDBFF;
@@ -1831,39 +1802,6 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         } else {
             return new SourceStringBuffer(text);
         }
-    }
-
-    private SourceBuffer setupStreamBuffer(InputStream stream) {
-        final SourceInputStreamBuffer buffer = new SourceInputStreamBuffer(stream);
-
-        // TODO: Make this work
-
-        // SourceInputStreamBuffer doesn't currently implement SimdCapableBuffer
-        // so this will be simpler than setupStringBuffer.
-
-        // digitScanner = this::scanDigits;
-        // triviaHandler = this::advanceWhitespaceAndComments;
-        // advance = buffer::advance;
-
-        // if (ALLOW_COMMENTS) {
-        //     tokenHandler = this::nextTokenWithComments;
-        // } else {
-        //     tokenHandler = this::nextTokenWithoutComments;
-        // }
-        // if (ALLOW_UNICODE) {
-        //     tokenScanner = this::scanTokenAsciiOrUnicode;
-        //     stringScanner = this::scanString;
-        //     numberScanner = this::scanNumberUnicode;
-        //     numberScanner = this::scanNumberAscii;
-        //     identifierScanner = this::scanIdentifierUnicode;
-        // } else {
-        //     tokenScanner = this::scanTokenAscii;
-        //     stringScanner = this::scanString;
-        //     numberScanner = this::scanNumberAscii;
-        //     identifierScanner = this::scanIdentifierAscii;
-        // }
-
-        return buffer;
     }
 
     //

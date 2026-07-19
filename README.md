@@ -40,6 +40,6 @@ For examples, see the [Cascara Language Processors Collection](http://127.0.0.1:
 - [JsonEmitter](https://qishr.github.io/javadoc/cascara.lang.json/json/processor/JsonEmitter/)
 - [JsonConverter](https://qishr.github.io/javadoc/cascara.lang.json/json/processor/JsonConverter/)
 
-## Compliance
+## Parity
 
-![](https://qishr.github.io/cascara/language-processors/json/images/compliance-json-parser.svg)
+![](https://qishr.github.io/cascara/language-processors/json/images/parity-json-parser.svg)

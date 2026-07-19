@@ -94,16 +94,16 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
 
     /// Default constructor for SPI
     public JsonAstParser() {
-        applyOptions(new JsonOptions());
+        applyOptions();
     }
 
     public JsonAstParser setOptions(JsonOptions options) {
         super.setOptions(options);
-        applyOptions(options);
+        applyOptions();
         return this;
     }
 
-    private void applyOptions(JsonOptions options) {
+    private void applyOptions() {
         this.ALLOW_COMMENTS         = options.allowComments();
         this.ALLOW_INFINITY_AND_NAN = options.allowJson5Numbers();
         this.ALLOW_TRAILING_COMMA   = options.allowTrailingComma();
@@ -114,6 +114,10 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
 
     @Override
     protected JsonAstParser self() { return this; }
+
+    public JsonTokenizer getTokenizer() {
+        return tokenizer;
+    }
 
     //
     // High-level API: String / InputStream
@@ -203,6 +207,9 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
 
     private JsonNode parseValue() {
         depth++;
+        if (depth > DEPTH_LIMIT) {
+            error(peek(),JsonDiagnosticCode.DEPTH_LIMIT);
+        }
         trace("parseValue");
 
         try {
@@ -348,9 +355,6 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
 
     private JsonSequenceNode parseSequence() {
         depth++;
-        if (depth > DEPTH_LIMIT) {
-            error(peek(),JsonDiagnosticCode.DEPTH_LIMIT);
-        }
         trace("parseSequence");
 
         try {
@@ -673,7 +677,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
 
         @Override
         public ContentType getContentType() {
-            return null; // safe default
+			throw new UnsupportedOperationException("Unimplemented method 'getContentType'");
         }
 
 		@Override
@@ -681,5 +685,10 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
 			// TODO Auto-generated method stub
 			throw new UnsupportedOperationException("Unimplemented method 'open'");
 		}
+
+        @Override
+        public int getOffset() {
+			throw new UnsupportedOperationException("Unimplemented method 'getOffset'");
+        }
     }
 }
