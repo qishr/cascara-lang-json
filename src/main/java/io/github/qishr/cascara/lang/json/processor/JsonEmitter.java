@@ -120,10 +120,16 @@ public class JsonEmitter extends AbstractJsonProcessor<JsonEmitter>  implements 
     }
 
     private String formatScalar(JsonScalarNode scalar) {
+
+        // asString returns the unescaped string content without quotes
         String value = scalar.asString();
         if (value == null) return "null";
 
         return switch (scalar.getQuoteStyle()) {
+
+            // TODO: It goes wrong here:
+            // I think here we want the lexeme form, not the content form
+
             case DOUBLE -> "\"" + escapeJson(value) + "\"";
             case SINGLE -> "'" + escapeJson(value) + "'";
             case LITERAL_BLOCK, FOLDED -> value; // Usually used for multi-line or raw blocks
@@ -134,16 +140,7 @@ public class JsonEmitter extends AbstractJsonProcessor<JsonEmitter>  implements 
 
     private String formatKey(String value) {
         if (value == null) return "null";
-
         return "\"" + escapeJson(value) + "\"";
-
-        // return switch (scalar.getQuoteStyle()) {
-        //     case DOUBLE -> "\"" + escapeJson(value) + "\"";
-        //     case SINGLE -> "'" + escapeJson(value) + "'";
-        //     case LITERAL_BLOCK, FOLDED -> value; // Usually used for multi-line or raw blocks
-        //     case PLAIN -> value; // For numbers, booleans, or unquoted keys
-        //     default -> value;
-        // };
     }
 
     private String escapeJson(String input) {

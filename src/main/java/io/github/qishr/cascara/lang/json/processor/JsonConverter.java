@@ -41,7 +41,6 @@ import io.github.qishr.cascara.common.lang.annotation.Nullable;
 import io.github.qishr.cascara.common.lang.ast.AstNode;
 import io.github.qishr.cascara.common.lang.ast.MapAstNode;
 import io.github.qishr.cascara.common.lang.ast.MapEntryAstNode;
-import io.github.qishr.cascara.common.lang.util.QuoteStyle;
 import io.github.qishr.cascara.common.lang.ast.ScalarAstNode;
 import io.github.qishr.cascara.common.lang.ast.SequenceAstNode;
 import io.github.qishr.cascara.common.lang.processor.AstConverter;
@@ -68,10 +67,7 @@ public class JsonConverter extends AbstractJsonProcessor<JsonConverter> implemen
     @Nullable
     public JsonNode fromAst(AstNode from) {
         if (from == null) return null;
-
-        // System.out.println("fromAst");
         if (from instanceof MapAstNode fromMap) {
-            // System.out.println("  map");
             JsonMapNode map = new JsonMapNode();
             for (Object entry : fromMap.getEntries()) {
                 if (entry instanceof MapEntryAstNode fromMapEntry) {
@@ -79,17 +75,13 @@ public class JsonConverter extends AbstractJsonProcessor<JsonConverter> implemen
                     AstNode astValue = fromMapEntry.getValue();
                     if (astKey instanceof ScalarAstNode astScalar) {
                         String jsonKey = astScalar.asString();
-                        // if (fromAst(astScalar) instanceof JsonScalarNode jsonKey) {
-                            // System.out.println("    scalar key " + jsonKey);
-                            JsonNode jsonValue = fromAst(astValue);
-                            map.put(jsonKey, jsonValue);
-                        // }
+                        JsonNode jsonValue = fromAst(astValue);
+                        map.put(jsonKey, jsonValue);
                     }
                 }
             }
             return map;
         } else if (from instanceof SequenceAstNode astSeq) {
-            // System.out.println("  seq");
             JsonSequenceNode sequence = new JsonSequenceNode();
             for (Object element : astSeq.getElements()) {
                 if (element instanceof AstNode astElement) {
@@ -98,29 +90,13 @@ public class JsonConverter extends AbstractJsonProcessor<JsonConverter> implemen
             }
             return sequence;
         } else if (from instanceof ScalarAstNode astScalar) {
-            // System.out.println("  sca " + astScalar.asString());
-
-            // TODO: Tests for this
-
+            // System.out.println("Debug: SCALAR: " + astScalar.asString());
             return new JsonScalarNode(astScalar.getPrimitive(), false);
-            // scalar.setPrimitive(astScalar.getPrimitive());
-            // scalar.setRaw(astScalar.getString());
-            // Object value = scalar.getPrimitive();
-            // if (value == null
-            //     || value instanceof Integer
-            //     || value instanceof Double
-            //     || value instanceof Boolean
-            // ) {
-            //     scalar.setQuoteStyle(QuoteStyle.PLAIN);
-            // } else {
-            //     scalar.setQuoteStyle(QuoteStyle.DOUBLE);
-            // }
-            // return scalar;
-
-
         } else {
-            String name = (from == null) ? "null" : from.getClass().getSimpleName();
-            throw new JsonConverterException(LangDiagnosticCode.UNKNOWN_NODE_TYPE, name);
+            throw new JsonConverterException(
+                LangDiagnosticCode.UNKNOWN_NODE_TYPE,
+                from.getClass().getSimpleName()
+            );
         }
     }
 }

@@ -49,9 +49,7 @@ import io.github.qishr.cascara.common.lang.type.PrimitiveType;
 
 public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> {
 
-    private final JsonOptions options;
-
-    private PrimitiveType schemaType;
+    private PrimitiveType primitiveType;
     private QuoteStyle quoteStyle = QuoteStyle.UNDETERMINED;
 
     private Object jvmValue;
@@ -62,24 +60,22 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
 
     private final boolean isKey;
 
+    private final JsonOptions options;
+
     /// Constructor for use in parsers.
     /// Used when reading raw text from a file stream.
     /// Takes a String and triggers full lexical dialect type inference.
     public JsonScalarNode(
         JsonToken token,
-        PrimitiveType schemaType,
+        PrimitiveType primitiveType,
         boolean isKey,
         JsonOptions options
     ) {
         super(token);
-        this.schemaType = schemaType;
+        this.primitiveType = primitiveType;
         this.quoteStyle = token.getQuoteStyle();
         this.options = (options == null) ? JsonOptions.STRICT : options;
         this.isKey = isKey;
-    }
-
-    public JsonScalarNode(String content, JsonOptions options) {
-        this(content, QuoteStyle.UNDETERMINED, false, options);
     }
 
     public JsonScalarNode(
@@ -89,12 +85,17 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
         JsonOptions options
     ) {
         super();
-        this.schemaType = PrimitiveType.of(jvmValue);
+        this.primitiveType = PrimitiveType.of(jvmValue);
         this.quoteStyle = quoteStyle;
         this.options = (options == null) ? JsonOptions.STRICT : options;
         this.isKey = false;
         this.jvmValue = jvmValue;
         this.isJvmValueCached = true;
+    }
+
+    // TODO: What is this used for? Document it.
+    public JsonScalarNode(Object content, JsonOptions options) {
+        this(content, QuoteStyle.UNDETERMINED, false, options);
     }
 
     /// A programmatic and serializer constructor.
@@ -112,7 +113,7 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
     }
 
     public JsonScalarNode(JsonToken tok, Object jvmValue) {
-        this.schemaType = PrimitiveType.of(jvmValue);
+        this.primitiveType = PrimitiveType.of(jvmValue);
         this.jvmValue = jvmValue;
         this.isJvmValueCached = true;
         this.options = null;
@@ -131,19 +132,15 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
         this(null);
     }
 
-    @Override
-    public List<JsonNode> getChildren() {
-        return List.of();
-    }
-
+    // TODO: Add to interface
     public PrimitiveType getPrimitiveType() {
-        return schemaType;
+        return primitiveType;
     }
 
     @Override
     public QuoteStyle getQuoteStyle() {
         if (quoteStyle == QuoteStyle.UNDETERMINED) {
-            switch (schemaType) {
+            switch (primitiveType) {
                 case INTEGER, NULL, NUMBER, BOOLEAN:
                     quoteStyle = QuoteStyle.PLAIN;
                     break;
@@ -185,10 +182,12 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
     @Override
     public String asString() {
         if (!isStringValueCached) {
-            if (token == null) {
-                stringValue = (jvmValue == null) ? null : String.valueOf(jvmValue);
-            } else {
-                stringValue = unescape(token.getContent(), quoteStyle, isKey);
+            if (primitiveType != PrimitiveType.NULL) {
+                if (token == null) {
+                    stringValue = (jvmValue == null) ? null : String.valueOf(jvmValue);
+                } else {
+                    stringValue = unescape(token.getContent(), quoteStyle, isKey);
+                }
             }
             isStringValueCached = true;
         }
@@ -235,6 +234,7 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
         return asBoolean(false);
     }
 
+    /// {@inheritDoc}
     @Override
     public boolean asBoolean(boolean defaultValue) {
         Object v = getPrimitive();
@@ -247,6 +247,18 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
         return defaultValue;
     }
 
+    /// {@inheritDoc}
+    /// Scalars are leaf nodes and have no children.
+    @Override
+    public List<JsonNode> getChildren() {
+        return List.of();
+    }
+
+    //
+    //
+    //
+
+    /// {@inheritDoc}
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -256,6 +268,7 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
             && isKey == that.isKey;
     }
 
+    /// {@inheritDoc}
     @Override
     public int hashCode() {
         return Objects.hash(getLexeme(), getContent(), quoteStyle, isKey);
@@ -273,11 +286,11 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
 
     private Object parse(String raw, QuoteStyle quoteStyle, boolean isKey) {
 
-        if (schemaType == null || schemaType == PrimitiveType.ANY) {
-            schemaType = inferType(raw, quoteStyle, isKey);
+        if (primitiveType == null || primitiveType == PrimitiveType.ANY) {
+            primitiveType = inferType(raw, quoteStyle, isKey);
         }
 
-        switch (schemaType) {
+        switch (primitiveType) {
             case BOOLEAN:
                 return "true".equals(raw);
 

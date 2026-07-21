@@ -57,8 +57,13 @@ public class JsonLexemeBackedToken implements JsonToken {
     private final QuoteStyle quoteStyle;
     private List<JsonComment> comments;
 
-    // Structural
-    public JsonLexemeBackedToken(int line, int column, int startOffset, JsonTokenType type) {
+    /// Structural Token
+    public JsonLexemeBackedToken(
+        int line,
+        int column,
+        int startOffset,
+        JsonTokenType type)
+    {
         this.startLine = line;
         this.startColumn = column;
         this.startOffset = startOffset;
@@ -70,8 +75,13 @@ public class JsonLexemeBackedToken implements JsonToken {
         this.quoteStyle = QuoteStyle.PLAIN;
     }
 
-    // Literals
-    public JsonLexemeBackedToken(int line, int column, int startOffset, JsonTokenType type, JsonLiteral literal) {
+    /// Literals Token
+    public JsonLexemeBackedToken(
+        int line, int column,
+        int startOffset,
+        JsonTokenType type,
+        JsonLiteral literal
+    ) {
         this.startLine = line;
         this.startColumn = column;
         this.startOffset = startOffset;
@@ -79,7 +89,6 @@ public class JsonLexemeBackedToken implements JsonToken {
         this.literal = literal;
 
         this.lexeme = null;
-
 
         this.content = switch (literal) {
             case TRUE -> TRUE;
@@ -89,12 +98,16 @@ public class JsonLexemeBackedToken implements JsonToken {
             case NAN -> NAN;
         };
 
-
         this.quoteStyle = QuoteStyle.PLAIN;
     }
 
-    // Numbers & Identifiers
-    public JsonLexemeBackedToken(int line, int column, int startOffset, JsonTokenType type, String lexeme) {
+    /// Number & Identifier Tokens
+    public JsonLexemeBackedToken(
+        int line, int column,
+        int startOffset,
+        JsonTokenType type,
+        String lexeme
+    ) {
         this.startLine = line;
         this.startColumn = column;
         this.startOffset = startOffset;
@@ -106,8 +119,14 @@ public class JsonLexemeBackedToken implements JsonToken {
         this.quoteStyle = QuoteStyle.PLAIN;
     }
 
-    // Strings
-    public JsonLexemeBackedToken(int line, int column, int startOffset, JsonTokenType type, String lexeme, String content, QuoteStyle quoteStyle) {
+    /// String Token
+    public JsonLexemeBackedToken(
+        int line, int column,
+        int startOffset,
+        JsonTokenType type,
+        String lexeme, String content,
+        QuoteStyle quoteStyle
+    ) {
         this.startLine = line;
         this.startColumn = column;
         this.startOffset = startOffset;
@@ -117,6 +136,21 @@ public class JsonLexemeBackedToken implements JsonToken {
         this.quoteStyle = quoteStyle;
 
         this.literal = null;
+    }
+
+    @Override
+    public int getStartLine() {
+        return startLine;
+    }
+
+    @Override
+    public int getStartColumn() {
+        return startColumn;
+    }
+
+    @Override
+    public int getOffset() {
+        return startOffset;
     }
 
     @Override
@@ -141,21 +175,6 @@ public class JsonLexemeBackedToken implements JsonToken {
     @Override
     public QuoteStyle getQuoteStyle() {
         return quoteStyle;
-    }
-
-    @Override
-    public int getOffset() {
-        return startOffset;
-    }
-
-    @Override
-    public int getStartLine() {
-        return startLine;
-    }
-
-    @Override
-    public int getStartColumn() {
-        return startColumn;
     }
 
     public List<JsonComment> getComments() {
