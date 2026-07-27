@@ -33,25 +33,26 @@
 // version.
 
 
-package io.github.qishr.cascara.lang.json.processor;
+package io.github.qishr.cascara.lang.json.streaming;
 
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import io.github.qishr.cascara.common.lang.streaming.StreamingEvent;
+import io.github.qishr.cascara.common.lang.streaming.StreamingEventType;
 
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+public class JsonStreamingEvent implements StreamingEvent {
+    private final int line;
+    private final int column;
+    private final String content;
+    private final StreamingEventType type;
 
-import io.github.qishr.cascara.common.diagnostic.Diagnostic.Level;
-import io.github.qishr.cascara.common.diagnostic.StandardReporter;
-
-public class ObjectTests {
-    private JsonAstParser parser;
-
-    @BeforeEach
-    void init() {
-        parser = new JsonAstParser().setReporter(new StandardReporter().setLevel(Level.TRACE));
+    public JsonStreamingEvent(int line, int column, StreamingEventType type, String content) {
+        this.line = line;
+        this.column = column;
+        this.type = type;
+        this.content = content != null ? content : "";
     }
 
-    @Test void test_i_structure_UTF8_BOM_empty_object() {
-        assertThrows(Exception.class, () -> parser.parse("\uFEFF{}"));
-    }
+    @Override public StreamingEventType getType() { return type; }
+    @Override public String getContent() { return content; }
+    @Override public long getLineNumber() { return line; }
+    @Override public long getColumnNumber() { return column; }
 }

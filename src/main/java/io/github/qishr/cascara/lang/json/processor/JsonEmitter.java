@@ -1,3 +1,38 @@
+// # License & Terms
+//
+// This file is part of **Cascara**.
+//
+// **Cascara** is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+//
+// ---
+//
+// ## Special Runtime Exception
+//
+// As a special exception, the copyright holders of this library give you
+// permission to link this library with independent modules to produce an
+// executable, regardless of the license terms of these independent modules,
+// and to copy and distribute the resulting executable under terms of your
+// choice, provided that you also meet, for each linked independent module,
+// the terms and conditions of the license of that module.
+//
+// An independent module is a module which is not derived from or based on
+// this library. If you modify this library, you may extend this exception
+// to your version of the library, but you are not obligated to do so. If
+// you do not wish to do so, delete this exception statement from your
+// version.
+
+
 package io.github.qishr.cascara.lang.json.processor;
 
 import io.github.qishr.cascara.common.util.ContentType;
@@ -53,14 +88,7 @@ public class JsonEmitter extends AbstractJsonProcessor<JsonEmitter>  implements 
             for (int i = 0; i < entries.size(); i++) {
                 JsonMapEntryNode entry = (JsonMapEntryNode) entries.get(i);
 
-
-
-                //
-                // emitNode(entry.getKey());
                 emitScalar(formatKey(entry.getKey()));
-
-
-
                 emitPropertySeparator();
                 emitNode(entry.getValue());
 
@@ -85,13 +113,14 @@ public class JsonEmitter extends AbstractJsonProcessor<JsonEmitter>  implements 
     }
 
     private String formatScalar(JsonScalarNode scalar) {
+
+        // asString returns the unescaped string content without quotes
         String value = scalar.asString();
         if (value == null) return "null";
 
         return switch (scalar.getQuoteStyle()) {
             case DOUBLE -> "\"" + escapeJson(value) + "\"";
             case SINGLE -> "'" + escapeJson(value) + "'";
-            case LITERAL_BLOCK, FOLDED -> value; // Usually used for multi-line or raw blocks
             case PLAIN -> value; // For numbers, booleans, or unquoted keys
             default -> value;
         };
@@ -99,28 +128,42 @@ public class JsonEmitter extends AbstractJsonProcessor<JsonEmitter>  implements 
 
     private String formatKey(String value) {
         if (value == null) return "null";
-
         return "\"" + escapeJson(value) + "\"";
-
-        // return switch (scalar.getQuoteStyle()) {
-        //     case DOUBLE -> "\"" + escapeJson(value) + "\"";
-        //     case SINGLE -> "'" + escapeJson(value) + "'";
-        //     case LITERAL_BLOCK, FOLDED -> value; // Usually used for multi-line or raw blocks
-        //     case PLAIN -> value; // For numbers, booleans, or unquoted keys
-        //     default -> value;
-        // };
     }
 
     private String escapeJson(String input) {
-        if (input == null) return "";
-        return input.replace("\\", "\\\\")
-                    .replace("\"", "\\\"")
-                    .replace("\b", "\\b")
-                    .replace("\f", "\\f")
-                    .replace("\n", "\\n")
-                    .replace("\r", "\\r")
-                    .replace("\t", "\\t");
+        StringBuilder sb = new StringBuilder(input.length());
+        for (int i = 0; i < input.length(); i++) {
+            char c = input.charAt(i);
+            switch (c) {
+                case '"':
+                    sb.append("\\\"");
+                    break;
+                case '\\':
+                    sb.append("\\\\");
+                    break;
+                case '\b':
+                    sb.append("\\b");
+                    break;
+                case '\f':
+                    sb.append("\\f");
+                    break;
+                case '\n':
+                    sb.append("\\n");
+                    break;
+                case '\r':
+                    sb.append("\\r");
+                    break;
+                case '\t':
+                    sb.append("\\t");
+                    break;
+                default:
+                    sb.append(c);
+            }
+        }
+        return sb.toString();
     }
+
 
     @Override
     public void emitMapStart() {
@@ -152,6 +195,9 @@ public class JsonEmitter extends AbstractJsonProcessor<JsonEmitter>  implements 
 
     @Override
     public void emitPropertySeparator() {
+        // if (options.insertSpaces()) {
+        //     output.append(" ");
+        // }
         output.append(":");
         if (options.insertSpaces()) {
             output.append(" ");

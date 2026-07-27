@@ -1,3 +1,38 @@
+// # License & Terms
+//
+// This file is part of **Cascara**.
+//
+// **Cascara** is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+//
+// ---
+//
+// ## Special Runtime Exception
+//
+// As a special exception, the copyright holders of this library give you
+// permission to link this library with independent modules to produce an
+// executable, regardless of the license terms of these independent modules,
+// and to copy and distribute the resulting executable under terms of your
+// choice, provided that you also meet, for each linked independent module,
+// the terms and conditions of the license of that module.
+//
+// An independent module is a module which is not derived from or based on
+// this library. If you modify this library, you may extend this exception
+// to your version of the library, but you are not obligated to do so. If
+// you do not wish to do so, delete this exception statement from your
+// version.
+
+
 package io.github.qishr.cascara.lang.json.processor;
 
 import java.io.InputStream;
@@ -9,9 +44,9 @@ import java.util.Set;
 
 import io.github.qishr.cascara.common.diagnostic.Reporter;
 import io.github.qishr.cascara.common.diagnostic.code.DiagnosticCode;
+import io.github.qishr.cascara.common.diagnostic.code.GenericDiagnosticCode;
 import io.github.qishr.cascara.common.lang.exception.ParserException;
 import io.github.qishr.cascara.common.lang.processor.AstParser;
-import io.github.qishr.cascara.common.lang.processor.Tokenizer;
 import io.github.qishr.cascara.common.lang.type.PrimitiveType;
 import io.github.qishr.cascara.common.lang.util.LanguageOptions;
 import io.github.qishr.cascara.common.lang.util.QuoteStyle;
@@ -24,17 +59,17 @@ import io.github.qishr.cascara.lang.json.ast.JsonNode;
 import io.github.qishr.cascara.lang.json.ast.JsonScalarNode;
 import io.github.qishr.cascara.lang.json.ast.JsonSequenceNode;
 import io.github.qishr.cascara.lang.json.exception.JsonDiagnosticCode;
+import io.github.qishr.cascara.lang.json.internal.JsonStringUnescaper;
 import io.github.qishr.cascara.lang.json.token.JsonErrorToken;
 import io.github.qishr.cascara.lang.json.token.JsonLiteral;
 import io.github.qishr.cascara.lang.json.token.JsonNumberToken;
 import io.github.qishr.cascara.lang.json.token.JsonToken;
 import io.github.qishr.cascara.lang.json.token.JsonTokenType;
 import io.github.qishr.cascara.lang.json.util.JsonOptions;
-import io.github.qishr.cascara.lang.json.util.JsonStringUnescaper;
 
 /// A recursive descent parser for JSON/JSON5.
 public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
-        implements AstParser<JsonNode, JsonToken> {
+        implements AstParser<JsonNode, JsonToken, JsonTokenizer> {
 
     private static final String INFINITY = "Infinity";
     private static final String NAN = "NaN";
@@ -59,22 +94,13 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
 
     /// Default constructor for SPI
     public JsonAstParser() {
-        applyOptions(new JsonOptions());
+        applyOptions();
     }
 
     public JsonAstParser setOptions(JsonOptions options) {
         super.setOptions(options);
-        applyOptions(options);
+        applyOptions();
         return this;
-    }
-
-    private void applyOptions(JsonOptions options) {
-        this.ALLOW_COMMENTS         = options.allowComments();
-        this.ALLOW_INFINITY_AND_NAN = options.allowJson5Numbers();
-        this.ALLOW_TRAILING_COMMA   = options.allowTrailingComma();
-        this.ALLOW_UNQUOTED_KEYS    = options.allowUnquotedKeys();
-        this.CAPTURE_COMMENTS       = options.captureComments();
-        this.DEPTH_LIMIT            = options.getDepthLimit();
     }
 
     @Override
@@ -119,21 +145,15 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
         return parse(tokenizer);
     }
 
-    //
-    // Eager API: List<JsonToken> (adapter to streaming)
-    //
-
+    /// Eager API: List<JsonToken> (adapter to streaming)
     @Override
     public JsonNode parse(List<JsonToken> tokens) {
         return parse(new ListBackedJsonTokenizer(tokens));
     }
 
-    //
-    // Streaming API: Tokenizer<JsonToken>
-    //
-
+    /// Streaming API: Tokenizer<JsonToken>
     @Override
-    public JsonNode parse(Tokenizer<JsonToken> tokenizer) {
+    public JsonNode parse(JsonTokenizer tokenizer) {
         this.tokenizer = (JsonTokenizer) tokenizer;
         this.currentToken = null;
         this.depth = 0;
@@ -162,12 +182,37 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
         return root;
     }
 
+    @Override
+    public JsonTokenizer getTokenizer() {
+        if (tokenizer == null) {
+            tokenizer = new JsonTokenizer();
+        }
+        return tokenizer;
+    }
+
+    @Override
+    public List<JsonToken> getTokens() {
+        throw new ParserException(GenericDiagnosticCode.UNIMPLEMENTED_METHOD, "JsonAstParser", "getTokens");
+    }
+
+    private void applyOptions() {
+        this.ALLOW_COMMENTS         = options.allowComments();
+        this.ALLOW_INFINITY_AND_NAN = options.allowJson5Numbers();
+        this.ALLOW_TRAILING_COMMA   = options.allowTrailingComma();
+        this.ALLOW_UNQUOTED_KEYS    = options.allowUnquotedKeys();
+        this.CAPTURE_COMMENTS       = options.captureComments();
+        this.DEPTH_LIMIT            = options.getDepthLimit();
+    }
+
     //
     // Core parsing
     //
 
     private JsonNode parseValue() {
         depth++;
+        if (depth > DEPTH_LIMIT) {
+            error(peek(),JsonDiagnosticCode.DEPTH_LIMIT);
+        }
         trace("parseValue");
 
         try {
@@ -313,9 +358,6 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
 
     private JsonSequenceNode parseSequence() {
         depth++;
-        if (depth > DEPTH_LIMIT) {
-            error(peek(),JsonDiagnosticCode.DEPTH_LIMIT);
-        }
         trace("parseSequence");
 
         try {
@@ -588,7 +630,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
     // Adapter: List<JsonToken> → Tokenizer<JsonToken>
     //
 
-    private static final class ListBackedJsonTokenizer implements Tokenizer<JsonToken> {
+    private static final class ListBackedJsonTokenizer extends JsonTokenizer {
 
         private final List<JsonToken> tokens;
         private int index = 0;
@@ -617,7 +659,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
         }
 
         @Override
-        public Set<? extends JsonTokenType> getTokenTypes() {
+        public Set<JsonTokenType> getTokenTypes() {
             return Set.of(JsonTokenType.values());
         }
 
@@ -638,7 +680,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
 
         @Override
         public ContentType getContentType() {
-            return null; // safe default
+			throw new UnsupportedOperationException("Unimplemented method 'getContentType'");
         }
 
 		@Override
@@ -646,5 +688,10 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
 			// TODO Auto-generated method stub
 			throw new UnsupportedOperationException("Unimplemented method 'open'");
 		}
+
+        @Override
+        public int getOffset() {
+			throw new UnsupportedOperationException("Unimplemented method 'getOffset'");
+        }
     }
 }

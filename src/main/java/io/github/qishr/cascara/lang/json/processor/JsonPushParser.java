@@ -35,23 +35,32 @@
 
 package io.github.qishr.cascara.lang.json.processor;
 
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import java.io.InputStream;
 
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import io.github.qishr.cascara.common.lang.exception.ParserException;
+import io.github.qishr.cascara.common.lang.processor.PushParser;
+import io.github.qishr.cascara.common.lang.streaming.StreamHandler;
+import io.github.qishr.cascara.common.lang.streaming.StreamingEvent;
+import io.github.qishr.cascara.lang.json.internal.JsonStreamEngine;
 
-import io.github.qishr.cascara.common.diagnostic.Diagnostic.Level;
-import io.github.qishr.cascara.common.diagnostic.StandardReporter;
+public class JsonPushParser extends AbstractJsonProcessor<JsonPushParser> implements PushParser {
 
-public class ObjectTests {
-    private JsonAstParser parser;
+    public JsonPushParser() {}
 
-    @BeforeEach
-    void init() {
-        parser = new JsonAstParser().setReporter(new StandardReporter().setLevel(Level.TRACE));
+    @Override
+    public void parse(InputStream input, StreamHandler handler) throws ParserException {
+        JsonStreamEngine engine = new JsonStreamEngine(input, getOptions(), getReporter());
+
+        while (engine.hasNextEvent()) {
+            StreamingEvent evt = engine.nextEvent();
+            if (evt != null) {
+                handler.onEvent(evt);
+            }
+        }
     }
 
-    @Test void test_i_structure_UTF8_BOM_empty_object() {
-        assertThrows(Exception.class, () -> parser.parse("\uFEFF{}"));
+    @Override
+    protected JsonPushParser self() {
+        return this;
     }
 }
