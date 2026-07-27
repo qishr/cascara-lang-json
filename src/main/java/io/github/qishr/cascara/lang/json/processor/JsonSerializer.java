@@ -103,7 +103,7 @@ public class JsonSerializer extends AbstractSerializer<JsonSerializer,JsonNode,J
 
     /// {@inheritDoc}
     @Override
-    public JsonSerializer setParser(AstParser<JsonNode,?> parser) {
+    public JsonSerializer setParser(AstParser<JsonNode,?,?> parser) {
         if (!(parser instanceof JsonAstParser JsonAstParser)) {
             throw new SerializerException(GenericDiagnosticCode.ERROR, "Parser must be a JsonAstParser");
         }

@@ -39,10 +39,10 @@ import java.util.List;
 import java.util.Objects;
 
 import io.github.qishr.cascara.common.lang.util.QuoteStyle;
+import io.github.qishr.cascara.lang.json.internal.Json5SingleQuoteUnescaper;
+import io.github.qishr.cascara.lang.json.internal.JsonStringUnescaper;
 import io.github.qishr.cascara.lang.json.token.JsonToken;
-import io.github.qishr.cascara.lang.json.util.Json5SingleQuoteUnescaper;
 import io.github.qishr.cascara.lang.json.util.JsonOptions;
-import io.github.qishr.cascara.lang.json.util.JsonStringUnescaper;
 import io.github.qishr.cascara.common.lang.ast.ScalarAstNode;
 import io.github.qishr.cascara.common.lang.type.PrimitiveType;
 
@@ -132,7 +132,7 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
         this(null);
     }
 
-    // TODO: Add to interface
+    @Override
     public PrimitiveType getPrimitiveType() {
         return primitiveType;
     }
@@ -263,21 +263,23 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
     public boolean equals(Object o) {
         if (this == o) return true;
         if (!(o instanceof JsonScalarNode that)) return false;
-        return Objects.equals(this.getPrimitive(), that.getPrimitive())
-            && quoteStyle == that.quoteStyle
-            && isKey == that.isKey;
+        return Objects.equals(this.asString(), that.asString())
+            && getQuoteStyle() == that.getQuoteStyle();
+            // && isKey == that.isKey;
     }
 
     /// {@inheritDoc}
     @Override
     public int hashCode() {
-        return Objects.hash(getLexeme(), getContent(), quoteStyle, isKey);
+        // return Objects.hash(asString(), quoteStyle, isKey);
+        return Objects.hash(asString(), getQuoteStyle());
     }
 
     /// {@inheritDoc}
     @Override
     public String toString() {
-        return getLexeme() != null ? getLexeme() : String.valueOf(getPrimitive());
+        return asString();
+        // return getLexeme() != null ? getLexeme() : String.valueOf(getPrimitive());
     }
 
     //

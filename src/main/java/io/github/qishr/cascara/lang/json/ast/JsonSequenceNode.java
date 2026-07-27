@@ -38,6 +38,8 @@ package io.github.qishr.cascara.lang.json.ast;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.Objects;
 
 import io.github.qishr.cascara.common.lang.ast.SequenceAstNode;
 
@@ -62,6 +64,22 @@ public class JsonSequenceNode extends JsonNode implements SequenceAstNode<JsonNo
     @Override public JsonNode get(int index) { return elements.get(index); }
     @Override public List<JsonNode> getElements() { return elements; }
     @Override public List<JsonNode> getChildren() { return elements; }
+
+    @Override
+    public JsonNode getFirst() {
+        if (elements.isEmpty()) {
+            throw new NoSuchElementException();
+        }
+        return elements.getFirst();
+    }
+
+    @Override
+    public JsonNode getLast() {
+        if (elements.isEmpty()) {
+            throw new NoSuchElementException();
+        }
+        return elements.getLast();
+    }
 
     @Override
     public JsonSequenceNode remove(JsonNode node) {
@@ -105,6 +123,20 @@ public class JsonSequenceNode extends JsonNode implements SequenceAstNode<JsonNo
     public boolean isEmpty() {
         // TODO Auto-generated method stub
         throw new UnsupportedOperationException("Unimplemented method 'isEmpty'");
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof JsonSequenceNode that)) return false;
+        return Objects.equals(this.elements, that.elements);
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public int hashCode() {
+        return Objects.hash(elements);
     }
 }
 

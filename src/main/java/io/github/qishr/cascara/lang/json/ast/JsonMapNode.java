@@ -38,6 +38,8 @@ package io.github.qishr.cascara.lang.json.ast;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Set;
 import java.util.Iterator;
 
@@ -75,9 +77,17 @@ public class JsonMapNode extends JsonNode implements MapAstNode<String, JsonNode
     }
 
     @Nullable
+    @Override
     public JsonMapEntryNode getEntry(String key) {
         if (key == null) return null;
         return entriesByKey.get(key);
+    }
+
+    @Nullable
+    @Override
+    public JsonMapEntryNode getEntry(int i) {
+        if (i < 0 || i > size()) throw new NoSuchElementException();
+        return entriesByKey.sequencedValues().toArray(new JsonMapEntryNode[]{})[i];
     }
 
     @Override
@@ -121,6 +131,15 @@ public class JsonMapNode extends JsonNode implements MapAstNode<String, JsonNode
     public JsonSequenceNode getSequence(String key) {
         JsonNode node = this.get(key);
         return (node instanceof JsonSequenceNode seq) ? seq : new JsonSequenceNode();
+    }
+
+    @Override
+    @Nullable
+    public JsonScalarNode getScalar(String key) {
+        if (get(key) instanceof JsonScalarNode scalar) {
+            return scalar;
+        }
+        return null;
     }
 
     @Override
@@ -184,5 +203,19 @@ public class JsonMapNode extends JsonNode implements MapAstNode<String, JsonNode
     @Override
     public Iterator<JsonMapEntryNode> iterator() {
         return entriesByKey.sequencedValues().iterator();
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof JsonMapNode that)) return false;
+        return Objects.equals(this.entriesByKey, that.entriesByKey);
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public int hashCode() {
+        return Objects.hash(entriesByKey);
     }
 }

@@ -88,14 +88,7 @@ public class JsonEmitter extends AbstractJsonProcessor<JsonEmitter>  implements 
             for (int i = 0; i < entries.size(); i++) {
                 JsonMapEntryNode entry = (JsonMapEntryNode) entries.get(i);
 
-
-
-                //
-                // emitNode(entry.getKey());
                 emitScalar(formatKey(entry.getKey()));
-
-
-
                 emitPropertySeparator();
                 emitNode(entry.getValue());
 
@@ -126,13 +119,8 @@ public class JsonEmitter extends AbstractJsonProcessor<JsonEmitter>  implements 
         if (value == null) return "null";
 
         return switch (scalar.getQuoteStyle()) {
-
-            // TODO: It goes wrong here:
-            // I think here we want the lexeme form, not the content form
-
             case DOUBLE -> "\"" + escapeJson(value) + "\"";
             case SINGLE -> "'" + escapeJson(value) + "'";
-            case LITERAL_BLOCK, FOLDED -> value; // Usually used for multi-line or raw blocks
             case PLAIN -> value; // For numbers, booleans, or unquoted keys
             default -> value;
         };
@@ -144,15 +132,38 @@ public class JsonEmitter extends AbstractJsonProcessor<JsonEmitter>  implements 
     }
 
     private String escapeJson(String input) {
-        if (input == null) return "";
-        return input.replace("\\", "\\\\")
-                    .replace("\"", "\\\"")
-                    .replace("\b", "\\b")
-                    .replace("\f", "\\f")
-                    .replace("\n", "\\n")
-                    .replace("\r", "\\r")
-                    .replace("\t", "\\t");
+        StringBuilder sb = new StringBuilder(input.length());
+        for (int i = 0; i < input.length(); i++) {
+            char c = input.charAt(i);
+            switch (c) {
+                case '"':
+                    sb.append("\\\"");
+                    break;
+                case '\\':
+                    sb.append("\\\\");
+                    break;
+                case '\b':
+                    sb.append("\\b");
+                    break;
+                case '\f':
+                    sb.append("\\f");
+                    break;
+                case '\n':
+                    sb.append("\\n");
+                    break;
+                case '\r':
+                    sb.append("\\r");
+                    break;
+                case '\t':
+                    sb.append("\\t");
+                    break;
+                default:
+                    sb.append(c);
+            }
+        }
+        return sb.toString();
     }
+
 
     @Override
     public void emitMapStart() {
@@ -184,6 +195,9 @@ public class JsonEmitter extends AbstractJsonProcessor<JsonEmitter>  implements 
 
     @Override
     public void emitPropertySeparator() {
+        // if (options.insertSpaces()) {
+        //     output.append(" ");
+        // }
         output.append(":");
         if (options.insertSpaces()) {
             output.append(" ");

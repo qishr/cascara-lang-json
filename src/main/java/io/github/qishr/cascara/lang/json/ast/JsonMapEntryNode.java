@@ -89,7 +89,7 @@ public class JsonMapEntryNode extends JsonNode implements MapEntryAstNode<String
 
     @Override
     public int hashCode() {
-        return Objects.hash(getChildren());
+        return Objects.hash(key, value);
     }
 
 }

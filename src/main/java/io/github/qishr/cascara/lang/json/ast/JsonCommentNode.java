@@ -38,6 +38,7 @@ package io.github.qishr.cascara.lang.json.ast;
 import io.github.qishr.cascara.common.lang.ast.CommentAstNode;
 import io.github.qishr.cascara.common.lang.util.QuoteStyle;
 import io.github.qishr.cascara.common.lang.ast.ScalarAstNode;
+import io.github.qishr.cascara.common.lang.type.PrimitiveType;
 
 import java.util.List;
 
@@ -56,6 +57,11 @@ public class JsonCommentNode extends JsonNode implements ScalarAstNode<JsonNode>
     // @Override
     public String getContent() {
         return value != null ? value.toString() : null;
+    }
+
+    @Override
+    public PrimitiveType getPrimitiveType() {
+        return PrimitiveType.STRING;
     }
 
     @Override
