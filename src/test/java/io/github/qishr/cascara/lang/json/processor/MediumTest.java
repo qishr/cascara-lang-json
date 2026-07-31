@@ -48,9 +48,9 @@ import org.junit.jupiter.api.Test;
 
 import io.github.qishr.cascara.common.diagnostic.StandardReporter;
 import io.github.qishr.cascara.common.diagnostic.Diagnostic.Level;
-import io.github.qishr.cascara.lang.json.ast.JsonMapNode;
+import io.github.qishr.cascara.lang.json.ast.JsonObject;
 import io.github.qishr.cascara.lang.json.ast.JsonNode;
-import io.github.qishr.cascara.lang.json.ast.JsonScalarNode;
+import io.github.qishr.cascara.lang.json.ast.JsonScalar;
 import io.github.qishr.cascara.lang.json.util.JsonOptions;
 import io.github.qishr.cascara.lang.json.util.ProfilingHarness;
 
@@ -84,8 +84,8 @@ public class MediumTest {
             .setReporter(new StandardReporter().setLevel(Level.TRACE));
 
         JsonNode doc = parser.parse(content);
-        if (doc instanceof JsonMapNode map) {
-            if (map.get("status") instanceof JsonScalarNode status) {
+        if (doc instanceof JsonObject map) {
+            if (map.get("status") instanceof JsonScalar status) {
                 Object o = status.getPrimitive();
                 assertInstanceOf(Boolean.class, o);
             }

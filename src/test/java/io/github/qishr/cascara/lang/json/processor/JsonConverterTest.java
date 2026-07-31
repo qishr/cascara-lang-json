@@ -44,11 +44,11 @@ import io.github.qishr.cascara.common.lang.reference.ReferenceMapNode;
 import io.github.qishr.cascara.common.lang.reference.ReferenceScalarNode;
 import io.github.qishr.cascara.common.lang.reference.ReferenceSequenceNode;
 import io.github.qishr.cascara.common.lang.util.QuoteStyle;
-import io.github.qishr.cascara.lang.json.ast.JsonMapEntryNode;
-import io.github.qishr.cascara.lang.json.ast.JsonMapNode;
+import io.github.qishr.cascara.lang.json.ast.JsonProperty;
+import io.github.qishr.cascara.lang.json.ast.JsonObject;
 import io.github.qishr.cascara.lang.json.ast.JsonNode;
-import io.github.qishr.cascara.lang.json.ast.JsonScalarNode;
-import io.github.qishr.cascara.lang.json.ast.JsonSequenceNode;
+import io.github.qishr.cascara.lang.json.ast.JsonScalar;
+import io.github.qishr.cascara.lang.json.ast.JsonArray;
 
 public class JsonConverterTest {
     @Test
@@ -56,8 +56,8 @@ public class JsonConverterTest {
         ReferenceScalarNode root = new ReferenceScalarNode("testStr");
         JsonConverter converter = new JsonConverter();
         JsonNode jsonRoot = converter.fromAst(root);
-        assertInstanceOf(JsonScalarNode.class, jsonRoot);
-        JsonScalarNode scalar = (JsonScalarNode)jsonRoot;
+        assertInstanceOf(JsonScalar.class, jsonRoot);
+        JsonScalar scalar = (JsonScalar)jsonRoot;
         assertEquals("testStr", scalar.asString());
         assertEquals(QuoteStyle.DOUBLE, scalar.getQuoteStyle());
         // TODO: Assert PrimitiveType
@@ -68,8 +68,8 @@ public class JsonConverterTest {
         ReferenceScalarNode root = new ReferenceScalarNode(true);
         JsonConverter converter = new JsonConverter();
         JsonNode jsonRoot = converter.fromAst(root);
-        assertInstanceOf(JsonScalarNode.class, jsonRoot);
-        JsonScalarNode scalar = (JsonScalarNode)jsonRoot;
+        assertInstanceOf(JsonScalar.class, jsonRoot);
+        JsonScalar scalar = (JsonScalar)jsonRoot;
         assertEquals(true, scalar.asBoolean());
         assertEquals(QuoteStyle.PLAIN, scalar.getQuoteStyle());
         // TODO: Assert PrimitiveType
@@ -102,49 +102,49 @@ public class JsonConverterTest {
 
         // 3. Verify / Validate
 
-        assertInstanceOf(JsonMapNode.class, jsonRoot);
-        JsonMapNode map = (JsonMapNode)jsonRoot;
+        assertInstanceOf(JsonObject.class, jsonRoot);
+        JsonObject map = (JsonObject)jsonRoot;
 
         JsonNode testStr = map.get("testStr");
-        assertInstanceOf(JsonScalarNode.class, testStr);
-        JsonScalarNode testStrScalar = (JsonScalarNode)testStr;
+        assertInstanceOf(JsonScalar.class, testStr);
+        JsonScalar testStrScalar = (JsonScalar)testStr;
         assertEquals("testStr", testStrScalar.asString());
 
         // Check quotes on value and key
-        JsonMapEntryNode entry = map.getEntries().getFirst();
+        JsonProperty entry = map.getEntries().getFirst();
         assertInstanceOf(String.class, entry.getKey());
-        assertInstanceOf(JsonScalarNode.class, entry.getValue());
-        String key = entry.getKey();
-        JsonScalarNode value = (JsonScalarNode)entry.getValue();
+        assertInstanceOf(JsonScalar.class, entry.getValue());
+        // String key = entry.getKey();
+        JsonScalar value = (JsonScalar)entry.getValue();
         // assertEquals(QuoteStyle.DOUBLE, key.getQuoteStyle());
         assertEquals(QuoteStyle.DOUBLE, value.getQuoteStyle());
 
         JsonNode testBool = map.get("testBool");
-        assertInstanceOf(JsonScalarNode.class, testBool);
-        assertEquals(true, ((JsonScalarNode)testBool).asBoolean());
+        assertInstanceOf(JsonScalar.class, testBool);
+        assertEquals(true, ((JsonScalar)testBool).asBoolean());
 
         // Check quotes on value and key
         entry = map.getEntries().get(1);
         assertInstanceOf(String.class, entry.getKey());
-        assertInstanceOf(JsonScalarNode.class, entry.getValue());
-        key = entry.getKey();
-        value = (JsonScalarNode)entry.getValue();
+        assertInstanceOf(JsonScalar.class, entry.getValue());
+        // key = entry.getKey();
+        value = (JsonScalar)entry.getValue();
         // assertEquals(QuoteStyle.DOUBLE, key.getQuoteStyle());
         assertEquals(QuoteStyle.PLAIN, value.getQuoteStyle());
 
         JsonNode testSeq = map.get("testSeq");
-        assertInstanceOf(JsonSequenceNode.class, testSeq);
-        JsonSequenceNode seq = (JsonSequenceNode)testSeq;
+        assertInstanceOf(JsonArray.class, testSeq);
+        JsonArray seq = (JsonArray)testSeq;
         assertEquals(3, seq.size());
 
         JsonNode item1 = seq.get(0);
-        assertInstanceOf(JsonScalarNode.class, item1);
-        JsonScalarNode item1scalar = (JsonScalarNode)item1;
+        assertInstanceOf(JsonScalar.class, item1);
+        JsonScalar item1scalar = (JsonScalar)item1;
         assertEquals(1, item1scalar.asInteger());
 
         JsonNode item3 = seq.get(2);
-        assertInstanceOf(JsonScalarNode.class, item3);
-        JsonScalarNode item3scalar = (JsonScalarNode)item3;
+        assertInstanceOf(JsonScalar.class, item3);
+        JsonScalar item3scalar = (JsonScalar)item3;
         assertEquals(3, item3scalar.asInteger());
     }
 }

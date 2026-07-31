@@ -41,18 +41,18 @@ import java.util.Objects;
 import io.github.qishr.cascara.common.lang.ast.MapEntryAstNode;
 
 /// Represents the structural pairing of a key and a value in a JSON object.
-public class JsonMapEntryNode extends JsonNode implements MapEntryAstNode<String,JsonNode> {
+public class JsonProperty extends JsonNode implements MapEntryAstNode<String,JsonNode> {
     private final String key;
     private JsonNode value;
 
-    public JsonMapEntryNode(int line, int column, String key, JsonNode value) {
+    public JsonProperty(int line, int column, String key, JsonNode value) {
         super(line, column);
         this.key = key;
         this.value = value;
     }
 
     /// Convenience constructor for programmatic node creation.
-    public JsonMapEntryNode(String key, JsonNode value) {
+    public JsonProperty(String key, JsonNode value) {
         super(0, 0);
         this.key = key;
         this.value = value;
@@ -62,7 +62,7 @@ public class JsonMapEntryNode extends JsonNode implements MapEntryAstNode<String
 
     @Override public JsonNode getValue() { return value; }
 
-    @Override public JsonMapEntryNode setRaw(JsonNode value) {
+    @Override public JsonProperty setRaw(JsonNode value) {
         this.value = value;
         return this;
     }
@@ -74,7 +74,7 @@ public class JsonMapEntryNode extends JsonNode implements MapEntryAstNode<String
     }
 
     @Override
-    public JsonMapEntryNode setValue(JsonNode value) {
+    public JsonProperty setValue(JsonNode value) {
         this.value = value;
         return this;
     }
@@ -82,7 +82,7 @@ public class JsonMapEntryNode extends JsonNode implements MapEntryAstNode<String
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof JsonMapEntryNode other)) return false;
+        if (!(o instanceof JsonProperty other)) return false;
         return Objects.equals(value, other.value) &&
                key.equals(other.key);
     }

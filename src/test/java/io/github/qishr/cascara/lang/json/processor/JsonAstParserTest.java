@@ -68,18 +68,18 @@ class JsonAstParserTest {
 
         parser.setOptions(JsonOptions.JSON5.duplicate().setCaptureComments(true));
 
-        JsonMapNode root = (JsonMapNode) parser.parse(input);
+        JsonObject root = (JsonObject) parser.parse(input);
 
         // 1. Get the Entry so we can see the Key
 
-        JsonMapEntryNode entry = root.getEntry("port");
+        JsonProperty entry = root.getEntry("port");
 
         assertNotNull(entry, "Entry for 'port' should exist");
 
         JsonNode valueNode = entry.getValue();
 
         // 2. Verify Value logic still works
-        assertEquals(8080, ((JsonScalarNode) valueNode).asInteger());
+        assertEquals(8080, ((JsonScalar) valueNode).asInteger());
 
         // TODO: Make this work
         // // 3. Verify Comment is on the entry
@@ -93,9 +93,9 @@ class JsonAstParserTest {
 
         parser.setOptions(JsonOptions.JSON5);
 
-        JsonMapNode root = (JsonMapNode) parser.parse(input);
+        JsonObject root = (JsonObject) parser.parse(input);
 
-        JsonMapEntryNode entry = root.getEntries().get(0);
+        JsonProperty entry = root.getEntries().get(0);
         String keyNode = entry.getKey();
 
         assertEquals("user", keyNode);
@@ -106,11 +106,11 @@ class JsonAstParserTest {
     void testNestedSequence() {
         String input = "[1, [2, 3]]";
         JsonNode doc = parser.parse(input);
-        assertTrue(doc instanceof JsonSequenceNode);
+        assertTrue(doc instanceof JsonArray);
 
-        JsonSequenceNode root = (JsonSequenceNode) doc;
+        JsonArray root = (JsonArray) doc;
         assertEquals(2, root.size());
-        assertTrue(root.get(1) instanceof JsonSequenceNode);
+        assertTrue(root.get(1) instanceof JsonArray);
     }
 
     @Test
@@ -130,9 +130,9 @@ class JsonAstParserTest {
 
         parser.setOptions(JsonOptions.JSON5.duplicate().setCaptureComments(true));
 
-        JsonMapNode root = (JsonMapNode) parser.parse(input);
+        JsonObject root = (JsonObject) parser.parse(input);
 
-        JsonMapEntryNode unquotedEntry = root.getEntry("unquoted");
+        // JsonProperty unquotedEntry = root.getEntry("unquoted");
         // TODO: key comments -> entry comments?
         // assertFalse(unquotedEntry.getKey().getComments().isEmpty());
 
@@ -141,20 +141,21 @@ class JsonAstParserTest {
         // assertEquals("// Header comment", root.getComments().get(0).getText());
 
         // 2. Verify Nested Object & Unquoted Key
-        JsonMapNode nested = root.getMap("nested");
-        JsonMapEntryNode entry = nested.getEntry("key");
+        JsonObject nested = root.getMap("nested");
+        JsonProperty entry = nested.getEntry("key");
         assertNotNull(entry);
 
         // 3. Verify Inline Comment (Clings to the node that follows it or the entry)
         // In our current logic, it will buffer and attach to "array"
-        JsonMapEntryNode arrayEntry = nested.getEntry("array");
+        JsonProperty arrayEntry = nested.getEntry("array");
+        assertNotNull(arrayEntry);
 
         // TODO: Key comments
         // assertFalse(arrayEntry.getKey().getComments().isEmpty());
         // assertEquals(" Inline comment", arrayEntry.getKey().getComments().get(0).asString());
 
         // 4. Verify Trailing Comma didn't break the Sequence
-        JsonSequenceNode array = (JsonSequenceNode) nested.get("array");
+        JsonArray array = (JsonArray) nested.get("array");
         assertEquals(2, array.size());
     }
 
@@ -168,8 +169,8 @@ class JsonAstParserTest {
     void testStandaloneScalar() {
         // A single string is a valid JSON document
         JsonNode doc = parser.parse("\"Hello World\"");
-        assertTrue(doc instanceof JsonScalarNode);
-        assertEquals("Hello World", ((JsonScalarNode)doc).asString());
+        assertTrue(doc instanceof JsonScalar);
+        assertEquals("Hello World", ((JsonScalar)doc).asString());
     }
 
     @Test
@@ -223,13 +224,13 @@ class JsonAstParserTest {
 
         parser.setOptions(JsonOptions.JSON5);
 
-        JsonMapNode root = (JsonMapNode) parser.parse(input);
+        JsonObject root = (JsonObject) parser.parse(input);
 
-        JsonMapNode level1 = root.getMap("level1");
+        JsonObject level1 = root.getMap("level1");
         // JsonMapNode level2 = level1.getMap("level2");
 
-        assertTrue(level1.get("level2") instanceof JsonSequenceNode);
-        JsonSequenceNode seq = level1.getSequence("level2");
+        assertTrue(level1.get("level2") instanceof JsonArray);
+        JsonArray seq = level1.getSequence("level2");
         assertEquals(2, seq.size());
     }
 
@@ -260,9 +261,9 @@ class JsonAstParserTest {
 
         // JSON5 allows: +.5, -.5, 0x123, 1.
         String input = "[ +.5, 0x123, 1. ]";
-        JsonSequenceNode seq = (JsonSequenceNode) parser.parse(input);
+        JsonArray seq = (JsonArray) parser.parse(input);
 
-        assertEquals(0.5, ((JsonScalarNode)seq.get(0)).asDouble());
+        assertEquals(0.5, ((JsonScalar)seq.get(0)).asDouble());
     }
 
     @Test
@@ -281,7 +282,8 @@ class JsonAstParserTest {
 
         parser.setOptions(JsonOptions.JSON5.duplicate().setCaptureComments(true));
 
-        JsonMapNode root = (JsonMapNode) parser.parse(input);
+        JsonObject root = (JsonObject) parser.parse(input);
+        assertNotNull(root);
 
         // TODO: Key comments:
 
@@ -303,19 +305,19 @@ class JsonAstParserTest {
         String json = "{\"matrix\": [[1, 2], [3, 4]]}";
 
         JsonNode root = parser.parse(json);
-        JsonMapNode rootMap = (JsonMapNode)root;
+        JsonObject rootMap = (JsonObject)root;
 
         // 2. Get the value for "matrix"
         JsonNode matrixNode = rootMap.get("matrix");
-        assertTrue(matrixNode instanceof JsonSequenceNode);
+        assertTrue(matrixNode instanceof JsonArray);
 
         // 3. Now we are at the outer sequence: [[1, 2], [3, 4]]
-        JsonSequenceNode outer = (JsonSequenceNode) matrixNode;
+        JsonArray outer = (JsonArray) matrixNode;
         assertEquals(2, outer.size());
 
         // 4. Get the first inner sequence: [1, 2]
-        assertTrue(outer.get(0) instanceof JsonSequenceNode);
-        JsonSequenceNode inner = (JsonSequenceNode) outer.get(0);
+        assertTrue(outer.get(0) instanceof JsonArray);
+        JsonArray inner = (JsonArray) outer.get(0);
         assertEquals(2, inner.size());
 
         // 5. Verify a leaf value

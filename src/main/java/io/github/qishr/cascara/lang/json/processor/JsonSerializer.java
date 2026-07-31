@@ -49,16 +49,16 @@ import io.github.qishr.cascara.common.lang.processor.AbstractSerializer;
 import io.github.qishr.cascara.common.lang.processor.AstParser;
 import io.github.qishr.cascara.common.lang.type.TypeReference;
 import io.github.qishr.cascara.common.util.ContentType;
-import io.github.qishr.cascara.lang.json.ast.JsonMapEntryNode;
-import io.github.qishr.cascara.lang.json.ast.JsonMapNode;
+import io.github.qishr.cascara.lang.json.ast.JsonProperty;
+import io.github.qishr.cascara.lang.json.ast.JsonObject;
 import io.github.qishr.cascara.lang.json.ast.JsonNode;
 import io.github.qishr.cascara.lang.json.ast.JsonNodeFactory;
-import io.github.qishr.cascara.lang.json.ast.JsonScalarNode;
-import io.github.qishr.cascara.lang.json.ast.JsonSequenceNode;
+import io.github.qishr.cascara.lang.json.ast.JsonScalar;
+import io.github.qishr.cascara.lang.json.ast.JsonArray;
 import io.github.qishr.cascara.lang.json.util.JsonOptions;
 
 /// Standard implementation for JSON serialization.
-public class JsonSerializer extends AbstractSerializer<JsonSerializer,JsonNode,JsonScalarNode,JsonSequenceNode,JsonMapNode,JsonMapEntryNode,String> {
+public class JsonSerializer extends AbstractSerializer<JsonSerializer,JsonNode,JsonScalar,JsonArray,JsonObject,JsonProperty,String> {
 
     private JsonAstParser parser;
     private JsonOptions options = new JsonOptions();

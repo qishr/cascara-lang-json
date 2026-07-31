@@ -59,7 +59,6 @@ public class JsonStreamEngine {
 
     private boolean rootOpened = false;
     private boolean documentEnded = false;
-    private boolean expectingValue = false;
 
     public JsonStreamEngine(InputStream input, JsonOptions options, Reporter reporter) {
         this.tokenizer = new JsonTokenizer().setReporter(reporter);

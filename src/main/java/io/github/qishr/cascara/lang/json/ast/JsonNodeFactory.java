@@ -40,21 +40,21 @@ import io.github.qishr.cascara.common.lang.util.LanguageOptions;
 import io.github.qishr.cascara.common.lang.util.QuoteStyle;
 import io.github.qishr.cascara.lang.json.util.JsonOptions;
 
-public class JsonNodeFactory implements AstNodeFactory<JsonNode,JsonScalarNode,JsonSequenceNode,JsonMapNode,JsonMapEntryNode,String> {
+public class JsonNodeFactory implements AstNodeFactory<JsonNode,JsonScalar,JsonArray,JsonObject,JsonProperty,String> {
 
     @Override
-    public JsonScalarNode createScalarNode(Object jvmValue) {
-        return new JsonScalarNode(jvmValue);
+    public JsonScalar createScalarNode(Object jvmValue) {
+        return new JsonScalar(jvmValue);
     }
 
     @Override
-    public JsonScalarNode createScalarNode(Object jvmValue, QuoteStyle quoteStyle) {
-        return new JsonScalarNode(jvmValue, quoteStyle);
+    public JsonScalar createScalarNode(Object jvmValue, QuoteStyle quoteStyle) {
+        return new JsonScalar(jvmValue, quoteStyle);
     }
 
 	@Override
-	public JsonScalarNode createScalarNode(Object jvmValue, QuoteStyle quoteStyle, LanguageOptions<?> options) {
-        return new JsonScalarNode(jvmValue, quoteStyle, false, (JsonOptions)options);
+	public JsonScalar createScalarNode(Object jvmValue, QuoteStyle quoteStyle, LanguageOptions<?> options) {
+        return new JsonScalar(jvmValue, quoteStyle, false, (JsonOptions)options);
 	}
 
     @Override
@@ -65,12 +65,12 @@ public class JsonNodeFactory implements AstNodeFactory<JsonNode,JsonScalarNode,J
     }
 
     @Override
-    public JsonSequenceNode createSequenceNode() {
-        return new JsonSequenceNode();
+    public JsonArray createSequenceNode() {
+        return new JsonArray();
     }
 
     @Override
-    public JsonMapNode createMapNode() {
-        return new JsonMapNode();
+    public JsonObject createMapNode() {
+        return new JsonObject();
     }
 }

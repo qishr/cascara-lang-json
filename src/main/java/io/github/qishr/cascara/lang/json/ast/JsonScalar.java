@@ -47,7 +47,7 @@ import io.github.qishr.cascara.common.lang.ast.ScalarAstNode;
 import io.github.qishr.cascara.common.lang.type.PrimitiveType;
 
 
-public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> {
+public class JsonScalar extends JsonNode implements ScalarAstNode<JsonNode> {
 
     private PrimitiveType primitiveType;
     private QuoteStyle quoteStyle = QuoteStyle.UNDETERMINED;
@@ -65,7 +65,7 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
     /// Constructor for use in parsers.
     /// Used when reading raw text from a file stream.
     /// Takes a String and triggers full lexical dialect type inference.
-    public JsonScalarNode(
+    public JsonScalar(
         JsonToken token,
         PrimitiveType primitiveType,
         boolean isKey,
@@ -78,7 +78,7 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
         this.isKey = isKey;
     }
 
-    public JsonScalarNode(
+    public JsonScalar(
         Object jvmValue,
         QuoteStyle quoteStyle,
         boolean isKey,
@@ -94,25 +94,25 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
     }
 
     // TODO: What is this used for? Document it.
-    public JsonScalarNode(Object content, JsonOptions options) {
+    public JsonScalar(Object content, JsonOptions options) {
         this(content, QuoteStyle.UNDETERMINED, false, options);
     }
 
     /// A programmatic and serializer constructor.
     /// Used when building an AST dynamically in code.
     /// Takes a pre-typed Object and skips text-based type inference.
-    public JsonScalarNode(Object jvmValue, QuoteStyle quoteStyle) {
+    public JsonScalar(Object jvmValue, QuoteStyle quoteStyle) {
         this(jvmValue, quoteStyle, false, null);
     }
 
     /// A programmatic and serializer constructor.
     /// Used when building an AST dynamically in code.
     /// Takes a pre-typed Object and skips text-based type inference.
-    public JsonScalarNode(Object jvmValue) {
+    public JsonScalar(Object jvmValue) {
         this(jvmValue, false);
     }
 
-    public JsonScalarNode(JsonToken tok, Object jvmValue) {
+    public JsonScalar(JsonToken tok, Object jvmValue) {
         this.primitiveType = PrimitiveType.of(jvmValue);
         this.jvmValue = jvmValue;
         this.isJvmValueCached = true;
@@ -123,12 +123,12 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
     /// A programmatic and serializer constructor.
     /// Used when building an AST dynamically in code.
     /// Takes a pre-typed Object and skips text-based type inference.
-    public JsonScalarNode(Object jvmValue, boolean isKey) {
+    public JsonScalar(Object jvmValue, boolean isKey) {
         this(jvmValue, QuoteStyle.UNDETERMINED, isKey, null);
     }
 
     /// The default constructor
-    public JsonScalarNode() {
+    public JsonScalar() {
         this(null);
     }
 
@@ -152,7 +152,7 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
     }
 
     @Override
-    public JsonScalarNode setQuoteStyle(QuoteStyle style) {
+    public JsonScalar setQuoteStyle(QuoteStyle style) {
         this.quoteStyle = style;
         return this;
     }
@@ -262,7 +262,7 @@ public class JsonScalarNode extends JsonNode implements ScalarAstNode<JsonNode> 
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof JsonScalarNode that)) return false;
+        if (!(o instanceof JsonScalar that)) return false;
         return Objects.equals(this.asString(), that.asString())
             && getQuoteStyle() == that.getQuoteStyle();
             // && isKey == that.isKey;

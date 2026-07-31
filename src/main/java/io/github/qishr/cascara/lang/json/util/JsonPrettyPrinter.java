@@ -40,11 +40,11 @@ import java.io.Writer;
 import java.util.ArrayList;
 
 import io.github.qishr.cascara.common.lang.ast.CommentAstNode;
-import io.github.qishr.cascara.lang.json.ast.JsonMapEntryNode;
-import io.github.qishr.cascara.lang.json.ast.JsonMapNode;
+import io.github.qishr.cascara.lang.json.ast.JsonProperty;
+import io.github.qishr.cascara.lang.json.ast.JsonObject;
 import io.github.qishr.cascara.lang.json.ast.JsonNode;
-import io.github.qishr.cascara.lang.json.ast.JsonScalarNode;
-import io.github.qishr.cascara.lang.json.ast.JsonSequenceNode;
+import io.github.qishr.cascara.lang.json.ast.JsonScalar;
+import io.github.qishr.cascara.lang.json.ast.JsonArray;
 
 public class JsonPrettyPrinter {
     private final Writer writer;
@@ -68,17 +68,17 @@ public class JsonPrettyPrinter {
         }
 
         // 2. Dispatch based on the Cascara AST interfaces
-        if (node instanceof JsonMapNode map) {
+        if (node instanceof JsonObject map) {
             printMap(map);
-        } else if (node instanceof JsonSequenceNode seq) {
+        } else if (node instanceof JsonArray seq) {
             printSequence(seq);
-        } else if (node instanceof JsonScalarNode scalar) {
+        } else if (node instanceof JsonScalar scalar) {
             // ScalarAstNode provides getLexeme() to preserve quotes/formatting
             writer.write(scalar.getLexeme());
         }
     }
 
-    private void printMap(JsonMapNode map) throws IOException {
+    private void printMap(JsonObject map) throws IOException {
         writer.write("{\n");
         indentLevel++;
 
@@ -87,7 +87,7 @@ public class JsonPrettyPrinter {
         for (int i = 0; i < keys.size(); i++) {
             String key = keys.get(i);
             // API doc: getEntry takes the Key node, not a String
-            JsonMapEntryNode entry = (JsonMapEntryNode) map.getEntry(key);
+            JsonProperty entry = (JsonProperty) map.getEntry(key);
 
             writeIndent();
             print(entry.getKey());
@@ -105,7 +105,7 @@ public class JsonPrettyPrinter {
         writer.write("}");
     }
 
-    private void printSequence(JsonSequenceNode seq) throws IOException {
+    private void printSequence(JsonArray seq) throws IOException {
         writer.write("[\n");
         indentLevel++;
 

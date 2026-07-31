@@ -43,7 +43,7 @@ import org.junit.jupiter.api.Test;
 
 import io.github.qishr.cascara.common.diagnostic.Diagnostic.Level;
 import io.github.qishr.cascara.common.diagnostic.StandardReporter;
-import io.github.qishr.cascara.lang.json.ast.JsonMapNode;
+import io.github.qishr.cascara.lang.json.ast.JsonObject;
 
 public class StringTests {
     private JsonAstParser parser;
@@ -57,7 +57,7 @@ public class StringTests {
     void test_stringContaining_quotes() {
         String text = "{\"name\": \"one \\\"two\\\" three\"}";
         JsonAstParser parser = new JsonAstParser();
-        JsonMapNode json = (JsonMapNode)parser.parse(text);
+        JsonObject json = (JsonObject)parser.parse(text);
         String name = json.getString("name");
         assertEquals("one \"two\" three", name);
     }

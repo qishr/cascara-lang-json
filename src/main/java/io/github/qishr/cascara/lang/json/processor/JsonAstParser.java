@@ -52,12 +52,12 @@ import io.github.qishr.cascara.common.lang.util.LanguageOptions;
 import io.github.qishr.cascara.common.lang.util.QuoteStyle;
 import io.github.qishr.cascara.common.util.ContentType;
 import io.github.qishr.cascara.common.util.Properties;
-import io.github.qishr.cascara.lang.json.ast.JsonCommentNode;
-import io.github.qishr.cascara.lang.json.ast.JsonMapEntryNode;
-import io.github.qishr.cascara.lang.json.ast.JsonMapNode;
+import io.github.qishr.cascara.lang.json.ast.JsonComment;
+import io.github.qishr.cascara.lang.json.ast.JsonProperty;
+import io.github.qishr.cascara.lang.json.ast.JsonObject;
 import io.github.qishr.cascara.lang.json.ast.JsonNode;
-import io.github.qishr.cascara.lang.json.ast.JsonScalarNode;
-import io.github.qishr.cascara.lang.json.ast.JsonSequenceNode;
+import io.github.qishr.cascara.lang.json.ast.JsonScalar;
+import io.github.qishr.cascara.lang.json.ast.JsonArray;
 import io.github.qishr.cascara.lang.json.exception.JsonDiagnosticCode;
 import io.github.qishr.cascara.lang.json.internal.JsonStringUnescaper;
 import io.github.qishr.cascara.lang.json.token.JsonErrorToken;
@@ -75,7 +75,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
     private static final String NAN = "NaN";
 
     /// Buffer to hold comments until a data node is created to claim them.
-    private final List<JsonCommentNode> pendingComments = new ArrayList<>();
+    private final List<JsonComment> pendingComments = new ArrayList<>();
 
     // Note: Keep this in alphabetical order,
     // or it will become time consuming to maintain
@@ -240,7 +240,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
 
             // Unexpected token
             error(token, JsonDiagnosticCode.UNEXPECTED_TOKEN, type);
-            return new JsonScalarNode(
+            return new JsonScalar(
                 token,
                 PrimitiveType.ANY,
                 false,
@@ -252,13 +252,13 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
         }
     }
 
-    private JsonMapNode parseMap() {
+    private JsonObject parseMap() {
         depth++;
         trace("parseMap");
 
         try {
             JsonToken start = consume(JsonTokenType.LEFT_BRACE, JsonDiagnosticCode.EXPECTED_OPEN_BRACE);
-            JsonMapNode map = new JsonMapNode(start.getStartLine(), start.getStartColumn());
+            JsonObject map = new JsonObject(start.getStartLine(), start.getStartColumn());
 
             attachComments(map);
 
@@ -304,7 +304,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
                 JsonNode value = parseValue();
 
                 // map.put(keyString, value);
-                JsonMapEntryNode entry = new JsonMapEntryNode(
+                JsonProperty entry = new JsonProperty(
                     keyTok.getStartLine(),
                     keyTok.getStartColumn(),
                     keyString,
@@ -356,13 +356,13 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
         return key;
     }
 
-    private JsonSequenceNode parseSequence() {
+    private JsonArray parseSequence() {
         depth++;
         trace("parseSequence");
 
         try {
             JsonToken start = consume(JsonTokenType.LEFT_BRACKET, JsonDiagnosticCode.EXPECTED_OPEN_BRACKET);
-            JsonSequenceNode seq = new JsonSequenceNode(start.getStartLine(), start.getStartColumn());
+            JsonArray seq = new JsonArray(start.getStartLine(), start.getStartColumn());
 
             attachComments(seq);
 
@@ -403,7 +403,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
         }
     }
 
-    private JsonScalarNode parseScalar() {
+    private JsonScalar parseScalar() {
         depth++;
         trace("parseScalar");
 
@@ -411,12 +411,12 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
             skipTrivia();
             JsonToken tok = advance(); // consume the scalar token
             JsonTokenType type = tok.getType();
-            JsonScalarNode node = null;
+            JsonScalar node = null;
 
             switch (type) {
 
                 case STRING -> {
-                    node = new JsonScalarNode(
+                    node = new JsonScalar(
                         tok,
                         PrimitiveType.STRING,
                         false,
@@ -426,7 +426,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
 
                 case NUMBER -> {
                     if (tok instanceof JsonNumberToken number) {
-                        node = new JsonScalarNode(tok, number.getNumber());
+                        node = new JsonScalar(tok, number.getNumber());
                     }
                     // node = new JsonScalarNode(
                     //     tok,
@@ -441,7 +441,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
                     if (literal != null) {
                         switch(literal) {
                             case TRUE -> {
-                                node = new JsonScalarNode(
+                                node = new JsonScalar(
                                     tok,
                                     PrimitiveType.BOOLEAN,
                                     false,
@@ -449,7 +449,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
                                 );
                             }
                             case FALSE -> {
-                                node = new JsonScalarNode(
+                                node = new JsonScalar(
                                     tok,
                                     PrimitiveType.BOOLEAN,
                                     false,
@@ -457,7 +457,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
                                 );
                             }
                             case NULL -> {
-                                node = new JsonScalarNode(
+                                node = new JsonScalar(
                                     tok,
                                     PrimitiveType.NULL,
                                     false,
@@ -466,7 +466,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
                             }
                             case NAN -> {
                                 if (ALLOW_INFINITY_AND_NAN) {
-                                    node = new JsonScalarNode(
+                                    node = new JsonScalar(
                                         tok,
                                         PrimitiveType.STRING,
                                         false,
@@ -474,12 +474,12 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
                                     );
                                 } else {
                                     error(tok, JsonDiagnosticCode.UNEXPECTED_UNQUOTED_STRING_VALUE, NAN);
-                                    node = new JsonScalarNode();
+                                    node = new JsonScalar();
                                 }
                             }
                             case INFINITY -> {
                                 if (ALLOW_INFINITY_AND_NAN) {
-                                    node = new JsonScalarNode(
+                                    node = new JsonScalar(
                                         tok,
                                         PrimitiveType.STRING,
                                         false,
@@ -487,7 +487,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
                                     );
                                 } else {
                                     error(tok, JsonDiagnosticCode.UNEXPECTED_UNQUOTED_STRING_VALUE, INFINITY);
-                                    node = new JsonScalarNode();
+                                    node = new JsonScalar();
                                 }
                             }
                         }
@@ -497,7 +497,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
 
             if (node == null) {
                 error(tok, JsonDiagnosticCode.UNEXPECTED_TOKEN, type);
-                node = new JsonScalarNode(
+                node = new JsonScalar(
                     tok,
                     PrimitiveType.ANY,
                     false,
@@ -526,7 +526,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
             // Avoid startsWith() cost when comment type is already known
             boolean isBlock = tok.getLexeme().length() > 1 && tok.getLexeme().charAt(1) == '*';
 
-            pendingComments.add(new JsonCommentNode(
+            pendingComments.add(new JsonComment(
                 tok.getStartLine(),
                 tok.getStartColumn(),
                 tok.getLexeme(),
@@ -539,7 +539,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
     private <T extends JsonNode> T attachComments(T node) {
         if (node == null) return null;
         if (!(ALLOW_COMMENTS && CAPTURE_COMMENTS)) return node;
-        for (JsonCommentNode comment : pendingComments) {
+        for (JsonComment comment : pendingComments) {
             node.addComment(comment);
         }
         pendingComments.clear();

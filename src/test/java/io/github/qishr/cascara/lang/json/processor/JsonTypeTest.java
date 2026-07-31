@@ -39,9 +39,9 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
 import org.junit.jupiter.api.Test;
 
-import io.github.qishr.cascara.lang.json.ast.JsonMapNode;
+import io.github.qishr.cascara.lang.json.ast.JsonObject;
 import io.github.qishr.cascara.lang.json.ast.JsonNode;
-import io.github.qishr.cascara.lang.json.ast.JsonScalarNode;
+import io.github.qishr.cascara.lang.json.ast.JsonScalar;
 
 public class JsonTypeTest {
     @Test
@@ -53,8 +53,8 @@ public class JsonTypeTest {
             """;
 
         JsonNode doc = new JsonAstParser().parse(json);
-        if (doc instanceof JsonMapNode map) {
-            if (map.get("status") instanceof JsonScalarNode status) {
+        if (doc instanceof JsonObject map) {
+            if (map.get("status") instanceof JsonScalar status) {
                 Object o = status.getPrimitive();
                 assertInstanceOf(Boolean.class, o);
             }

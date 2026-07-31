@@ -38,7 +38,6 @@ package io.github.qishr.cascara.lang.json.processor;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.lang.module.ModuleDescriptor;
 import java.util.stream.Collectors;
 
 import io.github.qishr.cascara.common.diagnostic.NoOpReporter;

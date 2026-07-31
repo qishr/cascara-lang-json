@@ -43,23 +43,23 @@ import java.util.Objects;
 
 import io.github.qishr.cascara.common.lang.ast.SequenceAstNode;
 
-public class JsonSequenceNode extends JsonNode implements SequenceAstNode<JsonNode> {
+public class JsonArray extends JsonNode implements SequenceAstNode<JsonNode> {
     private final List<JsonNode> elements = new ArrayList<>();
 
-    public JsonSequenceNode() { super(); }
-    public JsonSequenceNode(int line, int column) { super(line, column); }
+    public JsonArray() { super(); }
+    public JsonArray(int line, int column) { super(line, column); }
 
-    @Override public JsonSequenceNode add(JsonNode item) { elements.add(item); return this; }
+    @Override public JsonArray add(JsonNode item) { elements.add(item); return this; }
 
     @Override
-    public JsonSequenceNode remove(int index) {
+    public JsonArray remove(int index) {
         if (index >= 0 && index < elements.size()) {
             elements.remove(index);
         }
         return this;
     }
 
-    @Override public JsonSequenceNode clear() { elements.clear(); return this; }
+    @Override public JsonArray clear() { elements.clear(); return this; }
     @Override public int size() { return elements.size(); }
     @Override public JsonNode get(int index) { return elements.get(index); }
     @Override public List<JsonNode> getElements() { return elements; }
@@ -82,7 +82,7 @@ public class JsonSequenceNode extends JsonNode implements SequenceAstNode<JsonNo
     }
 
     @Override
-    public JsonSequenceNode remove(JsonNode node) {
+    public JsonArray remove(JsonNode node) {
         elements.remove(node);
         return this;
     }
@@ -94,11 +94,11 @@ public class JsonSequenceNode extends JsonNode implements SequenceAstNode<JsonNo
     }
 
     static class SequenceIterator<T> implements Iterator<JsonNode> {
-        JsonSequenceNode list;
+        JsonArray list;
         int currentIndex = 0;
 
         // initialize pointer to head of the list for iteration
-        public SequenceIterator(JsonSequenceNode list) {
+        public SequenceIterator(JsonArray list) {
             this.list = list;
         }
 
@@ -129,7 +129,7 @@ public class JsonSequenceNode extends JsonNode implements SequenceAstNode<JsonNo
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof JsonSequenceNode that)) return false;
+        if (!(o instanceof JsonArray that)) return false;
         return Objects.equals(this.elements, that.elements);
     }
 

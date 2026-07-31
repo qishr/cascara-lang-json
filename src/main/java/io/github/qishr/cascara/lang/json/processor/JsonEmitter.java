@@ -39,11 +39,11 @@ import io.github.qishr.cascara.common.util.ContentType;
 import io.github.qishr.cascara.common.diagnostic.Reporter;
 import io.github.qishr.cascara.common.lang.util.LanguageOptions;
 import io.github.qishr.cascara.common.lang.processor.Emitter;
-import io.github.qishr.cascara.lang.json.ast.JsonMapEntryNode;
-import io.github.qishr.cascara.lang.json.ast.JsonMapNode;
+import io.github.qishr.cascara.lang.json.ast.JsonProperty;
+import io.github.qishr.cascara.lang.json.ast.JsonObject;
 import io.github.qishr.cascara.lang.json.ast.JsonNode;
-import io.github.qishr.cascara.lang.json.ast.JsonScalarNode;
-import io.github.qishr.cascara.lang.json.ast.JsonSequenceNode;
+import io.github.qishr.cascara.lang.json.ast.JsonScalar;
+import io.github.qishr.cascara.lang.json.ast.JsonArray;
 import io.github.qishr.cascara.lang.json.util.JsonOptions;
 
 public class JsonEmitter extends AbstractJsonProcessor<JsonEmitter>  implements Emitter {
@@ -80,13 +80,13 @@ public class JsonEmitter extends AbstractJsonProcessor<JsonEmitter>  implements 
             }
         }
 
-        if (node instanceof JsonScalarNode scalar) {
+        if (node instanceof JsonScalar scalar) {
             emitScalar(formatScalar(scalar));
-        } else if (node instanceof JsonMapNode map) {
+        } else if (node instanceof JsonObject map) {
             emitMapStart();
             var entries = map.getEntries();
             for (int i = 0; i < entries.size(); i++) {
-                JsonMapEntryNode entry = (JsonMapEntryNode) entries.get(i);
+                JsonProperty entry = (JsonProperty) entries.get(i);
 
                 emitScalar(formatKey(entry.getKey()));
                 emitPropertySeparator();
@@ -97,7 +97,7 @@ public class JsonEmitter extends AbstractJsonProcessor<JsonEmitter>  implements 
                 }
             }
             emitMapEnd();
-        } else if (node instanceof JsonSequenceNode seq) {
+        } else if (node instanceof JsonArray seq) {
             emitSequenceStart();
             int total = seq.size();
             int index = 0;
@@ -112,7 +112,7 @@ public class JsonEmitter extends AbstractJsonProcessor<JsonEmitter>  implements 
         }
     }
 
-    private String formatScalar(JsonScalarNode scalar) {
+    private String formatScalar(JsonScalar scalar) {
 
         // asString returns the unescaped string content without quotes
         String value = scalar.asString();

@@ -47,104 +47,112 @@ import io.github.qishr.cascara.common.lang.annotation.Nullable;
 import io.github.qishr.cascara.common.lang.ast.MapAstNode;
 import io.github.qishr.cascara.lang.json.util.JsonOptions;
 
-public class JsonMapNode extends JsonNode implements MapAstNode<String, JsonNode, JsonMapEntryNode> {
-    private final LinkedHashMap<String, JsonMapEntryNode> entriesByKey = new LinkedHashMap<>();
+public class JsonObject extends JsonNode implements MapAstNode<String, JsonNode, JsonProperty> {
+    private final LinkedHashMap<String, JsonProperty> entriesByKey = new LinkedHashMap<>();
     private final JsonOptions options;
 
-    public JsonMapNode() {
+    public JsonObject() {
         super();
         this.options = JsonOptions.STRICT;
     }
 
-    public JsonMapNode(int line, int column) {
+    public JsonObject(int line, int column) {
         super(line, column);
         this.options = JsonOptions.STRICT;
     }
 
-    public JsonMapNode(JsonOptions options) {
+    public JsonObject(JsonOptions options) {
         super();
         this.options = options;
     }
 
-    public JsonMapNode(int line, int column, JsonOptions options) {
+    public JsonObject(int line, int column, JsonOptions options) {
         super(line, column);
         this.options = options;
     }
 
     @Override
-    public List<JsonMapEntryNode> getChildren() {
+    public List<JsonProperty> getChildren() {
         return List.copyOf(entriesByKey.values());
     }
 
     @Nullable
     @Override
-    public JsonMapEntryNode getEntry(String key) {
+    public JsonProperty getEntry(String key) {
         if (key == null) return null;
         return entriesByKey.get(key);
     }
 
     @Nullable
     @Override
-    public JsonMapEntryNode getEntry(int i) {
+    public JsonProperty getEntry(int i) {
         if (i < 0 || i > size()) throw new NoSuchElementException();
-        return entriesByKey.sequencedValues().toArray(new JsonMapEntryNode[]{})[i];
+        return entriesByKey.sequencedValues().toArray(new JsonProperty[]{})[i];
     }
 
     @Override
-    public List<JsonMapEntryNode> getEntries() {
+    public List<JsonProperty> getEntries() {
         return List.copyOf(entriesByKey.values());
     }
 
     @Override
     public Set<String> keySet() {
         Set<String> keys = new LinkedHashSet<>();
-        for (JsonMapEntryNode entry : entriesByKey.values()) {
+        for (JsonProperty entry : entriesByKey.values()) {
             keys.add(entry.getKey());
         }
         return keys;
     }
 
     @Override
-    public Set<JsonMapEntryNode> entrySet() {
+    public Set<JsonProperty> entrySet() {
         return new LinkedHashSet<>(entriesByKey.values());
     }
 
     @Override
-    public JsonMapNode remove(String key) {
+    public JsonObject remove(String key) {
         entriesByKey.remove(key);
         return this;
     }
 
     @Override
     public JsonNode get(String key) {
-        JsonMapEntryNode entry = entriesByKey.get(key);
+        JsonProperty entry = entriesByKey.get(key);
         return entry == null ? null : entry.getValue();
     }
 
     @Override
-    public JsonMapNode getMap(String key) {
+    public JsonObject getMap(String key) {
         JsonNode node = this.get(key);
-        return (node instanceof JsonMapNode map) ? map : new JsonMapNode();
+        return (node instanceof JsonObject map) ? map : new JsonObject();
     }
 
     @Override
-    public JsonSequenceNode getSequence(String key) {
+    public JsonArray getSequence(String key) {
         JsonNode node = this.get(key);
-        return (node instanceof JsonSequenceNode seq) ? seq : new JsonSequenceNode();
+        return (node instanceof JsonArray seq) ? seq : new JsonArray();
     }
 
     @Override
     @Nullable
-    public JsonScalarNode getScalar(String key) {
-        if (get(key) instanceof JsonScalarNode scalar) {
+    public JsonScalar getScalar(String key) {
+        if (get(key) instanceof JsonScalar scalar) {
             return scalar;
         }
         return null;
     }
 
+    public JsonObject getObject(String key) {
+        return getMap(key);
+    }
+
+    public JsonArray getArray(String key) {
+        return getArray(key);
+    }
+
     @Override
-    public JsonMapNode put(String key, JsonNode value) {
-        JsonMapEntryNode existing = entriesByKey.get(key);
+    public JsonObject put(String key, JsonNode value) {
+        JsonProperty existing = entriesByKey.get(key);
         if (existing != null) {
             // TODO: Should the key's comments be removed?
             // This needs to be in the javadoc.
@@ -152,14 +160,14 @@ public class JsonMapNode extends JsonNode implements MapAstNode<String, JsonNode
             return this;
         }
 
-        JsonMapEntryNode entry = new JsonMapEntryNode(0, 0, key, value);
+        JsonProperty entry = new JsonProperty(0, 0, key, value);
         entriesByKey.put(key, entry);
         return this;
     }
 
-    public JsonMapNode put(JsonMapEntryNode entry) {
+    public JsonObject put(JsonProperty entry) {
         String key = entry.getKey();
-        JsonMapEntryNode existing = entriesByKey.get(key);
+        JsonProperty existing = entriesByKey.get(key);
 
         if (existing != null) {
             existing.setRaw(entry.getValue());
@@ -185,8 +193,8 @@ public class JsonMapNode extends JsonNode implements MapAstNode<String, JsonNode
 
     /// {@inheritDoc}
     @Override
-    public JsonMapNode put(String key, String value) {
-        return put(key, new JsonScalarNode(value, options));
+    public JsonObject put(String key, String value) {
+        return put(key, new JsonScalar(value, options));
     }
 
     @Override
@@ -201,7 +209,7 @@ public class JsonMapNode extends JsonNode implements MapAstNode<String, JsonNode
 
     /// Returns Iterator instance
     @Override
-    public Iterator<JsonMapEntryNode> iterator() {
+    public Iterator<JsonProperty> iterator() {
         return entriesByKey.sequencedValues().iterator();
     }
 
@@ -209,7 +217,7 @@ public class JsonMapNode extends JsonNode implements MapAstNode<String, JsonNode
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof JsonMapNode that)) return false;
+        if (!(o instanceof JsonObject that)) return false;
         return Objects.equals(this.entriesByKey, that.entriesByKey);
     }
 

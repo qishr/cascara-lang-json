@@ -42,12 +42,12 @@ import io.github.qishr.cascara.common.lang.type.PrimitiveType;
 
 import java.util.List;
 
-public class JsonCommentNode extends JsonNode implements ScalarAstNode<JsonNode>, CommentAstNode {
+public class JsonComment extends JsonNode implements ScalarAstNode<JsonNode>, CommentAstNode {
     private String value;
     private String rawValue;
     private final boolean multiLine;
 
-    public JsonCommentNode(int line, int column, String rawValue, String stringValue, boolean multiLine) {
+    public JsonComment(int line, int column, String rawValue, String stringValue, boolean multiLine) {
         super(line, column);
         this.value = stringValue;
         this.rawValue = rawValue;
@@ -65,7 +65,7 @@ public class JsonCommentNode extends JsonNode implements ScalarAstNode<JsonNode>
     }
 
     @Override
-    public JsonCommentNode setQuoteStyle(QuoteStyle style) {
+    public JsonComment setQuoteStyle(QuoteStyle style) {
         return this;
     }
 

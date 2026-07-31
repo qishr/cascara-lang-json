@@ -44,10 +44,10 @@ import io.github.qishr.cascara.common.lang.ast.MapEntryAstNode;
 import io.github.qishr.cascara.common.lang.ast.ScalarAstNode;
 import io.github.qishr.cascara.common.lang.ast.SequenceAstNode;
 import io.github.qishr.cascara.common.lang.processor.AstConverter;
-import io.github.qishr.cascara.lang.json.ast.JsonMapNode;
+import io.github.qishr.cascara.lang.json.ast.JsonObject;
 import io.github.qishr.cascara.lang.json.ast.JsonNode;
-import io.github.qishr.cascara.lang.json.ast.JsonScalarNode;
-import io.github.qishr.cascara.lang.json.ast.JsonSequenceNode;
+import io.github.qishr.cascara.lang.json.ast.JsonScalar;
+import io.github.qishr.cascara.lang.json.ast.JsonArray;
 import io.github.qishr.cascara.lang.json.exception.JsonConverterException;
 
 public class JsonConverter extends AbstractJsonProcessor<JsonConverter> implements AstConverter<JsonNode> {
@@ -68,7 +68,7 @@ public class JsonConverter extends AbstractJsonProcessor<JsonConverter> implemen
     public JsonNode fromAst(AstNode from) {
         if (from == null) return null;
         if (from instanceof MapAstNode fromMap) {
-            JsonMapNode map = new JsonMapNode();
+            JsonObject map = new JsonObject();
             for (Object entry : fromMap.getEntries()) {
                 if (entry instanceof MapEntryAstNode fromMapEntry) {
                     Object astKey = fromMapEntry.getKey();
@@ -82,7 +82,7 @@ public class JsonConverter extends AbstractJsonProcessor<JsonConverter> implemen
             }
             return map;
         } else if (from instanceof SequenceAstNode astSeq) {
-            JsonSequenceNode sequence = new JsonSequenceNode();
+            JsonArray sequence = new JsonArray();
             for (Object element : astSeq.getElements()) {
                 if (element instanceof AstNode astElement) {
                     sequence.add(fromAst(astElement));
@@ -91,7 +91,7 @@ public class JsonConverter extends AbstractJsonProcessor<JsonConverter> implemen
             return sequence;
         } else if (from instanceof ScalarAstNode astScalar) {
             // System.out.println("Debug: SCALAR: " + astScalar.asString());
-            return new JsonScalarNode(astScalar.getPrimitive(), false);
+            return new JsonScalar(astScalar.getPrimitive(), false);
         } else {
             throw new JsonConverterException(
                 LangDiagnosticCode.UNKNOWN_NODE_TYPE,
