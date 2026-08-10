@@ -40,9 +40,9 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
 import org.junit.jupiter.api.Test;
 
-import io.github.qishr.cascara.common.lang.reference.ReferenceMapNode;
-import io.github.qishr.cascara.common.lang.reference.ReferenceScalarNode;
-import io.github.qishr.cascara.common.lang.reference.ReferenceSequenceNode;
+import io.github.qishr.cascara.common.lang.agnostic.AgnosticMapNode;
+import io.github.qishr.cascara.common.lang.agnostic.AgnosticScalarNode;
+import io.github.qishr.cascara.common.lang.agnostic.AgnosticSequenceNode;
 import io.github.qishr.cascara.common.lang.util.QuoteStyle;
 import io.github.qishr.cascara.lang.json.ast.JsonProperty;
 import io.github.qishr.cascara.lang.json.ast.JsonObject;
@@ -53,7 +53,7 @@ import io.github.qishr.cascara.lang.json.ast.JsonArray;
 public class JsonConverterTest {
     @Test
     void test_convertString() {
-        ReferenceScalarNode root = new ReferenceScalarNode("testStr");
+        AgnosticScalarNode root = new AgnosticScalarNode("testStr");
         JsonConverter converter = new JsonConverter();
         JsonNode jsonRoot = converter.fromAst(root);
         assertInstanceOf(JsonScalar.class, jsonRoot);
@@ -65,7 +65,7 @@ public class JsonConverterTest {
 
     @Test
     void test_convertBoolean() {
-        ReferenceScalarNode root = new ReferenceScalarNode(true);
+        AgnosticScalarNode root = new AgnosticScalarNode(true);
         JsonConverter converter = new JsonConverter();
         JsonNode jsonRoot = converter.fromAst(root);
         assertInstanceOf(JsonScalar.class, jsonRoot);
@@ -87,13 +87,13 @@ public class JsonConverterTest {
 
         // 1. Build a simple AST using the reference implementation nodes
 
-        ReferenceMapNode root = new ReferenceMapNode()
+        AgnosticMapNode root = new AgnosticMapNode()
             .put("testStr", "testStr")
-            .put("testBool", new ReferenceScalarNode(true))
-            .put("testSeq", new ReferenceSequenceNode()
-                .add(new ReferenceScalarNode(1))
-                .add(new ReferenceScalarNode(2))
-                .add(new ReferenceScalarNode(3)));
+            .put("testBool", new AgnosticScalarNode(true))
+            .put("testSeq", new AgnosticSequenceNode()
+                .add(new AgnosticScalarNode(1))
+                .add(new AgnosticScalarNode(2))
+                .add(new AgnosticScalarNode(3)));
 
         // 2. Convert it to a JSON AST
 
