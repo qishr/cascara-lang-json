@@ -78,7 +78,7 @@ public class JsonObject extends JsonNode implements MapAstNode<String, JsonNode,
 
     @Nullable
     @Override
-    public JsonProperty getEntry(String key) {
+    public JsonProperty getEntry(Object key) {
         if (key == null) return null;
         return entriesByKey.get(key);
     }
@@ -116,26 +116,26 @@ public class JsonObject extends JsonNode implements MapAstNode<String, JsonNode,
     }
 
     @Override
-    public JsonNode get(String key) {
+    public JsonNode get(Object key) {
         JsonProperty entry = entriesByKey.get(key);
         return entry == null ? null : entry.getValue();
     }
 
     @Override
-    public JsonObject getMap(String key) {
+    public JsonObject getMap(Object key) {
         JsonNode node = this.get(key);
         return (node instanceof JsonObject map) ? map : new JsonObject();
     }
 
     @Override
-    public JsonArray getSequence(String key) {
+    public JsonArray getSequence(Object key) {
         JsonNode node = this.get(key);
         return (node instanceof JsonArray seq) ? seq : new JsonArray();
     }
 
     @Override
     @Nullable
-    public JsonScalar getScalar(String key) {
+    public JsonScalar getScalar(Object key) {
         if (get(key) instanceof JsonScalar scalar) {
             return scalar;
         }
@@ -180,8 +180,11 @@ public class JsonObject extends JsonNode implements MapAstNode<String, JsonNode,
         return this;
     }
 
-    public boolean containsKey(String key) {
-        return entriesByKey.containsKey(key);
+    public boolean containsKey(Object key) {
+        if (key instanceof String string) {
+            return entriesByKey.containsKey(string);
+        }
+        return false;
     }
 
     /// {@inheritDoc}
