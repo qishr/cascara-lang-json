@@ -770,4 +770,10 @@ public final class JsonSourceByteBuffer implements JsonSimdCapableBuffer, Lexeme
         return true;
     }
 
+	@Override
+	public char previous() {
+		// TODO Auto-generated method stub
+		throw new UnsupportedOperationException("Unimplemented method 'previous'");
+	}
+
 }

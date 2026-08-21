@@ -50,7 +50,7 @@ import io.github.qishr.cascara.common.lang.util.QuoteStyle;
 import io.github.qishr.cascara.common.lang.util.SourceBuffer;
 import io.github.qishr.cascara.common.lang.util.SourceInputStreamBuffer;
 import io.github.qishr.cascara.common.lang.util.SourceStringBuffer;
-import io.github.qishr.cascara.lang.json.exception.JsonDiagnosticCode;
+import io.github.qishr.cascara.lang.json.diagnostic.JsonDiagnosticCode;
 import io.github.qishr.cascara.lang.json.token.JsonBufferBackedToken;
 import io.github.qishr.cascara.lang.json.token.JsonComment;
 import io.github.qishr.cascara.lang.json.token.JsonErrorToken;

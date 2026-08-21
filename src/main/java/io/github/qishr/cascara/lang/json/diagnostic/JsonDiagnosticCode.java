@@ -33,7 +33,7 @@
 // version.
 
 
-package io.github.qishr.cascara.lang.json.exception;
+package io.github.qishr.cascara.lang.json.diagnostic;
 
 import io.github.qishr.cascara.common.diagnostic.code.DiagnosticCode;
 

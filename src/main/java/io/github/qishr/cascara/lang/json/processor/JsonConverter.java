@@ -37,7 +37,7 @@ package io.github.qishr.cascara.lang.json.processor;
 
 import io.github.qishr.cascara.common.util.ContentType;
 import io.github.qishr.cascara.common.diagnostic.code.LangDiagnosticCode;
-import io.github.qishr.cascara.common.lang.annotation.Nullable;
+import io.github.qishr.cascara.common.annotation.Nullable;
 import io.github.qishr.cascara.common.lang.ast.AstNode;
 import io.github.qishr.cascara.common.lang.ast.MapAstNode;
 import io.github.qishr.cascara.common.lang.ast.MapEntryAstNode;
@@ -48,7 +48,7 @@ import io.github.qishr.cascara.lang.json.ast.JsonObject;
 import io.github.qishr.cascara.lang.json.ast.JsonNode;
 import io.github.qishr.cascara.lang.json.ast.JsonScalar;
 import io.github.qishr.cascara.lang.json.ast.JsonArray;
-import io.github.qishr.cascara.lang.json.exception.JsonConverterException;
+import io.github.qishr.cascara.lang.json.diagnostic.JsonConverterException;
 
 public class JsonConverter extends AbstractJsonProcessor<JsonConverter> implements AstConverter<JsonNode> {
     @Override protected JsonConverter self() { return this; }

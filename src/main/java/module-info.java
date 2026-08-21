@@ -38,6 +38,7 @@ module cascara.lang.json {
     requires jdk.incubator.vector;
 
     exports io.github.qishr.cascara.lang.json.ast;
+    exports io.github.qishr.cascara.lang.json.diagnostic;
     exports io.github.qishr.cascara.lang.json.processor;
     exports io.github.qishr.cascara.lang.json.streaming;
     exports io.github.qishr.cascara.lang.json.token;

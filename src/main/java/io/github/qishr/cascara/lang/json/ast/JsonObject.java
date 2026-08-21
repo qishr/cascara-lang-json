@@ -43,7 +43,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.Iterator;
 
-import io.github.qishr.cascara.common.lang.annotation.Nullable;
+import io.github.qishr.cascara.common.annotation.Nullable;
 import io.github.qishr.cascara.common.lang.ast.MapAstNode;
 import io.github.qishr.cascara.lang.json.util.JsonOptions;
 

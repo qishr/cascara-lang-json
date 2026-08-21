@@ -33,48 +33,37 @@
 // version.
 
 
-package io.github.qishr.cascara.lang.json.util;
+package io.github.qishr.cascara.lang.json.streaming;
 
-import java.io.*;
-import java.nio.charset.StandardCharsets;
+import io.github.qishr.cascara.common.lang.streaming.StreamingEventType;
 
-import io.github.qishr.cascara.common.annotation.Experimental;
-import io.github.qishr.cascara.lang.json.processor.JsonAstParser;
+public enum JsonStreamingEventType implements StreamingEventType {
+    START_STREAM,
 
-@Experimental
-public class ProfilingHarness {
+    END_STREAM,
 
-    public static void main(String[] args) throws Exception {
-        // Load medium.json from classpath
-        InputStream inputStream = ProfilingHarness.class.getResourceAsStream("/medium.json");
-        if (inputStream == null) {
-            throw new FileNotFoundException("medium.json not found on classpath");
-        }
+    START_DOCUMENT,
 
-        // Read entire file into a String
-        StringBuilder sb = new StringBuilder(4096);
-        try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
+    END_DOCUMENT,
 
-            char[] buf = new char[8192];
-            int n;
-            while ((n = reader.read(buf)) != -1) {
-                sb.append(buf, 0, n);
-            }
-        }
-        String content = sb.toString();
+    /// Maps to Map/Object entry boundaries
+    START_OBJECT,
 
-        JsonOptions options = new JsonOptions()
-            .setUseSimd(true)
-            .setAllowUnicode(false)
-            .setAllowComments(false)
-            .setCaptureComments(false)
-            .setAllowSingleQuotedStrings(false);
+    END_OBJECT,
 
+    /// Maps to List/Sequence boundaries
+    START_ARRAY,
 
-        for (int i = 0; i < 500_000; i++) {
-            JsonAstParser parser = new JsonAstParser().setOptions(options);
-            parser.parse(content);
-        }
-    }
+    END_ARRAY,
+
+    /// Keys
+    KEY,
+
+    /// String, number, boolean, null
+    VALUE_SCALAR,
+
+    COMMENT,
+
+    ERROR
+
 }

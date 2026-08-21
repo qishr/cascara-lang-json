@@ -62,7 +62,6 @@ public class JsonSerializer extends AbstractSerializer<JsonSerializer,JsonNode,J
 
     private JsonAstParser parser;
     private JsonOptions options = new JsonOptions();
-    private Reporter reporter = new NoOpReporter();
 
     public JsonSerializer() {
         // This constructor is for SPI and cannot take a parameter.
@@ -113,7 +112,7 @@ public class JsonSerializer extends AbstractSerializer<JsonSerializer,JsonNode,J
 
     /// {@inheritDoc}
     @Override
-    public String toText(Object jvmInstance) {
+    public String toString(Object jvmInstance) {
         JsonNode ast = toAst(jvmInstance);
         return new JsonEmitter().setOptions(options).emit(ast);
     }
@@ -121,6 +120,7 @@ public class JsonSerializer extends AbstractSerializer<JsonSerializer,JsonNode,J
     /// {@inheritDoc}
     @Override
     public JsonNode toAst(Object jvmInstance) {
+        setupSerializer();
         return serialize(jvmInstance);
     }
 
@@ -134,7 +134,7 @@ public class JsonSerializer extends AbstractSerializer<JsonSerializer,JsonNode,J
 
     /// {@inheritDoc}
     @Override
-    public <C> C fromText(String text, Class<C> jvmType) {
+    public <C> C fromString(String text, Class<C> jvmType) {
         JsonNode ast = getParser().parse(text);
         return fromAst(ast, jvmType);
     }
@@ -177,17 +177,21 @@ public class JsonSerializer extends AbstractSerializer<JsonSerializer,JsonNode,J
     /// {@inheritDoc}
     @Override
     public <C> C fromAst(JsonNode astNode, Class<C> jvmType) {
+        setupSerializer();
         return (C) deserialize(astNode, jvmType);
     }
 
     /// {@inheritDoc}
     @Override
     public <C> C fromAst(JsonNode astNode, TypeReference<C> typeRef) {
+        setupSerializer();
         return (C) deserialize(astNode, typeRef);
     }
 
-
-
+    protected void setupSerializer() {
+        super.setupSerializer();
+        depthLimit = options.getDepthLimit();
+    }
 
     private JsonAstParser getParser() {
         if (parser == null) {

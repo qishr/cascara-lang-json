@@ -65,7 +65,7 @@ public final class CascaraJson {
 
     /// Read JSON text into a JVM object of the given type.
     public static <T> T read(String text, Class<T> type) {
-        return newSerializer().fromText(text, type);
+        return newSerializer().fromString(text, type);
     }
 
     /// Read JSON text using a generic type reference.
@@ -107,12 +107,12 @@ public final class CascaraJson {
 
     /// Write a JVM object to JSON text.
     public static String write(Object value) {
-        return newSerializer().toText(value);
+        return newSerializer().toString(value);
     }
 
     /// Write a JVM object to a Writer as JSON.
     public static void write(Object value, Writer writer) throws IOException {
-        writer.write(newSerializer().toText(value));
+        writer.write(newSerializer().toString(value));
     }
 
     // ---------------------------------------------------------------------

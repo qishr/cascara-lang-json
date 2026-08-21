@@ -58,7 +58,7 @@ import io.github.qishr.cascara.lang.json.ast.JsonObject;
 import io.github.qishr.cascara.lang.json.ast.JsonNode;
 import io.github.qishr.cascara.lang.json.ast.JsonScalar;
 import io.github.qishr.cascara.lang.json.ast.JsonArray;
-import io.github.qishr.cascara.lang.json.exception.JsonDiagnosticCode;
+import io.github.qishr.cascara.lang.json.diagnostic.JsonDiagnosticCode;
 import io.github.qishr.cascara.lang.json.internal.JsonStringUnescaper;
 import io.github.qishr.cascara.lang.json.token.JsonErrorToken;
 import io.github.qishr.cascara.lang.json.token.JsonLiteral;

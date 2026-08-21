@@ -42,17 +42,17 @@ import java.util.Deque;
 import io.github.qishr.cascara.common.diagnostic.Reporter;
 import io.github.qishr.cascara.common.lang.exception.ParserException;
 import io.github.qishr.cascara.common.lang.streaming.StreamingEvent;
-import io.github.qishr.cascara.common.lang.streaming.StreamingEventType;
-import io.github.qishr.cascara.lang.json.exception.JsonDiagnosticCode;
+import io.github.qishr.cascara.lang.json.diagnostic.JsonDiagnosticCode;
 import io.github.qishr.cascara.lang.json.processor.JsonTokenizer;
 import io.github.qishr.cascara.lang.json.streaming.JsonStreamingEvent;
+import io.github.qishr.cascara.lang.json.streaming.JsonStreamingEventType;
 import io.github.qishr.cascara.lang.json.token.JsonToken;
 import io.github.qishr.cascara.lang.json.token.JsonTokenType;
 import io.github.qishr.cascara.lang.json.util.JsonOptions;
 
 public class JsonStreamEngine {
     private final JsonTokenizer tokenizer;
-    private final Deque<StreamingEventType> contextStack = new ArrayDeque<>();
+    private final Deque<JsonStreamingEventType> contextStack = new ArrayDeque<>();
 
     private JsonToken currentToken;
     private JsonToken bufferedToken;
@@ -74,7 +74,7 @@ public class JsonStreamEngine {
 
         if (!rootOpened) {
             rootOpened = true;
-            return new JsonStreamingEvent(1, 1, StreamingEventType.START_DOCUMENT, "");
+            return new JsonStreamingEvent(1, 1, JsonStreamingEventType.START_DOCUMENT, "");
         }
 
         advanceToken();
@@ -82,36 +82,36 @@ public class JsonStreamEngine {
         if (currentToken == null || currentToken.getType() == JsonTokenType.EOF) {
             documentEnded = true;
             return new JsonStreamingEvent(tokenizer.getLine(), tokenizer.getColumn(),
-                                          StreamingEventType.END_DOCUMENT, "");
+                                          JsonStreamingEventType.END_DOCUMENT, "");
         }
 
         switch (currentToken.getType()) {
             case LEFT_BRACE:
-                contextStack.push(StreamingEventType.START_OBJECT);
-                return event(StreamingEventType.START_OBJECT);
+                contextStack.push(JsonStreamingEventType.START_OBJECT);
+                return event(JsonStreamingEventType.START_OBJECT);
 
             case RIGHT_BRACE:
                 contextStack.pop();
-                return event(StreamingEventType.END_OBJECT);
+                return event(JsonStreamingEventType.END_OBJECT);
 
             case LEFT_BRACKET:
-                contextStack.push(StreamingEventType.START_ARRAY);
-                return event(StreamingEventType.START_ARRAY);
+                contextStack.push(JsonStreamingEventType.START_ARRAY);
+                return event(JsonStreamingEventType.START_ARRAY);
 
             case RIGHT_BRACKET:
                 contextStack.pop();
-                return event(StreamingEventType.END_ARRAY);
+                return event(JsonStreamingEventType.END_ARRAY);
 
             case STRING:
                 if (isNextTokenColon()) {
-                    return event(StreamingEventType.FIELD_NAME, currentToken.getLexeme());
+                    return event(JsonStreamingEventType.KEY, currentToken.getLexeme());
                 }
-                return event(StreamingEventType.VALUE_SCALAR, currentToken.getLexeme());
+                return event(JsonStreamingEventType.VALUE_SCALAR, currentToken.getLexeme());
 
             case NUMBER:
             case BOOLEAN:
             case NULL:
-                return event(StreamingEventType.VALUE_SCALAR, currentToken.getLexeme());
+                return event(JsonStreamingEventType.VALUE_SCALAR, currentToken.getLexeme());
 
             case COLON:
             case COMMA:
@@ -138,11 +138,11 @@ public class JsonStreamEngine {
         }
     }
 
-    private JsonStreamingEvent event(StreamingEventType type) {
+    private JsonStreamingEvent event(JsonStreamingEventType type) {
         return new JsonStreamingEvent(tokenizer.getLine(), tokenizer.getColumn(), type, "");
     }
 
-    private JsonStreamingEvent event(StreamingEventType type, String content) {
+    private JsonStreamingEvent event(JsonStreamingEventType type, String content) {
         return new JsonStreamingEvent(tokenizer.getLine(), tokenizer.getColumn(), type, content);
     }
 }
