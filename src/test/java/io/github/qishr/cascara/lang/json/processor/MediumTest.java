@@ -78,7 +78,16 @@ public class MediumTest {
 
         JsonAstParser parser = new JsonAstParser()
             .setOptions(new JsonOptions()
-                .setUseSimd(true)
+
+
+                //
+                // TODO: Test this in the SIMD module
+                //.setUseSimd(true)
+                //
+
+                // Also test that with no SIMD module this doesn't crash
+
+
                 // .setAllowUnicode(true)
             )
             .setReporter(new StandardReporter().setLevel(Level.TRACE));

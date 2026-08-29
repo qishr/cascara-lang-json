@@ -147,7 +147,7 @@ public class JsonObject extends JsonNode implements MapAstNode<String, JsonNode,
     }
 
     public JsonArray getArray(String key) {
-        return getArray(key);
+        return getSequence(key);
     }
 
     @Override

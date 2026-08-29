@@ -40,7 +40,6 @@ import java.io.InputStream;
 import java.io.Reader;
 import java.io.Writer;
 
-import io.github.qishr.cascara.common.diagnostic.NoOpReporter;
 import io.github.qishr.cascara.common.diagnostic.Reporter;
 import io.github.qishr.cascara.common.diagnostic.code.GenericDiagnosticCode;
 import io.github.qishr.cascara.common.lang.util.LanguageOptions;
@@ -62,6 +61,7 @@ public class JsonSerializer extends AbstractSerializer<JsonSerializer,JsonNode,J
 
     private JsonAstParser parser;
     private JsonOptions options = new JsonOptions();
+    private JsonNode rootNode;
 
     public JsonSerializer() {
         // This constructor is for SPI and cannot take a parameter.
@@ -113,8 +113,12 @@ public class JsonSerializer extends AbstractSerializer<JsonSerializer,JsonNode,J
     /// {@inheritDoc}
     @Override
     public String toString(Object jvmInstance) {
-        JsonNode ast = toAst(jvmInstance);
-        return new JsonEmitter().setOptions(options).emit(ast);
+        if (jvmInstance instanceof JsonNode node) {
+            rootNode = node;
+        } else {
+            rootNode = toAst(jvmInstance);
+        }
+        return new JsonEmitter().setOptions(options).emit(rootNode);
     }
 
     /// {@inheritDoc}
@@ -127,8 +131,12 @@ public class JsonSerializer extends AbstractSerializer<JsonSerializer,JsonNode,J
     /// {@inheritDoc}
     @Override
     public void toWriter(Object jvmInstance, Writer writer) throws IOException {
-        JsonNode ast = toAst(jvmInstance);
-        String text = new JsonEmitter().setOptions(options).emit(ast);
+        if (jvmInstance instanceof JsonNode node) {
+            rootNode = node;
+        } else {
+            rootNode = toAst(jvmInstance);
+        }
+        String text = new JsonEmitter().setOptions(options).emit(rootNode);
         writer.write(text);
     }
 

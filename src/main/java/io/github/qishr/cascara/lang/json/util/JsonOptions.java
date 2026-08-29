@@ -45,6 +45,8 @@ public class JsonOptions extends LanguageOptions<JsonOptions> implements Duplica
     @Experimental
     public static final JsonOptions JSON5 = new ImmutableJsonOptions(
         new JsonOptions()
+            .setIndentSize(2)
+            .setCaptureComments(true)
             .setAllowComments(true)
             .setAllowHexadecimalNumbers(true)
             .setAllowJson5Numbers(true)
@@ -53,19 +55,25 @@ public class JsonOptions extends LanguageOptions<JsonOptions> implements Duplica
             .setAllowUnquotedKeys(true)
     );
 
-    public static final JsonOptions STRICT = new ImmutableJsonOptions(new JsonOptions());
+    public static final JsonOptions STRICT = new ImmutableJsonOptions(
+        new JsonOptions()
+            .setIndentSize(2)
+            .setCaptureComments(false)
+            .setAllowComments(false)
+            .setAllowTrailingComma(false)
+    );
 
     private boolean allowBooleanKeys = false;
-    private boolean allowComments = false;
+    private boolean allowComments = true;
     private boolean allowHexadecimalNumbers = false;
     private boolean allowJson5Numbers = false;
     private boolean allowSingleQuotedStrings = false;
     private boolean allowTrailingComma = false;
     private boolean allowUnicode = false;
     private boolean allowUnquotedKeys = false;
-    private boolean captureComments = false;
+    private boolean captureComments = true;
     private boolean insertSpaces = true;
-    private boolean prettyPrint = false;
+    private boolean prettyPrint = false; // TODO: remove
     private boolean useSimd = false;
     private boolean validateUnicode = false;
     private boolean trackPosition = false;
@@ -107,6 +115,15 @@ public class JsonOptions extends LanguageOptions<JsonOptions> implements Duplica
     public boolean useSimd() { return useSimd; }
     public boolean validateUnicode() { return validateUnicode; }
     public boolean trackPosition() { return trackPosition; }
+
+    protected int indentSize = 2;
+
+    public JsonOptions setIndentSize(int size) {
+        this.indentSize = size;
+        return this;
+    }
+
+    public int getIndentSize() { return indentSize; }
 
     public int getDepthLimit() {
         return depthLimit;

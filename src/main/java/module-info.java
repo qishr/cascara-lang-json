@@ -35,7 +35,6 @@
 
 module cascara.lang.json {
     requires transitive cascara.common;
-    requires jdk.incubator.vector;
 
     exports io.github.qishr.cascara.lang.json.ast;
     exports io.github.qishr.cascara.lang.json.diagnostic;

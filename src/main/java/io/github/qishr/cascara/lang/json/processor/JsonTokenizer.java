@@ -48,8 +48,10 @@ import io.github.qishr.cascara.common.lang.util.LanguageOptions;
 import io.github.qishr.cascara.common.lang.util.LexemeProvider;
 import io.github.qishr.cascara.common.lang.util.QuoteStyle;
 import io.github.qishr.cascara.common.lang.util.SourceBuffer;
+import io.github.qishr.cascara.common.lang.util.SourceBufferOptions;
 import io.github.qishr.cascara.common.lang.util.SourceInputStreamBuffer;
 import io.github.qishr.cascara.common.lang.util.SourceStringBuffer;
+import io.github.qishr.cascara.common.service.ServiceProviderFactory;
 import io.github.qishr.cascara.lang.json.diagnostic.JsonDiagnosticCode;
 import io.github.qishr.cascara.lang.json.token.JsonBufferBackedToken;
 import io.github.qishr.cascara.lang.json.token.JsonComment;
@@ -61,12 +63,13 @@ import io.github.qishr.cascara.lang.json.token.JsonToken;
 import io.github.qishr.cascara.lang.json.token.JsonLexemeBackedToken;
 import io.github.qishr.cascara.lang.json.token.JsonTokenType;
 import io.github.qishr.cascara.lang.json.token.ScannedNumber;
-import io.github.qishr.cascara.lang.json.token.JsonSourceByteBuffer;
+// import io.github.qishr.cascara.lang.json.token.JsonSourceBuffer;
 import io.github.qishr.cascara.lang.json.util.JsonOptions;
-import jdk.incubator.vector.ByteVector;
-import jdk.incubator.vector.VectorMask;
-import jdk.incubator.vector.VectorOperators;
-import jdk.incubator.vector.VectorSpecies;
+import io.github.qishr.cascara.lang.json.util.JsonSourceBuffer;
+// import jdk.incubator.vector.ByteVector;
+// import jdk.incubator.vector.VectorMask;
+// import jdk.incubator.vector.VectorOperators;
+// import jdk.incubator.vector.VectorSpecies;
 
 public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implements Tokenizer<JsonToken>{
 
@@ -226,14 +229,16 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
     @Override
     public void open(Reader reader) {
-        buffer = new SourceInputStreamBuffer(reader);
+        buffer = new SourceInputStreamBuffer();
+        buffer.open(reader);
         factory = setupTokenFactory(buffer);
         skipBom();
     }
 
     @Override
     public void open(InputStream stream) {
-        buffer = new SourceInputStreamBuffer(stream);
+        buffer = new SourceInputStreamBuffer();
+        buffer.open(stream);
         // buffer = setupStreamBuffer(stream);
         factory = setupTokenFactory(buffer);
         skipBom();
@@ -264,7 +269,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     }
 
     private JsonToken nextTokenWithoutComments() {
-        if (buffer instanceof JsonSourceByteBuffer byteBuffer) {
+        if (buffer instanceof JsonSourceBuffer byteBuffer) {
             byteBuffer.skipWhitespaceSimd();
             if (!ALLOW_UNICODE) {
                 return buffer.isAtEnd() ? makeEofToken() : scanTokenByte(byteBuffer.peekByte());
@@ -282,7 +287,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             return toCommentToken(pendingComments.remove(0));
         }
 
-        if (buffer instanceof JsonSourceByteBuffer byteBuffer) {
+        if (buffer instanceof JsonSourceBuffer byteBuffer) {
             byteBuffer.skipWhitespaceAndFormattingSimd();
         } else {
             scanWhitespaceAndComments();
@@ -427,7 +432,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     //
 
     private JsonToken scanStringTokenByte(byte quoteByte) {
-        final JsonSourceByteBuffer buffer = (JsonSourceByteBuffer) this.buffer;
+        final JsonSourceBuffer buffer = (JsonSourceBuffer) this.buffer;
 
         final int startOffset = buffer.offset();
         final int startLine   = buffer.line();
@@ -571,7 +576,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
     // TODO: Why is a SIMD method taking char instead of byte?
     private boolean scanStringSimd(char quoteChar) {
-        final JsonSourceByteBuffer bb = (JsonSourceByteBuffer) buffer;
+        final JsonSourceBuffer bb = (JsonSourceBuffer) buffer;
         final byte quoteByte = (byte) quoteChar;
         boolean pendingHighSurrogate = false;
 
@@ -800,10 +805,10 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     //
 
     private ScannedNumber scanNumberByte(byte first) {
-        JsonSourceByteBuffer buffer = (JsonSourceByteBuffer)this.buffer;
+        JsonSourceBuffer buffer = (JsonSourceBuffer)this.buffer;
 
-        final JsonSourceByteBuffer bb = (JsonSourceByteBuffer) buffer;
-        final byte[] raw = bb.raw;
+        final JsonSourceBuffer bb = (JsonSourceBuffer) buffer;
+        final byte[] raw = bb.getBytes();
 
         int start = buffer.offset();
         int i = start;
@@ -1116,8 +1121,8 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     }
 
     private ScannedNumber scanJson5KeywordNumberByte(byte first) {
-        JsonSourceByteBuffer bb = (JsonSourceByteBuffer) buffer;
-        byte[] raw = bb.raw;
+        JsonSourceBuffer bb = (JsonSourceBuffer) buffer;
+        byte[] raw = bb.getBytes();
         int off = bb.offset();
 
         boolean negative = false;
@@ -1160,7 +1165,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             first = buffer.peek();
         }
 
-        if (buffer instanceof JsonSourceByteBuffer) {
+        if (buffer instanceof JsonSourceBuffer) {
             if (asciiStartsWith("Infinity")) {
                 advanceBytes("Infinity".length());
                 return new ScannedNumber(
@@ -1296,8 +1301,8 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     }
 
     private boolean validateNumberBytes(int start, int end) {
-        JsonSourceByteBuffer bb = (JsonSourceByteBuffer) buffer;
-        byte[] raw = bb.raw;
+        JsonSourceBuffer bb = (JsonSourceBuffer) buffer;
+        byte[] raw = bb.getBytes();
 
         boolean seenDot = false;
         boolean seenExp = false;
@@ -1367,67 +1372,8 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
     // TODO: This uses SIMD directly. Move it.
     private void scanIdentifierSimd() {
-        final JsonSourceByteBuffer bb = (JsonSourceByteBuffer) buffer;
-
-        int pos = bb.offset();
-        int len = bb.length();
-
-        final VectorSpecies<Byte> S = ByteVector.SPECIES_256;
-
-        while (pos < len) {
-            int remaining = len - pos;
-
-            if (remaining < S.length()) {
-                // scalar tail
-                while (!bb.isAtEnd()) {
-                    char c = bb.peek();
-                    if (c < 128 && IDENT_PART[c]) {
-                        buffer.advance();
-                        continue;
-                    }
-                    return;
-                }
-                return;
-            }
-
-            ByteVector vec = ByteVector.fromArray(S, bb.raw, pos);
-
-            // classify identifier chars
-            VectorMask<Byte> mAZ =
-                vec.compare(VectorOperators.GE, (byte)'A')
-                   .and(vec.compare(VectorOperators.LE, (byte)'Z'));
-
-            VectorMask<Byte> maz =
-                vec.compare(VectorOperators.GE, (byte)'a')
-                   .and(vec.compare(VectorOperators.LE, (byte)'z'));
-
-            VectorMask<Byte> m09 =
-                vec.compare(VectorOperators.GE, (byte)'0')
-                   .and(vec.compare(VectorOperators.LE, (byte)'9'));
-
-            VectorMask<Byte> mus = vec.compare(VectorOperators.EQ, (byte)'_');
-            VectorMask<Byte> mdl = vec.compare(VectorOperators.EQ, (byte)'$');
-
-            long maskIdent = (mAZ.or(maz).or(m09).or(mus).or(mdl)).toLong();
-
-            // Only lane 0 matters for the first byte
-            if ((maskIdent & 1L) == 0L) {
-                return;
-            }
-
-            // find first non-identifier lane
-            long maskNonIdent = ~maskIdent;
-
-            int firstBad = Long.numberOfTrailingZeros(maskNonIdent);
-            if (firstBad < S.length()) {
-                bb.advanceBy(firstBad);
-                return;
-            }
-
-            // all 128 bytes are identifier chars
-            bb.advanceBy(S.length());
-            pos = bb.offset();
-        }
+        final JsonSourceBuffer bb = (JsonSourceBuffer) buffer;
+        bb.scanIdentifierSimd();
     }
 
     private void scanIdentifierAscii() {
@@ -1598,8 +1544,8 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     //
 
     private boolean startsWithInfinityOrNaNByte(byte first) {
-        JsonSourceByteBuffer bb = (JsonSourceByteBuffer) buffer;
-        byte[] raw = bb.raw;
+        JsonSourceBuffer bb = (JsonSourceBuffer) buffer;
+        byte[] raw = bb.getBytes();
         int off = bb.offset();
 
         // Unsigned byte check
@@ -1651,8 +1597,8 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     }
 
     private boolean byteStartsWith(String kw) {
-        JsonSourceByteBuffer bb = (JsonSourceByteBuffer) buffer;
-        byte[] raw = bb.raw;
+        JsonSourceBuffer bb = (JsonSourceBuffer) buffer;
+        byte[] raw = bb.getBytes();
         int off = buffer.offset();
         int n = kw.length();
 
@@ -1682,7 +1628,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     }
 
     private void advanceBytes(int count) {
-        JsonSourceByteBuffer buffer = (JsonSourceByteBuffer)this.buffer;
+        JsonSourceBuffer buffer = (JsonSourceBuffer)this.buffer;
         for (int i = 0; i < count; i++) buffer.advanceByte();
     }
 
@@ -1782,26 +1728,45 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         }
     }
 
-    // TODO: The following 2 methods should be replaced by a single JsonSourceByteBuffer instantiation.
+    // TODO: The following 2 methods should be replaced by a single JsonSourceBuffer instantiation.
     private SourceBuffer setupByteBuffer(byte[] data) {
+        SourceBuffer buffer;
         // SIMD & no JSON5 unquoted keys - use byte-based buffer
         if (options.useSimd() && !options.allowUnquotedKeys()) {
             usingByteBuffer = true;
-            return new JsonSourceByteBuffer(data, options);
+            buffer = createSourceBuffer(true);
+            buffer.open(data);
+            return buffer;
         } else {
-            return new SourceStringBuffer(new String(data));
+            buffer = new SourceStringBuffer();
+            buffer.open(new String(data));
+            return buffer;
         }
     }
 
     private SourceBuffer setupStringBuffer(String text) {
+        SourceBuffer buffer;
         // SIMD & no JSON5 unquoted keys - use byte-based buffer
         if (options.useSimd() && !options.allowUnquotedKeys()) {
             usingByteBuffer = true;
             byte[] data = text.getBytes(StandardCharsets.UTF_8);
-            return new JsonSourceByteBuffer(data, options);
+            buffer = createSourceBuffer(true);
+            buffer.open(data);
+            return buffer;
         } else {
-            return new SourceStringBuffer(text);
+            buffer = new SourceStringBuffer();
+            buffer.open(text);
+            return buffer;
         }
+    }
+
+    private SourceBuffer createSourceBuffer(boolean useSimd) {
+        SourceBufferOptions bufferOptions = new SourceBufferOptions();
+        bufferOptions.setSupportsSimd(useSimd);
+        bufferOptions.setStrictAsciiMode(!options.allowUnicode() && !options.validateUnicode());
+        bufferOptions.setTrackPosition(options.trackPosition());
+        ServiceProviderFactory factory = new ServiceProviderFactory();
+        return factory.createSourceBuffer(bufferOptions);
     }
 
     //

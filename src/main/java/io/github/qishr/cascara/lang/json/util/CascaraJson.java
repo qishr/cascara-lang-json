@@ -33,7 +33,7 @@
 // version.
 
 
-package io.github.qishr.cascara.lang.json;
+package io.github.qishr.cascara.lang.json.util;
 
 import java.io.InputStream;
 import java.io.Reader;
