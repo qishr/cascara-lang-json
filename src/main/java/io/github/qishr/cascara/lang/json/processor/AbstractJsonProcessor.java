@@ -110,7 +110,7 @@ public abstract class AbstractJsonProcessor<P extends Processor> implements Proc
         InputStream is = AbstractJsonProcessor.class.getResourceAsStream(resourcePath);
         try (BufferedReader br = new BufferedReader(new InputStreamReader(is))) {
             return br.lines().collect(Collectors.joining("\n"));
-        } catch (Exception _) {
+        } catch (Exception e) {
             return "";
         }
     }

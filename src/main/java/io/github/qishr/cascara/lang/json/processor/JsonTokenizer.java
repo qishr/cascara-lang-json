@@ -244,6 +244,12 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         skipBom();
     }
 
+
+    @Override
+    public List<JsonToken> tokenize(byte[] data) {
+        return tokenize(new String(data));
+    }
+
     @Override
     public List<JsonToken> tokenize(String source) {
         if (source == null || source.isEmpty()) {
