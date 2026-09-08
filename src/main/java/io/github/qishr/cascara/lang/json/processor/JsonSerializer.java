@@ -149,7 +149,7 @@ public class JsonSerializer extends AbstractSerializer<JsonSerializer,JsonNode,J
 
     /// {@inheritDoc}
     @Override
-    public <C> C fromText(String text, TypeReference<C> typeRef) {
+    public <C> C fromString(String text, TypeReference<C> typeRef) {
         JsonNode ast = getParser().parse(text);
         return fromAst(ast, typeRef);
     }

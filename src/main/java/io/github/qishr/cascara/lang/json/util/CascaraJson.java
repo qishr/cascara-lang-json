@@ -70,7 +70,7 @@ public final class CascaraJson {
 
     /// Read JSON text using a generic type reference.
     public static <T> T read(String text, TypeReference<T> type) {
-        return newSerializer().fromText(text, type);
+        return newSerializer().fromString(text, type);
     }
 
     // ---------------------------------------------------------------------

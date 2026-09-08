@@ -140,4 +140,10 @@ public class JsonComment extends JsonNode implements ScalarAstNode<JsonNode>, Co
     public boolean isMultiLine() {
         return multiLine;
     }
+
+    @Override
+    public ScalarAstNode<JsonNode> setPrimitive(Object jvmValue) {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'setPrimitive'");
+    }
 }

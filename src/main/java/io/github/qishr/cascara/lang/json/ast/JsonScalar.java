@@ -178,6 +178,14 @@ public class JsonScalar extends JsonNode implements ScalarAstNode<JsonNode> {
         return jvmValue;
     }
 
+    @Override
+    public ScalarAstNode<JsonNode> setPrimitive(Object jvmValue) {
+        this.jvmValue = jvmValue;
+        isJvmValueCached = true;
+        isStringValueCached = false;
+        return this;
+    }
+
     /// Returns the logical clean text value, stripped of outer formatting and escape markers.
     @Override
     public String asString() {
@@ -597,6 +605,5 @@ public class JsonScalar extends JsonNode implements ScalarAstNode<JsonNode> {
     public JsonOptions getOptions() {
         return options;
     }
-
 }
 
