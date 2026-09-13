@@ -43,7 +43,7 @@ import java.io.Writer;
 import io.github.qishr.cascara.common.diagnostic.Reporter;
 import io.github.qishr.cascara.common.diagnostic.code.GenericDiagnosticCode;
 import io.github.qishr.cascara.common.lang.util.LanguageOptions;
-import io.github.qishr.cascara.common.lang.exception.SerializerException;
+import io.github.qishr.cascara.common.lang.diagnostic.SerializerException;
 import io.github.qishr.cascara.common.lang.processor.AbstractSerializer;
 import io.github.qishr.cascara.common.lang.processor.AstParser;
 import io.github.qishr.cascara.common.lang.type.TypeReference;

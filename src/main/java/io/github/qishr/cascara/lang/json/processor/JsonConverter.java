@@ -36,7 +36,7 @@
 package io.github.qishr.cascara.lang.json.processor;
 
 import io.github.qishr.cascara.common.util.ContentType;
-import io.github.qishr.cascara.common.diagnostic.code.LangDiagnosticCode;
+import io.github.qishr.cascara.common.lang.diagnostic.LangDiagnosticCode;
 import io.github.qishr.cascara.common.annotation.Nullable;
 import io.github.qishr.cascara.common.lang.ast.AstNode;
 import io.github.qishr.cascara.common.lang.ast.MapAstNode;
@@ -58,7 +58,7 @@ public class JsonConverter extends AbstractJsonProcessor<JsonConverter> implemen
         return JsonAstParser.JSON_CONTENT_TYPE;
     }
 
-    public String toText(AstNode ast) {
+    public String toString(AstNode ast) {
         JsonNode jsonNode = fromAst(ast);
         JsonEmitter emitter = new JsonEmitter();
         return emitter.emit(jsonNode);

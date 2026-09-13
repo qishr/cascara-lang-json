@@ -47,7 +47,7 @@ import io.github.qishr.cascara.common.semver.SemVer;
 import io.github.qishr.cascara.common.lang.processor.Processor;
 import io.github.qishr.cascara.common.util.ContentType;
 import io.github.qishr.cascara.common.util.JarManifest;
-import io.github.qishr.cascara.common.util.Properties;
+import io.github.qishr.cascara.common.property.Properties;
 import io.github.qishr.cascara.lang.json.util.JsonOptions;
 
 public abstract class AbstractJsonProcessor<P extends Processor> implements Processor {

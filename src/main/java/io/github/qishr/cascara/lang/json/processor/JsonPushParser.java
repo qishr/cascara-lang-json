@@ -37,7 +37,7 @@ package io.github.qishr.cascara.lang.json.processor;
 
 import java.io.InputStream;
 
-import io.github.qishr.cascara.common.lang.exception.ParserException;
+import io.github.qishr.cascara.common.lang.diagnostic.ParserException;
 import io.github.qishr.cascara.common.lang.processor.PushParser;
 import io.github.qishr.cascara.common.lang.streaming.StreamHandler;
 import io.github.qishr.cascara.common.lang.streaming.StreamingEvent;
