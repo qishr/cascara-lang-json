@@ -92,7 +92,8 @@ public class JsonComment extends JsonNode implements ScalarAstNode<JsonNode>, Co
 
     @Override
     public int asInteger() {
-        return 0; //TODO:  cascara://projman/CASC-00027711
+        // This is the oldest CASC task, was changed from projman to organizer 18 sept 2026
+        return 0; //TODO:  cascara://organizer/CASC-00027711
     }
 
     @Override

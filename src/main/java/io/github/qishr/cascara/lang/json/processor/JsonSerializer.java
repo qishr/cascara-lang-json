@@ -205,6 +205,7 @@ public class JsonSerializer extends AbstractSerializer<JsonSerializer,JsonNode,J
         if (parser == null) {
             parser = new JsonAstParser();
             parser.setReporter(reporter);
+            parser.setOptions(options);
         }
         return parser;
     }
