@@ -41,7 +41,7 @@ import java.io.Reader;
 import java.io.Writer;
 
 import io.github.qishr.cascara.common.diagnostic.Reporter;
-import io.github.qishr.cascara.common.diagnostic.code.GenericDiagnosticCode;
+import io.github.qishr.cascara.common.diagnostic.message.GenericMessage;
 import io.github.qishr.cascara.common.lang.util.LanguageOptions;
 import io.github.qishr.cascara.common.lang.diagnostic.SerializerException;
 import io.github.qishr.cascara.common.lang.processor.AbstractSerializer;
@@ -54,6 +54,7 @@ import io.github.qishr.cascara.lang.json.ast.JsonNode;
 import io.github.qishr.cascara.lang.json.ast.JsonNodeFactory;
 import io.github.qishr.cascara.lang.json.ast.JsonScalar;
 import io.github.qishr.cascara.lang.json.ast.JsonArray;
+import io.github.qishr.cascara.lang.json.internal.AbstractJsonProcessor;
 import io.github.qishr.cascara.lang.json.util.JsonOptions;
 
 /// Standard implementation for JSON serialization.
@@ -104,7 +105,7 @@ public class JsonSerializer extends AbstractSerializer<JsonSerializer,JsonNode,J
     @Override
     public JsonSerializer setParser(AstParser<JsonNode,?,?> parser) {
         if (!(parser instanceof JsonAstParser JsonAstParser)) {
-            throw new SerializerException(GenericDiagnosticCode.ERROR, "Parser must be a JsonAstParser");
+            throw new SerializerException(GenericMessage.ERROR, "Parser must be a JsonAstParser");
         }
         this.parser = JsonAstParser;
         return this;

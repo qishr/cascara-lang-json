@@ -43,8 +43,8 @@ import java.util.List;
 import java.util.Set;
 
 import io.github.qishr.cascara.common.diagnostic.Reporter;
-import io.github.qishr.cascara.common.diagnostic.code.DiagnosticCode;
-import io.github.qishr.cascara.common.diagnostic.code.GenericDiagnosticCode;
+import io.github.qishr.cascara.common.diagnostic.message.DiagnosticMessage;
+import io.github.qishr.cascara.common.diagnostic.message.GenericMessage;
 import io.github.qishr.cascara.common.lang.diagnostic.ParserException;
 import io.github.qishr.cascara.common.lang.processor.AstParser;
 import io.github.qishr.cascara.common.lang.type.PrimitiveType;
@@ -58,7 +58,8 @@ import io.github.qishr.cascara.lang.json.ast.JsonObject;
 import io.github.qishr.cascara.lang.json.ast.JsonNode;
 import io.github.qishr.cascara.lang.json.ast.JsonScalar;
 import io.github.qishr.cascara.lang.json.ast.JsonArray;
-import io.github.qishr.cascara.lang.json.diagnostic.JsonDiagnosticCode;
+import io.github.qishr.cascara.lang.json.diagnostic.JsonDiagnosticMessage;
+import io.github.qishr.cascara.lang.json.internal.AbstractJsonProcessor;
 import io.github.qishr.cascara.lang.json.internal.JsonStringUnescaper;
 import io.github.qishr.cascara.lang.json.token.JsonErrorToken;
 import io.github.qishr.cascara.lang.json.token.JsonLiteral;
@@ -176,7 +177,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
         pendingComments.clear();
 
         if (!isAtEnd()) {
-            error(peek(), JsonDiagnosticCode.UNEXPECTED_TOKEN, peek().getType());
+            error(peek(), JsonDiagnosticMessage.UNEXPECTED_TOKEN, peek().getType());
         }
 
         return root;
@@ -192,7 +193,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
 
     @Override
     public List<JsonToken> getTokens() {
-        throw new ParserException(GenericDiagnosticCode.UNIMPLEMENTED_METHOD, "JsonAstParser", "getTokens");
+        throw new ParserException(GenericMessage.UNIMPLEMENTED_METHOD, "JsonAstParser", "getTokens");
     }
 
     private void applyOptions() {
@@ -211,7 +212,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
     private JsonNode parseValue() {
         depth++;
         if (depth > DEPTH_LIMIT) {
-            error(peek(),JsonDiagnosticCode.DEPTH_LIMIT);
+            error(peek(),JsonDiagnosticMessage.DEPTH_LIMIT);
         }
         trace("parseValue");
 
@@ -239,7 +240,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
             }
 
             // Unexpected token
-            error(token, JsonDiagnosticCode.UNEXPECTED_TOKEN, type);
+            error(token, JsonDiagnosticMessage.UNEXPECTED_TOKEN, type);
             return new JsonScalar(
                 token,
                 PrimitiveType.ANY,
@@ -257,14 +258,14 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
         trace("parseMap");
 
         try {
-            JsonToken start = consume(JsonTokenType.LEFT_BRACE, JsonDiagnosticCode.EXPECTED_OPEN_BRACE);
+            JsonToken start = consume(JsonTokenType.LEFT_BRACE, JsonDiagnosticMessage.EXPECTED_OPEN_BRACE);
             JsonObject map = new JsonObject(start.getStartLine(), start.getStartColumn());
 
             attachComments(map);
 
             // Fast exit for empty object: {}
             if (check(JsonTokenType.RIGHT_BRACE)) {
-                consume(JsonTokenType.RIGHT_BRACE, JsonDiagnosticCode.EXPECTED_CLOSE_BRACE);
+                consume(JsonTokenType.RIGHT_BRACE, JsonDiagnosticMessage.EXPECTED_CLOSE_BRACE);
                 return map;
             }
 
@@ -286,19 +287,19 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
 
                 // JSON5: unquoted keys allowed only when configured
                 if (!ALLOW_UNQUOTED_KEYS && keyTok.getQuoteStyle() != QuoteStyle.DOUBLE) {
-                    error(keyTok, JsonDiagnosticCode.EXPECTED_MAP_KEY);
+                    error(keyTok, JsonDiagnosticMessage.EXPECTED_MAP_KEY);
                 }
 
                 // Duplicate key detection
                 String keyString = parseKey(keyTok);
 
                 if (!seenKeys.add(keyString)) {
-                    // error(keyTok, JsonDiagnosticCode.DUPLICATE_KEY, keyString);
-                    warn(keyTok, JsonDiagnosticCode.DUPLICATE_KEY, keyString);
+                    // error(keyTok, JsonDiagnosticMessage.DUPLICATE_KEY, keyString);
+                    warn(keyTok, JsonDiagnosticMessage.DUPLICATE_KEY, keyString);
                 }
 
                 // ---- Parse colon ----
-                consume(JsonTokenType.COLON, JsonDiagnosticCode.EXPECTED_COLON_AFTER_MAP_KEY);
+                consume(JsonTokenType.COLON, JsonDiagnosticMessage.EXPECTED_COLON_AFTER_MAP_KEY);
 
                 // ---- Parse value ----
                 JsonNode value = parseValue();
@@ -322,7 +323,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
                 }
             }
 
-            consume(JsonTokenType.RIGHT_BRACE, JsonDiagnosticCode.EXPECTED_CLOSE_BRACE);
+            consume(JsonTokenType.RIGHT_BRACE, JsonDiagnosticMessage.EXPECTED_CLOSE_BRACE);
             return map;
 
         } finally {
@@ -342,13 +343,13 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
                 if (ALLOW_UNQUOTED_KEYS) {
                     key = tok.getLexeme();
                 } else {
-                    error(tok, JsonDiagnosticCode.EXPECTED_MAP_KEY);
+                    error(tok, JsonDiagnosticMessage.EXPECTED_MAP_KEY);
                     key = null;
                 }
             }
 
             default -> {
-                error(tok, JsonDiagnosticCode.EXPECTED_MAP_KEY);
+                error(tok, JsonDiagnosticMessage.EXPECTED_MAP_KEY);
                 key = null;
             }
         }
@@ -361,14 +362,14 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
         trace("parseSequence");
 
         try {
-            JsonToken start = consume(JsonTokenType.LEFT_BRACKET, JsonDiagnosticCode.EXPECTED_OPEN_BRACKET);
+            JsonToken start = consume(JsonTokenType.LEFT_BRACKET, JsonDiagnosticMessage.EXPECTED_OPEN_BRACKET);
             JsonArray seq = new JsonArray(start.getStartLine(), start.getStartColumn());
 
             attachComments(seq);
 
             // Fast exit for empty array: []
             if (check(JsonTokenType.RIGHT_BRACKET)) {
-                consume(JsonTokenType.RIGHT_BRACKET, JsonDiagnosticCode.EXPECTED_CLOSE_BRACKET);
+                consume(JsonTokenType.RIGHT_BRACKET, JsonDiagnosticMessage.EXPECTED_CLOSE_BRACKET);
                 return seq;
             }
 
@@ -395,7 +396,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
                 }
             }
 
-            consume(JsonTokenType.RIGHT_BRACKET, JsonDiagnosticCode.EXPECTED_CLOSE_BRACKET);
+            consume(JsonTokenType.RIGHT_BRACKET, JsonDiagnosticMessage.EXPECTED_CLOSE_BRACKET);
             return seq;
 
         } finally {
@@ -473,7 +474,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
                                         options
                                     );
                                 } else {
-                                    error(tok, JsonDiagnosticCode.UNEXPECTED_UNQUOTED_STRING_VALUE, NAN);
+                                    error(tok, JsonDiagnosticMessage.UNEXPECTED_UNQUOTED_STRING_VALUE, NAN);
                                     node = new JsonScalar();
                                 }
                             }
@@ -486,7 +487,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
                                         options
                                     );
                                 } else {
-                                    error(tok, JsonDiagnosticCode.UNEXPECTED_UNQUOTED_STRING_VALUE, INFINITY);
+                                    error(tok, JsonDiagnosticMessage.UNEXPECTED_UNQUOTED_STRING_VALUE, INFINITY);
                                     node = new JsonScalar();
                                 }
                             }
@@ -496,7 +497,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
             }
 
             if (node == null) {
-                error(tok, JsonDiagnosticCode.UNEXPECTED_TOKEN, type);
+                error(tok, JsonDiagnosticMessage.UNEXPECTED_TOKEN, type);
                 node = new JsonScalar(
                     tok,
                     PrimitiveType.ANY,
@@ -586,7 +587,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
         return false;
     }
 
-    private JsonToken consume(JsonTokenType type, DiagnosticCode code, Object... details) {
+    private JsonToken consume(JsonTokenType type, DiagnosticMessage code, Object... details) {
         if (check(type)) return advance();
 
         // Report the error but don't crash
@@ -609,11 +610,11 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
             tok.getStartLine(), tok.getStartColumn(), indent, methodName, tok.getType());
     }
 
-    private void warn(JsonToken token, DiagnosticCode code, Object... details) {
+    private void warn(JsonToken token, DiagnosticMessage code, Object... details) {
         reporter.warnAt(token, code, details);
     }
 
-    private void error(JsonToken token, DiagnosticCode code, Object... details) {
+    private void error(JsonToken token, DiagnosticMessage code, Object... details) {
 
         if (token instanceof JsonErrorToken error) {
             code = error.getCode();

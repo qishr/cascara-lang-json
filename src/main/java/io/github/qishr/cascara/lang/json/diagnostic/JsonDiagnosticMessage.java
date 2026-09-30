@@ -35,9 +35,9 @@
 
 package io.github.qishr.cascara.lang.json.diagnostic;
 
-import io.github.qishr.cascara.common.diagnostic.code.DiagnosticCode;
+import io.github.qishr.cascara.common.diagnostic.message.DiagnosticMessage;
 
-public enum JsonDiagnosticCode implements DiagnosticCode {
+public enum JsonDiagnosticMessage implements DiagnosticMessage {
 
     // Tokenizer
     EXPECTED_CLOSE_BRACE("JSON-102", "Expected '}'"),
@@ -86,13 +86,13 @@ public enum JsonDiagnosticCode implements DiagnosticCode {
     EXPECTED_SEQUENCE("JSON-511", "Expected a sequence for field: {0}");
 
     private final String code;
-    private final String message;
+    private final String format;
 
-    JsonDiagnosticCode(String code, String message) {
+    JsonDiagnosticMessage(String code, String format) {
         this.code = code;
-        this.message = message;
+        this.format = format;
     }
 
     @Override public String getCode() { return code; }
-    @Override public String getMessage() { return message; }
+    @Override public String getFormat() { return format; }
 }

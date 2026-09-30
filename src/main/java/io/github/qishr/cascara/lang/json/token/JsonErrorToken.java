@@ -37,17 +37,17 @@ package io.github.qishr.cascara.lang.json.token;
 
 import java.util.List;
 
-import io.github.qishr.cascara.common.diagnostic.code.DiagnosticCode;
+import io.github.qishr.cascara.common.diagnostic.message.DiagnosticMessage;
 import io.github.qishr.cascara.common.lang.util.QuoteStyle;
 
 public class JsonErrorToken implements JsonToken {
     private final int line;
     private final int column;
     private final int offset;
-    private final DiagnosticCode code;
+    private final DiagnosticMessage code;
     private final Object[] details;
 
-    public JsonErrorToken(int line, int column, int offset, DiagnosticCode code, Object... details) {
+    public JsonErrorToken(int line, int column, int offset, DiagnosticMessage code, Object... details) {
         this.line = line;
         this.column = column;
         this.offset = offset;
@@ -55,7 +55,7 @@ public class JsonErrorToken implements JsonToken {
         this.details = details;
     }
 
-    public DiagnosticCode getCode() {
+    public DiagnosticMessage getCode() {
         return code;
     }
 

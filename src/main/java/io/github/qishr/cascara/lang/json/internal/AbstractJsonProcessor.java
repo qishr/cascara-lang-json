@@ -33,7 +33,7 @@
 // version.
 
 
-package io.github.qishr.cascara.lang.json.processor;
+package io.github.qishr.cascara.lang.json.internal;
 
 import java.io.BufferedReader;
 import java.io.InputStream;
@@ -51,10 +51,10 @@ import io.github.qishr.cascara.common.property.Properties;
 import io.github.qishr.cascara.lang.json.util.JsonOptions;
 
 public abstract class AbstractJsonProcessor<P extends Processor> implements Processor {
-    static final String JSON_CONTENT_TYPE_STRING = "application/json";
-    static final Reporter NO_OP_REPORTER = new NoOpReporter();
+    public static final String JSON_CONTENT_TYPE_STRING = "application/json";
+    public static final Reporter NO_OP_REPORTER = new NoOpReporter();
 
-    static final ContentType JSON_CONTENT_TYPE = new ContentType("JSON")
+    public static final ContentType JSON_CONTENT_TYPE = new ContentType("JSON")
             .withType("text/json")
             .withType("application/json")
             .withType("application/schema+json")

@@ -36,7 +36,7 @@
 package io.github.qishr.cascara.lang.json.util;
 
 import io.github.qishr.cascara.common.diagnostic.LocalizableRuntimeException;
-import io.github.qishr.cascara.common.diagnostic.code.GenericDiagnosticCode;
+import io.github.qishr.cascara.common.diagnostic.message.GenericMessage;
 import io.github.qishr.cascara.common.annotation.Experimental;
 import io.github.qishr.cascara.common.lang.util.LanguageOptions;
 import io.github.qishr.cascara.common.util.Duplicable;
@@ -216,46 +216,46 @@ public class JsonOptions extends LanguageOptions<JsonOptions> implements Duplica
         }
 
         public JsonOptions setAllowComments(boolean val) {
-            throw new LocalizableRuntimeException(GenericDiagnosticCode.UNSUPPORTED_OPERATION, "setAllowComments");
+            throw new LocalizableRuntimeException(GenericMessage.UNSUPPORTED_OPERATION, "setAllowComments");
         }
 
         public JsonOptions setAllowHexadecimalNumbers(boolean val) {
-            throw new LocalizableRuntimeException(GenericDiagnosticCode.UNSUPPORTED_OPERATION, "setAllowHexadecimalNumbers");
+            throw new LocalizableRuntimeException(GenericMessage.UNSUPPORTED_OPERATION, "setAllowHexadecimalNumbers");
         }
         public JsonOptions setAllowJson5Numbers(boolean val) {
-            throw new LocalizableRuntimeException(GenericDiagnosticCode.UNSUPPORTED_OPERATION, "setAllowInfinityAndNaN");
+            throw new LocalizableRuntimeException(GenericMessage.UNSUPPORTED_OPERATION, "setAllowInfinityAndNaN");
         }
 
         public JsonOptions setAllowSingleQuotedStrings(boolean val) {
-            throw new LocalizableRuntimeException(GenericDiagnosticCode.UNSUPPORTED_OPERATION, "setAllowSingleQuotedStrings");
+            throw new LocalizableRuntimeException(GenericMessage.UNSUPPORTED_OPERATION, "setAllowSingleQuotedStrings");
         }
 
         public JsonOptions setAllowTrailingComma(boolean val) {
-            throw new LocalizableRuntimeException(GenericDiagnosticCode.UNSUPPORTED_OPERATION, "setAllowTrailingComma");
+            throw new LocalizableRuntimeException(GenericMessage.UNSUPPORTED_OPERATION, "setAllowTrailingComma");
         }
 
         public JsonOptions setAllowUnicode(boolean val) {
-            throw new LocalizableRuntimeException(GenericDiagnosticCode.UNSUPPORTED_OPERATION, "setAllowComments");
+            throw new LocalizableRuntimeException(GenericMessage.UNSUPPORTED_OPERATION, "setAllowComments");
         }
 
         public JsonOptions setAllowUnquotedKeys(boolean val) {
-            throw new LocalizableRuntimeException(GenericDiagnosticCode.UNSUPPORTED_OPERATION, "setAllowUnquotedKeys");
+            throw new LocalizableRuntimeException(GenericMessage.UNSUPPORTED_OPERATION, "setAllowUnquotedKeys");
         }
 
         public JsonOptions setCaptureComments(boolean val) {
-            throw new LocalizableRuntimeException(GenericDiagnosticCode.UNSUPPORTED_OPERATION, "setCaptureComments");
+            throw new LocalizableRuntimeException(GenericMessage.UNSUPPORTED_OPERATION, "setCaptureComments");
         }
 
         public JsonOptions setStrict(boolean val) {
-            throw new LocalizableRuntimeException(GenericDiagnosticCode.UNSUPPORTED_OPERATION, "setStrict");
+            throw new LocalizableRuntimeException(GenericMessage.UNSUPPORTED_OPERATION, "setStrict");
         }
 
         public JsonOptions setInsertSpaces(boolean val) {
-            throw new LocalizableRuntimeException(GenericDiagnosticCode.UNSUPPORTED_OPERATION, "setInsertSpaces");
+            throw new LocalizableRuntimeException(GenericMessage.UNSUPPORTED_OPERATION, "setInsertSpaces");
         }
 
         public JsonOptions setPrettyPrint(boolean v) {
-            throw new LocalizableRuntimeException(GenericDiagnosticCode.UNSUPPORTED_OPERATION, "setPrettyPrint");
+            throw new LocalizableRuntimeException(GenericMessage.UNSUPPORTED_OPERATION, "setPrettyPrint");
         }
     }
 }

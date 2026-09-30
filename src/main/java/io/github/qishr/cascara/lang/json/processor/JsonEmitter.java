@@ -44,6 +44,7 @@ import io.github.qishr.cascara.lang.json.ast.JsonObject;
 import io.github.qishr.cascara.lang.json.ast.JsonNode;
 import io.github.qishr.cascara.lang.json.ast.JsonScalar;
 import io.github.qishr.cascara.lang.json.ast.JsonArray;
+import io.github.qishr.cascara.lang.json.internal.AbstractJsonProcessor;
 import io.github.qishr.cascara.lang.json.util.JsonOptions;
 
 public class JsonEmitter extends AbstractJsonProcessor<JsonEmitter>  implements Emitter {

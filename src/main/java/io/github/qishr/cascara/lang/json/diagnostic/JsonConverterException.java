@@ -36,15 +36,15 @@
 package io.github.qishr.cascara.lang.json.diagnostic;
 
 import io.github.qishr.cascara.common.diagnostic.LocalizableRuntimeException;
-import io.github.qishr.cascara.common.diagnostic.code.DiagnosticCode;
+import io.github.qishr.cascara.common.diagnostic.message.DiagnosticMessage;
 
 public class JsonConverterException extends LocalizableRuntimeException {
 
-    public JsonConverterException(Throwable cause, DiagnosticCode code, Object... details) {
+    public JsonConverterException(Throwable cause, DiagnosticMessage code, Object... details) {
         super(cause, code, details);
     }
 
-    public JsonConverterException(DiagnosticCode code, Object... details) {
+    public JsonConverterException(DiagnosticMessage code, Object... details) {
         this(null, code, details);
     }
 }

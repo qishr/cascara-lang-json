@@ -42,7 +42,7 @@ import java.util.Deque;
 import io.github.qishr.cascara.common.diagnostic.Reporter;
 import io.github.qishr.cascara.common.lang.diagnostic.ParserException;
 import io.github.qishr.cascara.common.lang.streaming.StreamingEvent;
-import io.github.qishr.cascara.lang.json.diagnostic.JsonDiagnosticCode;
+import io.github.qishr.cascara.lang.json.diagnostic.JsonDiagnosticMessage;
 import io.github.qishr.cascara.lang.json.processor.JsonTokenizer;
 import io.github.qishr.cascara.lang.json.streaming.JsonStreamingEvent;
 import io.github.qishr.cascara.lang.json.streaming.JsonStreamingEventType;
@@ -118,7 +118,7 @@ public class JsonStreamEngine {
                 return nextEvent(); // skip structural separators
 
             default:
-                throw new ParserException(currentToken, JsonDiagnosticCode.UNEXPECTED_TOKEN);
+                throw new ParserException(currentToken, JsonDiagnosticMessage.UNEXPECTED_TOKEN);
         }
     }
 

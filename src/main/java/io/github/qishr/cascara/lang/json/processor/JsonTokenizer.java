@@ -52,7 +52,8 @@ import io.github.qishr.cascara.common.lang.util.SourceBufferOptions;
 import io.github.qishr.cascara.common.lang.util.SourceInputStreamBuffer;
 import io.github.qishr.cascara.common.lang.util.SourceStringBuffer;
 import io.github.qishr.cascara.common.service.ServiceProviderFactory;
-import io.github.qishr.cascara.lang.json.diagnostic.JsonDiagnosticCode;
+import io.github.qishr.cascara.lang.json.diagnostic.JsonDiagnosticMessage;
+import io.github.qishr.cascara.lang.json.internal.AbstractJsonProcessor;
 import io.github.qishr.cascara.lang.json.token.JsonBufferBackedToken;
 import io.github.qishr.cascara.lang.json.token.JsonComment;
 import io.github.qishr.cascara.lang.json.token.JsonErrorToken;
@@ -63,13 +64,8 @@ import io.github.qishr.cascara.lang.json.token.JsonToken;
 import io.github.qishr.cascara.lang.json.token.JsonLexemeBackedToken;
 import io.github.qishr.cascara.lang.json.token.JsonTokenType;
 import io.github.qishr.cascara.lang.json.token.ScannedNumber;
-// import io.github.qishr.cascara.lang.json.token.JsonSourceBuffer;
 import io.github.qishr.cascara.lang.json.util.JsonOptions;
 import io.github.qishr.cascara.lang.json.util.JsonSourceBuffer;
-// import jdk.incubator.vector.ByteVector;
-// import jdk.incubator.vector.VectorMask;
-// import jdk.incubator.vector.VectorOperators;
-// import jdk.incubator.vector.VectorSpecies;
 
 public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implements Tokenizer<JsonToken>{
 
@@ -398,7 +394,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         if (!options.validateUnicode()) {
             // Unicode path disabled → treat all non‑ASCII as error
             buffer.advance();
-            return makeErrorToken(line, column, JsonDiagnosticCode.UNEXPECTED_CHARACTER, c);
+            return makeErrorToken(line, column, JsonDiagnosticMessage.UNEXPECTED_CHARACTER, c);
         }
 
         // Unicode whitespace (JSON5)
@@ -430,7 +426,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
         // Otherwise - UNKNOWN
         buffer.advance();
-        return makeErrorToken(line, column, JsonDiagnosticCode.UNEXPECTED_CHARACTER, c);
+        return makeErrorToken(line, column, JsonDiagnosticMessage.UNEXPECTED_CHARACTER, c);
     }
 
     //
@@ -460,12 +456,12 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
         if (qs == QuoteStyle.SINGLE && !options.allowSingleQuotedStrings()) {
             return makeErrorToken(startLine, startColumn,
-                                  JsonDiagnosticCode.NOT_ALLOWED_SINGLE_QUOTED_STRING);
+                                  JsonDiagnosticMessage.NOT_ALLOWED_SINGLE_QUOTED_STRING);
         }
 
         if (!ok) {
             return makeErrorToken(startLine, startColumn,
-                                  JsonDiagnosticCode.UNTERMINATED_STRING);
+                                  JsonDiagnosticMessage.UNTERMINATED_STRING);
         }
 
         return factory.makeStringToken(startLine, startColumn, startOffset, qs);
@@ -492,11 +488,11 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             : QuoteStyle.SINGLE;
 
         if (qs == QuoteStyle.SINGLE && !options.allowSingleQuotedStrings()) {
-            return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.NOT_ALLOWED_SINGLE_QUOTED_STRING);
+            return makeErrorToken(startLine, startColumn, JsonDiagnosticMessage.NOT_ALLOWED_SINGLE_QUOTED_STRING);
         }
 
         if (!ok) {
-            return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.UNTERMINATED_STRING);
+            return makeErrorToken(startLine, startColumn, JsonDiagnosticMessage.UNTERMINATED_STRING);
         }
 
         return factory.makeStringToken(startLine, startColumn, startOffset, qs);
@@ -728,7 +724,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
 
             int end = buffer.offset();
             if (!validateNumberBytes(startOffset, end)) {
-                return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.INVALID_NUMBER);
+                return makeErrorToken(startLine, startColumn, JsonDiagnosticMessage.INVALID_NUMBER);
             }
 
             return factory.makeNumberToken(startLine, startColumn, startOffset, number);
@@ -750,7 +746,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         return makeErrorToken(
             startLine,
             startColumn,
-            JsonDiagnosticCode.UNEXPECTED_CHARACTER,
+            JsonDiagnosticMessage.UNEXPECTED_CHARACTER,
             (char)b
         );
     }
@@ -777,7 +773,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             ScannedNumber number = scanNumberAscii(startChar);
             int end = buffer.offset();
             if (!validateNumberLexeme(start, end)) {
-                return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.INVALID_NUMBER);
+                return makeErrorToken(startLine, startColumn, JsonDiagnosticMessage.INVALID_NUMBER);
             }
             return factory.makeNumberToken(startLine, startColumn, startOffset, number);
         }
@@ -801,7 +797,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         return makeErrorToken(
             startLine,
             startColumn,
-            JsonDiagnosticCode.UNEXPECTED_CHARACTER,
+            JsonDiagnosticMessage.UNEXPECTED_CHARACTER,
             startChar
         );
     }
@@ -1240,29 +1236,29 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
             // Leading '+'
             if (lexeme.charAt(0) == '+') {
                 return false;
-                // return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.NOT_ALLOWED_LEADING_PLUS);
+                // return makeErrorToken(startLine, startColumn, JsonDiagnosticMessage.NOT_ALLOWED_LEADING_PLUS);
             }
 
             // Leading zero on integer part: 012, -012
             if (lexeme.charAt(0) == '0' && lexeme.length() > 1 && Character.isDigit(lexeme.charAt(1))) {
                 return false;
-                // return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.NOT_ALLOWED_LEADING_ZERO);
+                // return makeErrorToken(startLine, startColumn, JsonDiagnosticMessage.NOT_ALLOWED_LEADING_ZERO);
             }
             if (lexeme.startsWith("-0") && lexeme.length() > 2 && Character.isDigit(lexeme.charAt(2))) {
                 return false;
-                // return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.NOT_ALLOWED_LEADING_ZERO);
+                // return makeErrorToken(startLine, startColumn, JsonDiagnosticMessage.NOT_ALLOWED_LEADING_ZERO);
             }
 
             // Starting with '.' or '-.' (no integer part)
             if (lexeme.charAt(0) == '.' || lexeme.startsWith("-.")) {
                 return false;
-                // return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.MISSING_INTEGER_PART);
+                // return makeErrorToken(startLine, startColumn, JsonDiagnosticMessage.MISSING_INTEGER_PART);
             }
 
             // Trailing dot: 1., 2., -2.
             if (lexeme.endsWith(".")) {
                 return false;
-                // return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.NOT_ALLOWED_TRAILING_DOT);
+                // return makeErrorToken(startLine, startColumn, JsonDiagnosticMessage.NOT_ALLOWED_TRAILING_DOT);
             }
 
             // Fractional part must have at least one digit after '.'
@@ -1271,12 +1267,12 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
                 int i = dotPos + 1;
                 if (i >= lexeme.length()) {
                     return false;
-                    // return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.MISSING_FRACTIONAL_PART);
+                    // return makeErrorToken(startLine, startColumn, JsonDiagnosticMessage.MISSING_FRACTIONAL_PART);
                 }
                 char c = lexeme.charAt(i);
                 if (c == 'e' || c == 'E') {
                     return false;
-                    // return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.MISSING_FRACTIONAL_PART);
+                    // return makeErrorToken(startLine, startColumn, JsonDiagnosticMessage.MISSING_FRACTIONAL_PART);
                 }
             }
 
@@ -1287,19 +1283,19 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
                 int i = ePos + 1;
                 if (i >= lexeme.length()) {
                     return false;
-                    // return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.MISSING_EXPONENT);
+                    // return makeErrorToken(startLine, startColumn, JsonDiagnosticMessage.MISSING_EXPONENT);
                 }
                 char c = lexeme.charAt(i);
                 if (c == '+' || c == '-') {
                     i++;
                     if (i >= lexeme.length()) {
                         return false;
-                        // return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.MISSING_EXPONENT);
+                        // return makeErrorToken(startLine, startColumn, JsonDiagnosticMessage.MISSING_EXPONENT);
                     }
                 }
                 if (!Character.isDigit(lexeme.charAt(i))) {
                     return false;
-                    // return makeErrorToken(startLine, startColumn, JsonDiagnosticCode.MISSING_EXPONENT_DIGITS);
+                    // return makeErrorToken(startLine, startColumn, JsonDiagnosticMessage.MISSING_EXPONENT_DIGITS);
                 }
             }
         }
@@ -1846,7 +1842,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
         );
     }
 
-    private JsonToken makeErrorToken(int line, int column, JsonDiagnosticCode code, Object... details) {
+    private JsonToken makeErrorToken(int line, int column, JsonDiagnosticMessage code, Object... details) {
         return new JsonErrorToken(
             line, column,
             buffer.windowStartOffset(),

@@ -36,7 +36,7 @@
 package io.github.qishr.cascara.lang.json.processor;
 
 import io.github.qishr.cascara.common.util.ContentType;
-import io.github.qishr.cascara.common.lang.diagnostic.LangDiagnosticCode;
+import io.github.qishr.cascara.common.lang.diagnostic.LangMessage;
 import io.github.qishr.cascara.common.annotation.Nullable;
 import io.github.qishr.cascara.common.lang.ast.AstNode;
 import io.github.qishr.cascara.common.lang.ast.MapAstNode;
@@ -48,6 +48,7 @@ import io.github.qishr.cascara.lang.json.ast.JsonObject;
 import io.github.qishr.cascara.lang.json.ast.JsonNode;
 import io.github.qishr.cascara.lang.json.ast.JsonScalar;
 import io.github.qishr.cascara.lang.json.ast.JsonArray;
+import io.github.qishr.cascara.lang.json.internal.AbstractJsonProcessor;
 import io.github.qishr.cascara.lang.json.diagnostic.JsonConverterException;
 
 public class JsonConverter extends AbstractJsonProcessor<JsonConverter> implements AstConverter<JsonNode> {
@@ -94,7 +95,7 @@ public class JsonConverter extends AbstractJsonProcessor<JsonConverter> implemen
             return new JsonScalar(astScalar.getPrimitive(), false);
         } else {
             throw new JsonConverterException(
-                LangDiagnosticCode.UNKNOWN_NODE_TYPE,
+                LangMessage.UNKNOWN_NODE_TYPE,
                 from.getClass().getSimpleName()
             );
         }

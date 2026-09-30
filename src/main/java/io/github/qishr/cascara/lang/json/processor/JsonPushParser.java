@@ -41,6 +41,7 @@ import io.github.qishr.cascara.common.lang.diagnostic.ParserException;
 import io.github.qishr.cascara.common.lang.processor.PushParser;
 import io.github.qishr.cascara.common.lang.streaming.StreamHandler;
 import io.github.qishr.cascara.common.lang.streaming.StreamingEvent;
+import io.github.qishr.cascara.lang.json.internal.AbstractJsonProcessor;
 import io.github.qishr.cascara.lang.json.internal.JsonStreamEngine;
 
 public class JsonPushParser extends AbstractJsonProcessor<JsonPushParser> implements PushParser {
