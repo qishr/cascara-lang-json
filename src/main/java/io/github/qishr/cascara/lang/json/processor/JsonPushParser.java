@@ -40,20 +40,21 @@ import java.io.InputStream;
 import io.github.qishr.cascara.common.lang.diagnostic.ParserException;
 import io.github.qishr.cascara.common.lang.processor.PushParser;
 import io.github.qishr.cascara.common.lang.streaming.StreamHandler;
-import io.github.qishr.cascara.common.lang.streaming.StreamingEvent;
 import io.github.qishr.cascara.lang.json.internal.AbstractJsonProcessor;
 import io.github.qishr.cascara.lang.json.internal.JsonStreamEngine;
+import io.github.qishr.cascara.lang.json.streaming.JsonStreamingEvent;
+import io.github.qishr.cascara.lang.json.streaming.JsonStreamingEventType;
 
-public class JsonPushParser extends AbstractJsonProcessor<JsonPushParser> implements PushParser {
+public class JsonPushParser extends AbstractJsonProcessor<JsonPushParser> implements PushParser<JsonStreamingEventType,JsonStreamingEvent> {
 
     public JsonPushParser() {}
 
     @Override
-    public void parse(InputStream input, StreamHandler handler) throws ParserException {
+    public void parse(InputStream input, StreamHandler<JsonStreamingEvent> handler) throws ParserException {
         JsonStreamEngine engine = new JsonStreamEngine(input, getOptions(), getReporter());
 
         while (engine.hasNextEvent()) {
-            StreamingEvent evt = engine.nextEvent();
+            JsonStreamingEvent evt = engine.nextEvent();
             if (evt != null) {
                 handler.onEvent(evt);
             }

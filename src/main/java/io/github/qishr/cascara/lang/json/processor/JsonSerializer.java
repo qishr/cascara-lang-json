@@ -44,6 +44,7 @@ import io.github.qishr.cascara.common.diagnostic.Reporter;
 import io.github.qishr.cascara.common.diagnostic.message.GenericMessage;
 import io.github.qishr.cascara.common.lang.util.LanguageOptions;
 import io.github.qishr.cascara.common.lang.diagnostic.SerializerException;
+import io.github.qishr.cascara.common.lang.diagnostic.ParserException;
 import io.github.qishr.cascara.common.lang.processor.AbstractSerializer;
 import io.github.qishr.cascara.common.lang.processor.AstParser;
 import io.github.qishr.cascara.common.lang.type.TypeReference;
@@ -66,7 +67,7 @@ public class JsonSerializer extends AbstractSerializer<JsonSerializer,JsonNode,J
 
     public JsonSerializer() {
         // This constructor is for SPI and cannot take a parameter.
-        super(AbstractJsonProcessor.JSON_CONTENT_TYPE_STRING, new JsonNodeFactory(), new JsonOptions());
+        super(AbstractJsonProcessor.JSON_CONTENT_TYPE_STRING, new JsonNodeFactory(), new JsonConverter(), new JsonOptions());
     }
 
     @Override
@@ -144,46 +145,71 @@ public class JsonSerializer extends AbstractSerializer<JsonSerializer,JsonNode,J
     /// {@inheritDoc}
     @Override
     public <C> C fromString(String text, Class<C> jvmType) {
-        JsonNode ast = getParser().parse(text);
-        return fromAst(ast, jvmType);
+        try {
+            JsonNode ast = getParser().parse(text);
+            return fromAst(ast, jvmType);
+        } catch (ParserException e) {
+            throw new SerializerException(GenericMessage.ERROR, "Failed to parse input");
+        }
     }
 
     /// {@inheritDoc}
     @Override
     public <C> C fromString(String text, TypeReference<C> typeRef) {
-        JsonNode ast = getParser().parse(text);
-        return fromAst(ast, typeRef);
+        try {
+            JsonNode ast = getParser().parse(text);
+            return fromAst(ast, typeRef);
+        } catch (ParserException e) {
+            throw new SerializerException(GenericMessage.ERROR, "Failed to parse input");
+        }
     }
 
     /// {@inheritDoc}
     @Override
     public <C> C fromReader(Reader reader, Class<C> jvmType) {
-        JsonNode ast = getParser().parse(reader);
-        return fromAst(ast, jvmType);
+        try {
+            JsonNode ast = getParser().parse(reader);
+            return fromAst(ast, jvmType);
+        } catch (ParserException e) {
+            throw new SerializerException(GenericMessage.ERROR, "Failed to parse input");
+        }
     }
 
     /// {@inheritDoc}
     @Override
     public <C> C fromReader(Reader reader, TypeReference<C> typeRef) {
-        JsonNode ast = getParser().parse(reader);
-        return fromAst(ast, typeRef);
+        try {
+            JsonNode ast = getParser().parse(reader);
+            return fromAst(ast, typeRef);
+        } catch (ParserException e) {
+            throw new SerializerException(GenericMessage.ERROR, "Failed to parse input");
+        }
     }
 
     /// {@inheritDoc}
     @Override
     public <C> C fromStream(InputStream is, Class<C> jvmType) {
-        JsonNode ast = getParser().parse(is);
-        return fromAst(ast, jvmType);
+        try {
+            JsonNode ast = getParser().parse(is);
+            return fromAst(ast, jvmType);
+        } catch (ParserException e) {
+            throw new SerializerException(GenericMessage.ERROR, "Failed to parse input");
+        }
     }
 
     /// {@inheritDoc}
     @Override
     public <C> C fromStream(InputStream is, TypeReference<C> typeRef) {
-        JsonNode ast = getParser().parse(is);
-        return fromAst(ast, typeRef);
+        try {
+            JsonNode ast = getParser().parse(is);
+            return fromAst(ast, typeRef);
+        } catch (ParserException e) {
+            throw new SerializerException(GenericMessage.ERROR, "Failed to parse input");
+        }
     }
 
     /// {@inheritDoc}
+    @SuppressWarnings("unchecked")
     @Override
     public <C> C fromAst(JsonNode astNode, Class<C> jvmType) {
         setupSerializer();

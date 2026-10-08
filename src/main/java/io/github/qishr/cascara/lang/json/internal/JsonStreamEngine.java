@@ -41,7 +41,6 @@ import java.util.Deque;
 
 import io.github.qishr.cascara.common.diagnostic.Reporter;
 import io.github.qishr.cascara.common.lang.diagnostic.ParserException;
-import io.github.qishr.cascara.common.lang.streaming.StreamingEvent;
 import io.github.qishr.cascara.lang.json.diagnostic.JsonDiagnosticMessage;
 import io.github.qishr.cascara.lang.json.processor.JsonTokenizer;
 import io.github.qishr.cascara.lang.json.streaming.JsonStreamingEvent;
@@ -69,7 +68,7 @@ public class JsonStreamEngine {
         return !documentEnded;
     }
 
-    public StreamingEvent nextEvent() throws ParserException {
+    public JsonStreamingEvent nextEvent() throws ParserException {
         if (documentEnded) return null;
 
         if (!rootOpened) {

@@ -2,14 +2,14 @@ package io.github.qishr.cascara.lang.json.processor;
 
 import io.github.qishr.cascara.common.lang.diagnostic.ParserException;
 import io.github.qishr.cascara.common.lang.processor.PullParser;
-import io.github.qishr.cascara.common.lang.streaming.StreamingEvent;
 import io.github.qishr.cascara.lang.json.internal.AbstractJsonProcessor;
 import io.github.qishr.cascara.lang.json.internal.JsonStreamEngine;
+import io.github.qishr.cascara.lang.json.streaming.JsonStreamingEvent;
 
 import java.io.InputStream;
 import java.util.NoSuchElementException;
 
-public class JsonPullParser extends AbstractJsonProcessor<JsonPullParser> implements PullParser {
+public class JsonPullParser extends AbstractJsonProcessor<JsonPullParser> implements PullParser<JsonStreamingEvent> {
     private JsonStreamEngine engine;
     private final InputStream input;
 
@@ -44,7 +44,7 @@ public class JsonPullParser extends AbstractJsonProcessor<JsonPullParser> implem
     }
 
     @Override
-    public StreamingEvent next() {
+    public JsonStreamingEvent next() {
         if (!hasNext()) {
             throw new NoSuchElementException("No more JSON streaming events available.");
         }

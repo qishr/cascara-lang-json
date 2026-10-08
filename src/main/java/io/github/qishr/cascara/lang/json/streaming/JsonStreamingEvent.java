@@ -36,22 +36,21 @@
 package io.github.qishr.cascara.lang.json.streaming;
 
 import io.github.qishr.cascara.common.lang.streaming.StreamingEvent;
-import io.github.qishr.cascara.common.lang.streaming.StreamingEventType;
 
-public class JsonStreamingEvent implements StreamingEvent {
+public class JsonStreamingEvent implements StreamingEvent<JsonStreamingEventType> {
     private final int line;
     private final int column;
     private final String content;
-    private final StreamingEventType type;
+    private final JsonStreamingEventType type;
 
-    public JsonStreamingEvent(int line, int column, StreamingEventType type, String content) {
+    public JsonStreamingEvent(int line, int column, JsonStreamingEventType type, String content) {
         this.line = line;
         this.column = column;
         this.type = type;
         this.content = content != null ? content : "";
     }
 
-    @Override public StreamingEventType getType() { return type; }
+    @Override public JsonStreamingEventType getType() { return type; }
     @Override public String getContent() { return content; }
     @Override public long getLineNumber() { return line; }
     @Override public long getColumnNumber() { return column; }
