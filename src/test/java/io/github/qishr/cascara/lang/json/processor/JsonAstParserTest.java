@@ -36,8 +36,8 @@
 package io.github.qishr.cascara.lang.json.processor;
 
 import io.github.qishr.cascara.common.diagnostic.Diagnostic.Level;
-import io.github.qishr.cascara.common.diagnostic.SilentCollectingReporter;
-import io.github.qishr.cascara.common.diagnostic.StandardReporter;
+import io.github.qishr.cascara.common.diagnostic.report.SilentCollectingReporter;
+import io.github.qishr.cascara.common.diagnostic.report.LocalReporter;
 import io.github.qishr.cascara.common.lang.ast.CommentAstNode;
 import io.github.qishr.cascara.lang.json.ast.*;
 import io.github.qishr.cascara.lang.json.util.JsonOptions;
@@ -54,7 +54,7 @@ class JsonAstParserTest {
 
     @BeforeEach
     void init() {
-        parser = new JsonAstParser().setReporter(new StandardReporter().setLevel(Level.TRACE));
+        parser = new JsonAstParser().setReporter(new LocalReporter().setLevel(Level.TRACE));
     }
 
     @Test

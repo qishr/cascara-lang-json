@@ -35,7 +35,7 @@
 
 package io.github.qishr.cascara.lang.json.util;
 
-import io.github.qishr.cascara.common.diagnostic.LocalizableRuntimeException;
+import io.github.qishr.cascara.common.diagnostic.exception.LocalizableRuntimeException;
 import io.github.qishr.cascara.common.diagnostic.message.GenericMessage;
 import io.github.qishr.cascara.common.annotation.Experimental;
 import io.github.qishr.cascara.common.lang.util.LanguageOptions;

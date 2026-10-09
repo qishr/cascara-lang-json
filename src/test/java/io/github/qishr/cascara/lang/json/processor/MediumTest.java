@@ -46,7 +46,7 @@ import java.nio.charset.StandardCharsets;
 
 import org.junit.jupiter.api.Test;
 
-import io.github.qishr.cascara.common.diagnostic.StandardReporter;
+import io.github.qishr.cascara.common.diagnostic.report.LocalReporter;
 import io.github.qishr.cascara.common.diagnostic.Diagnostic.Level;
 import io.github.qishr.cascara.lang.json.ast.JsonObject;
 import io.github.qishr.cascara.lang.json.ast.JsonNode;
@@ -90,7 +90,7 @@ public class MediumTest {
 
                 // .setAllowUnicode(true)
             )
-            .setReporter(new StandardReporter().setLevel(Level.TRACE));
+            .setReporter(new LocalReporter().setLevel(Level.TRACE));
 
         JsonNode doc = parser.parse(content);
         if (doc instanceof JsonObject map) {

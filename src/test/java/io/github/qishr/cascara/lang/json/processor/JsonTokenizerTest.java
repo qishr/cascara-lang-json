@@ -35,7 +35,7 @@
 
 package io.github.qishr.cascara.lang.json.processor;
 
-import io.github.qishr.cascara.common.diagnostic.StandardReporter;
+import io.github.qishr.cascara.common.diagnostic.report.LocalReporter;
 import io.github.qishr.cascara.common.diagnostic.Diagnostic.Level;
 import io.github.qishr.cascara.lang.json.token.JsonNumberToken;
 import io.github.qishr.cascara.lang.json.token.JsonToken;
@@ -53,7 +53,7 @@ class JsonTokenizerTest {
     @BeforeEach
     void setup() {
         tokenizer = new JsonTokenizer()
-            .setReporter(new StandardReporter().setLevel(Level.TRACE))
+            .setReporter(new LocalReporter().setLevel(Level.TRACE))
             .setOptions(JsonOptions.JSON5.duplicate().setCaptureComments(true));
     }
 

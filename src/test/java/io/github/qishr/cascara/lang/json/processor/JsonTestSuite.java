@@ -45,8 +45,8 @@ import org.junit.jupiter.params.provider.MethodSource;
 import java.nio.file.*;
 import java.util.stream.Stream;
 
-import io.github.qishr.cascara.common.diagnostic.Reporter;
-import io.github.qishr.cascara.common.diagnostic.StandardReporter;
+import io.github.qishr.cascara.common.diagnostic.report.Reporter;
+import io.github.qishr.cascara.common.diagnostic.report.LocalReporter;
 import io.github.qishr.cascara.common.diagnostic.Diagnostic.Level;
 import io.github.qishr.cascara.lang.json.ast.JsonNode;
 import io.github.qishr.cascara.lang.json.util.JsonOptions;
@@ -58,7 +58,7 @@ class JsonTestSuite {
 
     @BeforeEach
     void init() {
-        reporter = new StandardReporter().setLevel(Level.TRACE);
+        reporter = new LocalReporter().setLevel(Level.TRACE);
         // options = new JsonOptions();
         parser = new JsonAstParser()
             // .setOptions(options)

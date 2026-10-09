@@ -42,7 +42,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import io.github.qishr.cascara.common.diagnostic.Diagnostic.Level;
-import io.github.qishr.cascara.common.diagnostic.StandardReporter;
+import io.github.qishr.cascara.common.diagnostic.report.LocalReporter;
 import io.github.qishr.cascara.lang.json.ast.JsonObject;
 
 public class StringTests {
@@ -50,7 +50,7 @@ public class StringTests {
 
     @BeforeEach
     void init() {
-        parser = new JsonAstParser().setReporter(new StandardReporter().setLevel(Level.TRACE));
+        parser = new JsonAstParser().setReporter(new LocalReporter().setLevel(Level.TRACE));
     }
 
     @Test

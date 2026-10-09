@@ -41,14 +41,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import io.github.qishr.cascara.common.diagnostic.Diagnostic.Level;
-import io.github.qishr.cascara.common.diagnostic.StandardReporter;
+import io.github.qishr.cascara.common.diagnostic.report.LocalReporter;
 
 public class NumberTests {
     private JsonAstParser parser;
 
     @BeforeEach
     void init() {
-        parser = new JsonAstParser().setReporter(new StandardReporter().setLevel(Level.TRACE));
+        parser = new JsonAstParser().setReporter(new LocalReporter().setLevel(Level.TRACE));
     }
 
     @Test void test_n_number_plus_1() {

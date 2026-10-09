@@ -5,7 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import org.junit.jupiter.api.Test;
 
 import io.github.qishr.cascara.common.diagnostic.Diagnostic.Level;
-import io.github.qishr.cascara.common.diagnostic.StandardReporter;
+import io.github.qishr.cascara.common.diagnostic.report.LocalReporter;
 
 public class SerializerTests {
     @Test
@@ -15,7 +15,7 @@ public class SerializerTests {
         JsonSerializer serializer = new JsonSerializer();
 
         serializer.setReporter(
-            new StandardReporter()
+            new LocalReporter()
                 .setLevel(Level.DEBUG)
                 .setStackTraceEnabled(true)
         );

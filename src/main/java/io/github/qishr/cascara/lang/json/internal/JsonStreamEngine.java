@@ -39,7 +39,7 @@ import java.io.InputStream;
 import java.util.ArrayDeque;
 import java.util.Deque;
 
-import io.github.qishr.cascara.common.diagnostic.Reporter;
+import io.github.qishr.cascara.common.diagnostic.report.Reporter;
 import io.github.qishr.cascara.common.lang.diagnostic.ParserException;
 import io.github.qishr.cascara.lang.json.diagnostic.JsonDiagnosticMessage;
 import io.github.qishr.cascara.lang.json.processor.JsonTokenizer;

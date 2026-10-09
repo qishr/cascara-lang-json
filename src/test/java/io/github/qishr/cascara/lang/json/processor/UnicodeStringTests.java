@@ -42,14 +42,14 @@ import org.junit.jupiter.api.Test;
 
 import io.github.qishr.cascara.common.diagnostic.Diagnostic.Level;
 import io.github.qishr.cascara.lang.json.util.JsonOptions;
-import io.github.qishr.cascara.common.diagnostic.StandardReporter;
+import io.github.qishr.cascara.common.diagnostic.report.LocalReporter;
 
 public class UnicodeStringTests {
     private JsonAstParser parser;
 
     @BeforeEach
     void init() {
-        parser = new JsonAstParser().setReporter(new StandardReporter().setLevel(Level.TRACE));
+        parser = new JsonAstParser().setReporter(new LocalReporter().setLevel(Level.TRACE));
         parser.setOptions(new JsonOptions()
             .setAllowUnicode(true)
             .setValidateUnicode(true)
