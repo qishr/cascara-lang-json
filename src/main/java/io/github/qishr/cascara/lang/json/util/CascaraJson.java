@@ -40,7 +40,7 @@ import java.io.Reader;
 import java.io.Writer;
 import java.io.IOException;
 
-import io.github.qishr.cascara.common.lang.type.TypeReference;
+import io.github.qishr.cascara.common.type.TypeReference;
 import io.github.qishr.cascara.common.semver.SemVer;
 import io.github.qishr.cascara.common.util.JarManifest;
 import io.github.qishr.cascara.lang.json.processor.JsonSerializer;

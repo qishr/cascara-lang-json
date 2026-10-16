@@ -44,10 +44,11 @@ import io.github.qishr.cascara.common.diagnostic.report.Reporter;
 import io.github.qishr.cascara.common.diagnostic.message.GenericMessage;
 import io.github.qishr.cascara.common.lang.util.LanguageOptions;
 import io.github.qishr.cascara.common.lang.diagnostic.SerializerException;
+import io.github.qishr.cascara.common.lang.ast.AstNode;
 import io.github.qishr.cascara.common.lang.diagnostic.ParserException;
 import io.github.qishr.cascara.common.lang.processor.AbstractSerializer;
 import io.github.qishr.cascara.common.lang.processor.AstParser;
-import io.github.qishr.cascara.common.lang.type.TypeReference;
+import io.github.qishr.cascara.common.type.TypeReference;
 import io.github.qishr.cascara.common.util.ContentType;
 import io.github.qishr.cascara.lang.json.ast.JsonProperty;
 import io.github.qishr.cascara.lang.json.ast.JsonObject;
@@ -149,7 +150,7 @@ public class JsonSerializer extends AbstractSerializer<JsonSerializer,JsonNode,J
             JsonNode ast = getParser().parse(text);
             return fromAst(ast, jvmType);
         } catch (ParserException e) {
-            throw new SerializerException(GenericMessage.ERROR, "Failed to parse input");
+            throw new SerializerException(e, GenericMessage.ERROR, "Failed to parse input. " + e.getMessage());
         }
     }
 
@@ -160,7 +161,7 @@ public class JsonSerializer extends AbstractSerializer<JsonSerializer,JsonNode,J
             JsonNode ast = getParser().parse(text);
             return fromAst(ast, typeRef);
         } catch (ParserException e) {
-            throw new SerializerException(GenericMessage.ERROR, "Failed to parse input");
+            throw new SerializerException(e, GenericMessage.ERROR, "Failed to parse input. " + e.getMessage());
         }
     }
 
@@ -171,7 +172,7 @@ public class JsonSerializer extends AbstractSerializer<JsonSerializer,JsonNode,J
             JsonNode ast = getParser().parse(reader);
             return fromAst(ast, jvmType);
         } catch (ParserException e) {
-            throw new SerializerException(GenericMessage.ERROR, "Failed to parse input");
+            throw new SerializerException(e, GenericMessage.ERROR, "Failed to parse input. " + e.getMessage());
         }
     }
 
@@ -182,7 +183,7 @@ public class JsonSerializer extends AbstractSerializer<JsonSerializer,JsonNode,J
             JsonNode ast = getParser().parse(reader);
             return fromAst(ast, typeRef);
         } catch (ParserException e) {
-            throw new SerializerException(GenericMessage.ERROR, "Failed to parse input");
+            throw new SerializerException(e, GenericMessage.ERROR, "Failed to parse input. " + e.getMessage());
         }
     }
 
@@ -193,7 +194,7 @@ public class JsonSerializer extends AbstractSerializer<JsonSerializer,JsonNode,J
             JsonNode ast = getParser().parse(is);
             return fromAst(ast, jvmType);
         } catch (ParserException e) {
-            throw new SerializerException(GenericMessage.ERROR, "Failed to parse input");
+            throw new SerializerException(e, GenericMessage.ERROR, "Failed to parse input. " + e.getMessage());
         }
     }
 
@@ -204,21 +205,21 @@ public class JsonSerializer extends AbstractSerializer<JsonSerializer,JsonNode,J
             JsonNode ast = getParser().parse(is);
             return fromAst(ast, typeRef);
         } catch (ParserException e) {
-            throw new SerializerException(GenericMessage.ERROR, "Failed to parse input");
+            throw new SerializerException(e, GenericMessage.ERROR, "Failed to parse input. " + e.getMessage());
         }
     }
 
     /// {@inheritDoc}
     @SuppressWarnings("unchecked")
     @Override
-    public <C> C fromAst(JsonNode astNode, Class<C> jvmType) {
+    public <C> C fromAst(AstNode astNode, Class<C> jvmType) {
         setupSerializer();
         return (C) deserialize(astNode, jvmType);
     }
 
     /// {@inheritDoc}
     @Override
-    public <C> C fromAst(JsonNode astNode, TypeReference<C> typeRef) {
+    public <C> C fromAst(AstNode astNode, TypeReference<C> typeRef) {
         setupSerializer();
         return (C) deserialize(astNode, typeRef);
     }
