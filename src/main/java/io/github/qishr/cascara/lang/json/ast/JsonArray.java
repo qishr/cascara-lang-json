@@ -41,6 +41,8 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 
+import io.github.qishr.cascara.common.lang.ast.MapAstNode;
+import io.github.qishr.cascara.common.lang.ast.ScalarAstNode;
 import io.github.qishr.cascara.common.lang.ast.SequenceAstNode;
 
 public class JsonArray extends JsonNode implements SequenceAstNode<JsonNode> {
@@ -137,6 +139,27 @@ public class JsonArray extends JsonNode implements SequenceAstNode<JsonNode> {
     @Override
     public int hashCode() {
         return Objects.hash(elements);
+    }
+    @Override
+    public JsonArray getSequence(int i) {
+        if (get(i) instanceof JsonArray array) {
+            return array;
+        }
+        return null;
+    }
+    @Override
+    public JsonObject getMap(int i) {
+        if (get(i) instanceof JsonObject obj) {
+            return obj;
+        }
+        return null;
+    }
+    @Override
+    public JsonScalar getScalar(int i) {
+        if (get(i) instanceof JsonScalar scalar) {
+            return scalar;
+        }
+        return null;
     }
 }
 

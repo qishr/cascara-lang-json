@@ -32,7 +32,7 @@
 // you do not wish to do so, delete this exception statement from your
 // version.
 
-
+/// Cascara JSON parsers, tokenizer, serializer, and converter.
 module cascara.lang.json {
     requires transitive cascara.common;
 
