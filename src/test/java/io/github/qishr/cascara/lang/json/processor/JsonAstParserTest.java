@@ -39,7 +39,9 @@ import io.github.qishr.cascara.common.diagnostic.Diagnostic.Level;
 import io.github.qishr.cascara.common.diagnostic.report.SilentCollectingReporter;
 import io.github.qishr.cascara.common.diagnostic.report.LocalReporter;
 import io.github.qishr.cascara.common.lang.ast.CommentAstNode;
+import io.github.qishr.cascara.common.lang.ast.*;
 import io.github.qishr.cascara.lang.json.ast.*;
+import io.github.qishr.cascara.lang.json.token.JsonToken;
 import io.github.qishr.cascara.lang.json.util.JsonOptions;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -55,6 +57,18 @@ class JsonAstParserTest {
     @BeforeEach
     void init() {
         parser = new JsonAstParser().setReporter(new LocalReporter().setLevel(Level.TRACE));
+    }
+
+    @Test
+    void testParserSimpleObject() {
+        String input = "{   \"n\": 0 }";
+
+        JsonTokenizer t = parser.getTokenizer();
+        List<JsonToken> tokens = t.tokenize(input);
+        TestUtils.dumpTokens(tokens);
+
+        AstNode root = parser.parse(input);
+        assertNotNull(root);
     }
 
     @Test

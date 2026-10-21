@@ -1,7 +1,7 @@
 plugins {
-    id 'application'
-    id "io.github.qishr.cascara-meta.java-library" version "0.1.0"
-    id "io.github.qishr.cascara-meta.publish" version "0.1.0"
+    id "java-library"
+    id "io.github.qishr.cascara.conventions" version "0.1.0"
+    id "io.github.qishr.cascara.publish" version "0.1.0"
 }
 
 
@@ -43,8 +43,8 @@ test {
 }
 
 
-application {
-    mainClass.set("io.github.qishr.cascara.lang.json.util.ProfilingHarness")
-    applicationDefaultJvmArgs = ["--add-modules=jdk.incubator.vector"]
-}
+// application {
+//     mainClass.set("io.github.qishr.cascara.lang.json.util.ProfilingHarness")
+//     applicationDefaultJvmArgs = ["--add-modules=jdk.incubator.vector"]
+// }
 

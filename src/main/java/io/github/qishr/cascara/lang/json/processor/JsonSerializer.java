@@ -224,17 +224,17 @@ public class JsonSerializer extends AbstractSerializer<JsonSerializer,JsonNode,J
         return (C) deserialize(astNode, typeRef);
     }
 
-    protected void setupSerializer() {
-        super.setupSerializer();
-        depthLimit = options.getDepthLimit();
-    }
-
-    private JsonAstParser getParser() {
+    public JsonAstParser getParser() {
         if (parser == null) {
             parser = new JsonAstParser();
             parser.setReporter(reporter);
             parser.setOptions(options);
         }
         return parser;
+    }
+
+    protected void setupSerializer() {
+        super.setupSerializer();
+        depthLimit = options.getDepthLimit();
     }
 }

@@ -113,7 +113,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
 
     @Override
     public JsonNode parse(String text) {
-        JsonTokenizer tokenizer = new JsonTokenizer();
+        JsonTokenizer tokenizer = getTokenizer();
         tokenizer.setOptions(options);
         tokenizer.setReporter(reporter);
         tokenizer.open(text);
@@ -121,7 +121,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
     }
 
     public JsonNode parse(byte[] data) {
-        JsonTokenizer tokenizer = new JsonTokenizer();
+        JsonTokenizer tokenizer = getTokenizer();
         tokenizer.setOptions(options);
         tokenizer.setReporter(reporter);
         tokenizer.open(data);
@@ -130,7 +130,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
 
     @Override
     public JsonNode parse(Reader reader) {
-        JsonTokenizer tokenizer = new JsonTokenizer();
+        JsonTokenizer tokenizer = getTokenizer();
         tokenizer.setOptions(options);
         tokenizer.setReporter(reporter);
         tokenizer.open(reader);
@@ -139,7 +139,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
 
     @Override
     public JsonNode parse(InputStream is) {
-        JsonTokenizer tokenizer = new JsonTokenizer();
+        JsonTokenizer tokenizer = getTokenizer();
         tokenizer.setOptions(options);
         tokenizer.setReporter(reporter);
         tokenizer.open(is);
