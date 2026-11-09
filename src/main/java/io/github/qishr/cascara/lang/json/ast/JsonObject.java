@@ -45,28 +45,28 @@ import java.util.Iterator;
 
 import io.github.qishr.cascara.common.annotation.Nullable;
 import io.github.qishr.cascara.common.lang.ast.MapAstNode;
-import io.github.qishr.cascara.lang.json.util.JsonOptions;
+import io.github.qishr.cascara.lang.json.util.JsonConfig;
 
 public class JsonObject extends JsonNode implements MapAstNode<String, JsonNode, JsonProperty> {
     private final LinkedHashMap<String, JsonProperty> entriesByKey = new LinkedHashMap<>();
-    private final JsonOptions options;
+    private final JsonConfig options;
 
     public JsonObject() {
         super();
-        this.options = JsonOptions.STRICT;
+        this.options = JsonConfig.STRICT;
     }
 
     public JsonObject(int line, int column) {
         super(line, column);
-        this.options = JsonOptions.STRICT;
+        this.options = JsonConfig.STRICT;
     }
 
-    public JsonObject(JsonOptions options) {
+    public JsonObject(JsonConfig options) {
         super();
         this.options = options;
     }
 
-    public JsonObject(int line, int column, JsonOptions options) {
+    public JsonObject(int line, int column, JsonConfig options) {
         super(line, column);
         this.options = options;
     }

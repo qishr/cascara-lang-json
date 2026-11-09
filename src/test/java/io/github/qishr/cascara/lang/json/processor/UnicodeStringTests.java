@@ -41,7 +41,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import io.github.qishr.cascara.common.diagnostic.Diagnostic.Level;
-import io.github.qishr.cascara.lang.json.util.JsonOptions;
+import io.github.qishr.cascara.lang.json.util.JsonConfig;
 import io.github.qishr.cascara.common.diagnostic.report.LocalReporter;
 
 public class UnicodeStringTests {
@@ -50,7 +50,7 @@ public class UnicodeStringTests {
     @BeforeEach
     void init() {
         parser = new JsonAstParser().setReporter(new LocalReporter().setLevel(Level.TRACE));
-        parser.setOptions(new JsonOptions()
+        parser.setConfig(new JsonConfig()
             .setAllowUnicode(true)
             .setValidateUnicode(true)
         );

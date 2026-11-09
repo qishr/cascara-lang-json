@@ -42,7 +42,7 @@ import io.github.qishr.cascara.common.lang.util.QuoteStyle;
 import io.github.qishr.cascara.lang.json.internal.Json5SingleQuoteUnescaper;
 import io.github.qishr.cascara.lang.json.internal.JsonStringUnescaper;
 import io.github.qishr.cascara.lang.json.token.JsonToken;
-import io.github.qishr.cascara.lang.json.util.JsonOptions;
+import io.github.qishr.cascara.lang.json.util.JsonConfig;
 import io.github.qishr.cascara.common.lang.ast.ScalarAstNode;
 import io.github.qishr.cascara.common.type.PrimitiveType;
 
@@ -60,7 +60,7 @@ public class JsonScalar extends JsonNode implements ScalarAstNode<JsonNode> {
 
     private final boolean isKey;
 
-    private final JsonOptions options;
+    private final JsonConfig options;
 
     /// Constructor for use in parsers.
     /// Used when reading raw text from a file stream.
@@ -69,12 +69,12 @@ public class JsonScalar extends JsonNode implements ScalarAstNode<JsonNode> {
         JsonToken token,
         PrimitiveType primitiveType,
         boolean isKey,
-        JsonOptions options
+        JsonConfig options
     ) {
         super(token);
         this.primitiveType = primitiveType;
         this.quoteStyle = token.getQuoteStyle();
-        this.options = (options == null) ? JsonOptions.STRICT : options;
+        this.options = (options == null) ? JsonConfig.STRICT : options;
         this.isKey = isKey;
     }
 
@@ -82,19 +82,19 @@ public class JsonScalar extends JsonNode implements ScalarAstNode<JsonNode> {
         Object jvmValue,
         QuoteStyle quoteStyle,
         boolean isKey,
-        JsonOptions options
+        JsonConfig options
     ) {
         super();
         this.primitiveType = PrimitiveType.of(jvmValue);
         this.quoteStyle = quoteStyle;
-        this.options = (options == null) ? JsonOptions.STRICT : options;
+        this.options = (options == null) ? JsonConfig.STRICT : options;
         this.isKey = false;
         this.jvmValue = jvmValue;
         this.isJvmValueCached = true;
     }
 
     // TODO: What is this used for? Document it.
-    public JsonScalar(Object content, JsonOptions options) {
+    public JsonScalar(Object content, JsonConfig options) {
         this(content, QuoteStyle.UNDETERMINED, false, options);
     }
 
@@ -602,7 +602,7 @@ public class JsonScalar extends JsonNode implements ScalarAstNode<JsonNode> {
         return Long.parseLong(raw);
     }
 
-    public JsonOptions getOptions() {
+    public JsonConfig getOptions() {
         return options;
     }
 }

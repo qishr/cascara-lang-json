@@ -1,0 +1,19 @@
+{
+	"files": [
+		{
+			"path": "src/main/java/io/github/qishr/cascara/lang/json/processor/JsonAstParser.java",
+			"bookmarks": [
+				{
+					"line": 262,
+					"column": 28,
+					"label": ""
+				},
+				{
+					"line": 290,
+					"column": 32,
+					"label": ""
+				}
+			]
+		}
+	]
+}

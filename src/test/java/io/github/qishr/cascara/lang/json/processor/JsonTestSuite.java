@@ -49,7 +49,7 @@ import io.github.qishr.cascara.common.diagnostic.report.Reporter;
 import io.github.qishr.cascara.common.diagnostic.report.LocalReporter;
 import io.github.qishr.cascara.common.diagnostic.Diagnostic.Level;
 import io.github.qishr.cascara.lang.json.ast.JsonNode;
-import io.github.qishr.cascara.lang.json.util.JsonOptions;
+import io.github.qishr.cascara.lang.json.util.JsonConfig;
 
 class JsonTestSuite {
 
@@ -59,9 +59,9 @@ class JsonTestSuite {
     @BeforeEach
     void init() {
         reporter = new LocalReporter().setLevel(Level.TRACE);
-        // options = new JsonOptions();
+        // options = new JsonConfig();
         parser = new JsonAstParser()
-            // .setOptions(options)
+            // .setConfig(options)
             .setReporter(reporter);
     }
 
@@ -102,9 +102,9 @@ class JsonTestSuite {
         // Parse original content (supports either JsonMapNode or JsonSequenceNode roots)
         JsonNode doc = parser.parse(content);
 
-        JsonOptions testOptions = new JsonOptions().setPrettyPrint(true);
+        JsonConfig testOptions = new JsonConfig().setPrettyPrint(true);
         JsonEmitter emitter = new JsonEmitter();
-        emitter.setOptions(testOptions);
+        emitter.setConfig(testOptions);
 
         // 1. First Emit
         String emitted = emitter.emit(doc);

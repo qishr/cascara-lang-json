@@ -47,7 +47,7 @@ import io.github.qishr.cascara.lang.json.streaming.JsonStreamingEvent;
 import io.github.qishr.cascara.lang.json.streaming.JsonStreamingEventType;
 import io.github.qishr.cascara.lang.json.token.JsonToken;
 import io.github.qishr.cascara.lang.json.token.JsonTokenType;
-import io.github.qishr.cascara.lang.json.util.JsonOptions;
+import io.github.qishr.cascara.lang.json.util.JsonConfig;
 
 public class JsonStreamEngine {
     private final JsonTokenizer tokenizer;
@@ -59,7 +59,7 @@ public class JsonStreamEngine {
     private boolean rootOpened = false;
     private boolean documentEnded = false;
 
-    public JsonStreamEngine(InputStream input, JsonOptions options, Reporter reporter) {
+    public JsonStreamEngine(InputStream input, JsonConfig options, Reporter reporter) {
         this.tokenizer = new JsonTokenizer().setReporter(reporter);
         this.tokenizer.open(input);
     }

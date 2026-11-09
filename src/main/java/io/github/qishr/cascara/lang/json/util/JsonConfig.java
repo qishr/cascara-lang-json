@@ -38,13 +38,13 @@ package io.github.qishr.cascara.lang.json.util;
 import io.github.qishr.cascara.common.diagnostic.exception.LocalizableRuntimeException;
 import io.github.qishr.cascara.common.diagnostic.message.GenericMessage;
 import io.github.qishr.cascara.common.annotation.Experimental;
-import io.github.qishr.cascara.common.lang.util.LanguageOptions;
+import io.github.qishr.cascara.common.lang.util.LanguageConfig;
 import io.github.qishr.cascara.common.util.Duplicable;
 
-public class JsonOptions extends LanguageOptions<JsonOptions> implements Duplicable<JsonOptions>  {
+public class JsonConfig extends LanguageConfig<JsonConfig> implements Duplicable<JsonConfig>  {
     @Experimental
-    public static final JsonOptions JSON5 = new ImmutableJsonOptions(
-        new JsonOptions()
+    public static final JsonConfig JSON5 = new ImmutableJsonOptions(
+        new JsonConfig()
             .setIndentSize(2)
             .setCaptureComments(true)
             .setAllowComments(true)
@@ -55,8 +55,8 @@ public class JsonOptions extends LanguageOptions<JsonOptions> implements Duplica
             .setAllowUnquotedKeys(true)
     );
 
-    public static final JsonOptions STRICT = new ImmutableJsonOptions(
-        new JsonOptions()
+    public static final JsonConfig STRICT = new ImmutableJsonOptions(
+        new JsonConfig()
             .setIndentSize(2)
             .setCaptureComments(false)
             .setAllowComments(false)
@@ -80,9 +80,9 @@ public class JsonOptions extends LanguageOptions<JsonOptions> implements Duplica
 
     private int depthLimit = 500;
 
-    public JsonOptions() {}
+    public JsonConfig() {}
 
-    public JsonOptions(JsonOptions original) {
+    public JsonConfig(JsonConfig original) {
         allowBooleanKeys = original.allowBooleanKeys;
         allowComments = original.allowComments;
         allowHexadecimalNumbers = original.allowHexadecimalNumbers;
@@ -118,7 +118,7 @@ public class JsonOptions extends LanguageOptions<JsonOptions> implements Duplica
 
     protected int indentSize = 2;
 
-    public JsonOptions setIndentSize(int size) {
+    public JsonConfig setIndentSize(int size) {
         this.indentSize = size;
         return this;
     }
@@ -129,132 +129,132 @@ public class JsonOptions extends LanguageOptions<JsonOptions> implements Duplica
         return depthLimit;
     }
 
-    public JsonOptions setDepthLimit(int limit) {
+    public JsonConfig setDepthLimit(int limit) {
         depthLimit = limit;
         return this;
     }
 
-    public JsonOptions setAllowBooleanKeys(boolean val) {
+    public JsonConfig setAllowBooleanKeys(boolean val) {
         this.allowBooleanKeys = val;
         return this;
     }
 
-    public JsonOptions setAllowComments(boolean val) {
+    public JsonConfig setAllowComments(boolean val) {
         this.allowComments = val;
         return this;
     }
 
-    public JsonOptions setAllowHexadecimalNumbers(boolean val) {
+    public JsonConfig setAllowHexadecimalNumbers(boolean val) {
         this.allowHexadecimalNumbers = val;
         return this;
     }
-    public JsonOptions setAllowJson5Numbers(boolean val) {
+    public JsonConfig setAllowJson5Numbers(boolean val) {
         this.allowJson5Numbers = val;
         return this;
     }
 
-    public JsonOptions setAllowSingleQuotedStrings(boolean val) {
+    public JsonConfig setAllowSingleQuotedStrings(boolean val) {
         this.allowSingleQuotedStrings = val;
         return this;
     }
 
-    public JsonOptions setAllowTrailingComma(boolean val) {
+    public JsonConfig setAllowTrailingComma(boolean val) {
         this.allowTrailingComma = val;
         return this;
     }
 
     /// Sets whether unicode characters are allowed in scalars.
-    public JsonOptions setAllowUnicode(boolean val) {
+    public JsonConfig setAllowUnicode(boolean val) {
         this.allowUnicode = val;
         return this;
     }
 
-    public JsonOptions setAllowUnquotedKeys(boolean val) {
+    public JsonConfig setAllowUnquotedKeys(boolean val) {
         this.allowUnquotedKeys = val;
         return this;
     }
 
-    public JsonOptions setCaptureComments(boolean val) {
+    public JsonConfig setCaptureComments(boolean val) {
         this.captureComments = val;
         return this;
     }
 
     /// Sets whether to use spaces or tabs for indentation.
-    public JsonOptions setInsertSpaces(boolean val) {
+    public JsonConfig setInsertSpaces(boolean val) {
         this.insertSpaces = val;
         return this;
     }
 
-    public JsonOptions setPrettyPrint(boolean v) {
+    public JsonConfig setPrettyPrint(boolean v) {
         this.prettyPrint = v;
         return this;
     }
 
-    public JsonOptions setUseSimd(boolean v) {
+    public JsonConfig setUseSimd(boolean v) {
         this.useSimd = v;
         return this;
     }
 
-    public JsonOptions setValidateUnicode(boolean v) {
+    public JsonConfig setValidateUnicode(boolean v) {
         this.validateUnicode = v;
         return this;
     }
 
-    public JsonOptions setTrackPosition(boolean v) {
+    public JsonConfig setTrackPosition(boolean v) {
         this.trackPosition = v;
         return this;
     }
 
     @Override
-    public JsonOptions duplicate() {
-        return new JsonOptions(this);
+    public JsonConfig duplicate() {
+        return new JsonConfig(this);
     }
 
-    public static class ImmutableJsonOptions extends JsonOptions {
-        public ImmutableJsonOptions(JsonOptions options) {
+    public static class ImmutableJsonOptions extends JsonConfig {
+        public ImmutableJsonOptions(JsonConfig options) {
             super(options);
         }
 
-        public JsonOptions setAllowComments(boolean val) {
+        public JsonConfig setAllowComments(boolean val) {
             throw new LocalizableRuntimeException(GenericMessage.UNSUPPORTED_OPERATION, "setAllowComments");
         }
 
-        public JsonOptions setAllowHexadecimalNumbers(boolean val) {
+        public JsonConfig setAllowHexadecimalNumbers(boolean val) {
             throw new LocalizableRuntimeException(GenericMessage.UNSUPPORTED_OPERATION, "setAllowHexadecimalNumbers");
         }
-        public JsonOptions setAllowJson5Numbers(boolean val) {
+        public JsonConfig setAllowJson5Numbers(boolean val) {
             throw new LocalizableRuntimeException(GenericMessage.UNSUPPORTED_OPERATION, "setAllowInfinityAndNaN");
         }
 
-        public JsonOptions setAllowSingleQuotedStrings(boolean val) {
+        public JsonConfig setAllowSingleQuotedStrings(boolean val) {
             throw new LocalizableRuntimeException(GenericMessage.UNSUPPORTED_OPERATION, "setAllowSingleQuotedStrings");
         }
 
-        public JsonOptions setAllowTrailingComma(boolean val) {
+        public JsonConfig setAllowTrailingComma(boolean val) {
             throw new LocalizableRuntimeException(GenericMessage.UNSUPPORTED_OPERATION, "setAllowTrailingComma");
         }
 
-        public JsonOptions setAllowUnicode(boolean val) {
+        public JsonConfig setAllowUnicode(boolean val) {
             throw new LocalizableRuntimeException(GenericMessage.UNSUPPORTED_OPERATION, "setAllowComments");
         }
 
-        public JsonOptions setAllowUnquotedKeys(boolean val) {
+        public JsonConfig setAllowUnquotedKeys(boolean val) {
             throw new LocalizableRuntimeException(GenericMessage.UNSUPPORTED_OPERATION, "setAllowUnquotedKeys");
         }
 
-        public JsonOptions setCaptureComments(boolean val) {
+        public JsonConfig setCaptureComments(boolean val) {
             throw new LocalizableRuntimeException(GenericMessage.UNSUPPORTED_OPERATION, "setCaptureComments");
         }
 
-        public JsonOptions setStrict(boolean val) {
+        public JsonConfig setStrict(boolean val) {
             throw new LocalizableRuntimeException(GenericMessage.UNSUPPORTED_OPERATION, "setStrict");
         }
 
-        public JsonOptions setInsertSpaces(boolean val) {
+        public JsonConfig setInsertSpaces(boolean val) {
             throw new LocalizableRuntimeException(GenericMessage.UNSUPPORTED_OPERATION, "setInsertSpaces");
         }
 
-        public JsonOptions setPrettyPrint(boolean v) {
+        public JsonConfig setPrettyPrint(boolean v) {
             throw new LocalizableRuntimeException(GenericMessage.UNSUPPORTED_OPERATION, "setPrettyPrint");
         }
     }

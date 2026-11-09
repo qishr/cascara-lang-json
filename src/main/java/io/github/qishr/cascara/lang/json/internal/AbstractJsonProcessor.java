@@ -42,13 +42,13 @@ import java.util.stream.Collectors;
 
 import io.github.qishr.cascara.common.diagnostic.report.NoOpReporter;
 import io.github.qishr.cascara.common.diagnostic.report.Reporter;
-import io.github.qishr.cascara.common.lang.util.LanguageOptions;
+import io.github.qishr.cascara.common.lang.util.LanguageConfig;
 import io.github.qishr.cascara.common.semver.SemVer;
 import io.github.qishr.cascara.common.lang.processor.Processor;
 import io.github.qishr.cascara.common.util.ContentType;
 import io.github.qishr.cascara.common.util.JarManifest;
 import io.github.qishr.cascara.common.property.Properties;
-import io.github.qishr.cascara.lang.json.util.JsonOptions;
+import io.github.qishr.cascara.lang.json.util.JsonConfig;
 
 public abstract class AbstractJsonProcessor<P extends Processor> implements Processor {
     public static final String JSON_CONTENT_TYPE_STRING = "application/json";
@@ -60,7 +60,7 @@ public abstract class AbstractJsonProcessor<P extends Processor> implements Proc
             .withType("application/schema+json")
             .withSuffix(".json");
 
-    protected JsonOptions options = JsonOptions.STRICT;
+    protected JsonConfig options = JsonConfig.STRICT;
     protected Reporter reporter = NO_OP_REPORTER;
     private Properties capabilities;
 
@@ -89,12 +89,12 @@ public abstract class AbstractJsonProcessor<P extends Processor> implements Proc
 
     /// {@inheritDoc}
     @Override
-    public P setOptions(LanguageOptions<?> options) {
-        this.options = (JsonOptions) options;
+    public P setConfig(LanguageConfig<?> options) {
+        this.options = (JsonConfig) options;
         return self();
     }
 
-    public JsonOptions getOptions() {
+    public JsonConfig getOptions() {
         return options;
     }
 

@@ -20,7 +20,7 @@
 
 - **Clean integration with Cascara language tooling** — Designed to plug directly into Cascara’s [AST](https://qishr.github.io/javadoc/cascara.common/lang/ast/), [Schema](https://qishr.github.io/cascara/schema/), and [diagnostic](https://qishr.github.io/cascara/diagnostics/) systems.
 
-- **Configurable behavior** — Toggle JSON5 features, Unicode validation, comment handling, and strictness levels via [JsonOptions](https://qishr.github.io/javadoc/cascara.lang.json/json/util/JsonOptions/).
+- **Configurable behavior** — Toggle JSON5 features, Unicode validation, comment handling, and strictness levels via [JsonConfig](https://qishr.github.io/javadoc/cascara.lang.json/json/util/JsonConfig/).
 
 - **Lightweight and embeddable** — No external dependencies, small footprint, and easy to integrate into editors, compilers, and configuration systems.
 

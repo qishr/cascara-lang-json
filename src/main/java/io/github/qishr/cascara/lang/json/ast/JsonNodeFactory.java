@@ -36,9 +36,9 @@
 package io.github.qishr.cascara.lang.json.ast;
 
 import io.github.qishr.cascara.common.lang.ast.AstNodeFactory;
-import io.github.qishr.cascara.common.lang.util.LanguageOptions;
+import io.github.qishr.cascara.common.lang.util.LanguageConfig;
 import io.github.qishr.cascara.common.lang.util.QuoteStyle;
-import io.github.qishr.cascara.lang.json.util.JsonOptions;
+import io.github.qishr.cascara.lang.json.util.JsonConfig;
 
 public class JsonNodeFactory implements AstNodeFactory<JsonNode,JsonScalar,JsonArray,JsonObject,JsonProperty,String> {
 
@@ -53,8 +53,8 @@ public class JsonNodeFactory implements AstNodeFactory<JsonNode,JsonScalar,JsonA
     }
 
 	@Override
-	public JsonScalar createScalarNode(Object jvmValue, QuoteStyle quoteStyle, LanguageOptions<?> options) {
-        return new JsonScalar(jvmValue, quoteStyle, false, (JsonOptions)options);
+	public JsonScalar createScalarNode(Object jvmValue, QuoteStyle quoteStyle, LanguageConfig<?> options) {
+        return new JsonScalar(jvmValue, quoteStyle, false, (JsonConfig)options);
 	}
 
     @Override

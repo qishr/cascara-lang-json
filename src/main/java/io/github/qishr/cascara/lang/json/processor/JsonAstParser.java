@@ -48,7 +48,7 @@ import io.github.qishr.cascara.common.diagnostic.message.GenericMessage;
 import io.github.qishr.cascara.common.lang.diagnostic.ParserException;
 import io.github.qishr.cascara.common.lang.processor.AstParser;
 import io.github.qishr.cascara.common.type.PrimitiveType;
-import io.github.qishr.cascara.common.lang.util.LanguageOptions;
+import io.github.qishr.cascara.common.lang.util.LanguageConfig;
 import io.github.qishr.cascara.common.lang.util.QuoteStyle;
 import io.github.qishr.cascara.common.util.ContentType;
 import io.github.qishr.cascara.common.property.Properties;
@@ -66,7 +66,7 @@ import io.github.qishr.cascara.lang.json.token.JsonLiteral;
 import io.github.qishr.cascara.lang.json.token.JsonNumberToken;
 import io.github.qishr.cascara.lang.json.token.JsonToken;
 import io.github.qishr.cascara.lang.json.token.JsonTokenType;
-import io.github.qishr.cascara.lang.json.util.JsonOptions;
+import io.github.qishr.cascara.lang.json.util.JsonConfig;
 
 /// A recursive descent parser for JSON/JSON5.
 public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
@@ -98,8 +98,8 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
         applyOptions();
     }
 
-    public JsonAstParser setOptions(JsonOptions options) {
-        super.setOptions(options);
+    public JsonAstParser setConfig(JsonConfig options) {
+        super.setConfig(options);
         applyOptions();
         return this;
     }
@@ -114,7 +114,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
     @Override
     public JsonNode parse(String text) {
         JsonTokenizer tokenizer = getTokenizer();
-        tokenizer.setOptions(options);
+        tokenizer.setConfig(options);
         tokenizer.setReporter(reporter);
         tokenizer.open(text);
         return parse(tokenizer);
@@ -122,7 +122,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
 
     public JsonNode parse(byte[] data) {
         JsonTokenizer tokenizer = getTokenizer();
-        tokenizer.setOptions(options);
+        tokenizer.setConfig(options);
         tokenizer.setReporter(reporter);
         tokenizer.open(data);
         return parse(tokenizer);
@@ -131,7 +131,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
     @Override
     public JsonNode parse(Reader reader) {
         JsonTokenizer tokenizer = getTokenizer();
-        tokenizer.setOptions(options);
+        tokenizer.setConfig(options);
         tokenizer.setReporter(reporter);
         tokenizer.open(reader);
         return parse(tokenizer);
@@ -140,7 +140,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
     @Override
     public JsonNode parse(InputStream is) {
         JsonTokenizer tokenizer = getTokenizer();
-        tokenizer.setOptions(options);
+        tokenizer.setConfig(options);
         tokenizer.setReporter(reporter);
         tokenizer.open(is);
         return parse(tokenizer);
@@ -259,6 +259,9 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
 
         try {
             JsonToken start = consume(JsonTokenType.LEFT_BRACE, JsonDiagnosticMessage.EXPECTED_OPEN_BRACE);
+            if (start == null) {
+                return null;
+            }
             JsonObject map = new JsonObject(start.getStartLine(), start.getStartColumn());
 
             attachComments(map);
@@ -284,6 +287,9 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
 
                 // ---- Parse key ----
                 JsonToken keyTok = advance();
+                if (keyTok == null) {
+                    return null;
+                }
 
                 // JSON5: unquoted keys allowed only when configured
                 if (!ALLOW_UNQUOTED_KEYS && keyTok.getQuoteStyle() != QuoteStyle.DOUBLE) {
@@ -670,7 +676,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
         }
 
         @Override
-        public ListBackedJsonTokenizer setOptions(LanguageOptions<?> options) {
+        public ListBackedJsonTokenizer setConfig(LanguageConfig<?> options) {
             return this;
         }
 

@@ -51,7 +51,7 @@ import io.github.qishr.cascara.common.diagnostic.Diagnostic.Level;
 import io.github.qishr.cascara.lang.json.ast.JsonObject;
 import io.github.qishr.cascara.lang.json.ast.JsonNode;
 import io.github.qishr.cascara.lang.json.ast.JsonScalar;
-import io.github.qishr.cascara.lang.json.util.JsonOptions;
+import io.github.qishr.cascara.lang.json.util.JsonConfig;
 import io.github.qishr.cascara.lang.json.util.ProfilingHarness;
 
 public class MediumTest {
@@ -77,7 +77,7 @@ public class MediumTest {
         String content = sb.toString();
 
         JsonAstParser parser = new JsonAstParser()
-            .setOptions(new JsonOptions()
+            .setConfig(new JsonConfig()
 
 
                 //

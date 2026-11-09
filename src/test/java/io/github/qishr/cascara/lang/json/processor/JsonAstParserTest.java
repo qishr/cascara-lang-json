@@ -42,7 +42,7 @@ import io.github.qishr.cascara.common.lang.ast.CommentAstNode;
 import io.github.qishr.cascara.common.lang.ast.*;
 import io.github.qishr.cascara.lang.json.ast.*;
 import io.github.qishr.cascara.lang.json.token.JsonToken;
-import io.github.qishr.cascara.lang.json.util.JsonOptions;
+import io.github.qishr.cascara.lang.json.util.JsonConfig;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -80,7 +80,7 @@ class JsonAstParserTest {
             }
             """;
 
-        parser.setOptions(JsonOptions.JSON5.duplicate().setCaptureComments(true));
+        parser.setConfig(JsonConfig.JSON5.duplicate().setCaptureComments(true));
 
         JsonObject root = (JsonObject) parser.parse(input);
 
@@ -105,7 +105,7 @@ class JsonAstParserTest {
     void testJson5UnquotedKeys() {
         String input = "{ user: \"admin\" }";
 
-        parser.setOptions(JsonOptions.JSON5);
+        parser.setConfig(JsonConfig.JSON5);
 
         JsonObject root = (JsonObject) parser.parse(input);
 
@@ -142,7 +142,7 @@ class JsonAstParserTest {
             }
             """;
 
-        parser.setOptions(JsonOptions.JSON5.duplicate().setCaptureComments(true));
+        parser.setConfig(JsonConfig.JSON5.duplicate().setCaptureComments(true));
 
         JsonObject root = (JsonObject) parser.parse(input);
 
@@ -202,7 +202,7 @@ class JsonAstParserTest {
     void testCommentTextStripping() {
         String input = "// This is a line comment\n/* This is a block comment */ { }";
 
-        parser.setOptions(JsonOptions.JSON5.duplicate().setCaptureComments(true));
+        parser.setConfig(JsonConfig.JSON5.duplicate().setCaptureComments(true));
 
         JsonNode root = parser.parse(input);
 
@@ -236,7 +236,7 @@ class JsonAstParserTest {
             }
             """;
 
-        parser.setOptions(JsonOptions.JSON5);
+        parser.setConfig(JsonConfig.JSON5);
 
         JsonObject root = (JsonObject) parser.parse(input);
 
@@ -257,7 +257,7 @@ class JsonAstParserTest {
             { "a": 1 }
             """;
 
-        parser.setOptions(JsonOptions.JSON5.duplicate().setCaptureComments(true));
+        parser.setConfig(JsonConfig.JSON5.duplicate().setCaptureComments(true));
 
         JsonNode root = parser.parse(input);
 
@@ -271,7 +271,7 @@ class JsonAstParserTest {
 
     @Test
     void testJson5NumericVariations() {
-        parser.setOptions(JsonOptions.JSON5.duplicate().setCaptureComments(true));
+        parser.setConfig(JsonConfig.JSON5.duplicate().setCaptureComments(true));
 
         // JSON5 allows: +.5, -.5, 0x123, 1.
         String input = "[ +.5, 0x123, 1. ]";
@@ -294,7 +294,7 @@ class JsonAstParserTest {
             }
             """;
 
-        parser.setOptions(JsonOptions.JSON5.duplicate().setCaptureComments(true));
+        parser.setConfig(JsonConfig.JSON5.duplicate().setCaptureComments(true));
 
         JsonObject root = (JsonObject) parser.parse(input);
         assertNotNull(root);

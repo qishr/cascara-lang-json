@@ -40,7 +40,7 @@ import io.github.qishr.cascara.common.diagnostic.Diagnostic.Level;
 import io.github.qishr.cascara.lang.json.token.JsonNumberToken;
 import io.github.qishr.cascara.lang.json.token.JsonToken;
 import io.github.qishr.cascara.lang.json.token.JsonTokenType;
-import io.github.qishr.cascara.lang.json.util.JsonOptions;
+import io.github.qishr.cascara.lang.json.util.JsonConfig;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -54,7 +54,7 @@ class JsonTokenizerTest {
     void setup() {
         tokenizer = new JsonTokenizer()
             .setReporter(new LocalReporter().setLevel(Level.TRACE))
-            .setOptions(JsonOptions.JSON5.duplicate().setCaptureComments(true));
+            .setConfig(JsonConfig.JSON5.duplicate().setCaptureComments(true));
     }
 
     @Test

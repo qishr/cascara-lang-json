@@ -42,7 +42,7 @@ import java.io.Writer;
 
 import io.github.qishr.cascara.common.diagnostic.report.Reporter;
 import io.github.qishr.cascara.common.diagnostic.message.GenericMessage;
-import io.github.qishr.cascara.common.lang.util.LanguageOptions;
+import io.github.qishr.cascara.common.lang.util.LanguageConfig;
 import io.github.qishr.cascara.common.lang.diagnostic.SerializerException;
 import io.github.qishr.cascara.common.lang.ast.AstNode;
 import io.github.qishr.cascara.common.lang.diagnostic.ParserException;
@@ -57,18 +57,18 @@ import io.github.qishr.cascara.lang.json.ast.JsonNodeFactory;
 import io.github.qishr.cascara.lang.json.ast.JsonScalar;
 import io.github.qishr.cascara.lang.json.ast.JsonArray;
 import io.github.qishr.cascara.lang.json.internal.AbstractJsonProcessor;
-import io.github.qishr.cascara.lang.json.util.JsonOptions;
+import io.github.qishr.cascara.lang.json.util.JsonConfig;
 
 /// Standard implementation for JSON serialization.
 public class JsonSerializer extends AbstractSerializer<JsonSerializer,JsonNode,JsonScalar,JsonArray,JsonObject,JsonProperty,String> {
 
     private JsonAstParser parser;
-    private JsonOptions options = new JsonOptions();
+    private JsonConfig options = new JsonConfig();
     private JsonNode rootNode;
 
     public JsonSerializer() {
         // This constructor is for SPI and cannot take a parameter.
-        super(AbstractJsonProcessor.JSON_CONTENT_TYPE_STRING, new JsonNodeFactory(), new JsonConverter(), new JsonOptions());
+        super(AbstractJsonProcessor.JSON_CONTENT_TYPE_STRING, new JsonNodeFactory(), new JsonConverter(), new JsonConfig());
     }
 
     @Override
@@ -98,8 +98,8 @@ public class JsonSerializer extends AbstractSerializer<JsonSerializer,JsonNode,J
 
     /// {@inheritDoc}
     @Override
-    public JsonSerializer setOptions(LanguageOptions<?> options) {
-        this.options = (JsonOptions) options;
+    public JsonSerializer setConfig(LanguageConfig<?> options) {
+        this.options = (JsonConfig) options;
         return this;
     }
 
@@ -121,7 +121,7 @@ public class JsonSerializer extends AbstractSerializer<JsonSerializer,JsonNode,J
         } else {
             rootNode = toAst(jvmInstance);
         }
-        return new JsonEmitter().setOptions(options).emit(rootNode);
+        return new JsonEmitter().setConfig(options).emit(rootNode);
     }
 
     /// {@inheritDoc}
@@ -139,7 +139,7 @@ public class JsonSerializer extends AbstractSerializer<JsonSerializer,JsonNode,J
         } else {
             rootNode = toAst(jvmInstance);
         }
-        String text = new JsonEmitter().setOptions(options).emit(rootNode);
+        String text = new JsonEmitter().setConfig(options).emit(rootNode);
         writer.write(text);
     }
 
@@ -228,7 +228,7 @@ public class JsonSerializer extends AbstractSerializer<JsonSerializer,JsonNode,J
         if (parser == null) {
             parser = new JsonAstParser();
             parser.setReporter(reporter);
-            parser.setOptions(options);
+            parser.setConfig(options);
         }
         return parser;
     }

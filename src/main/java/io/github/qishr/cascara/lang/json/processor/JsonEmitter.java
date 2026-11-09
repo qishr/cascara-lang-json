@@ -37,7 +37,7 @@ package io.github.qishr.cascara.lang.json.processor;
 
 import io.github.qishr.cascara.common.util.ContentType;
 import io.github.qishr.cascara.common.diagnostic.report.Reporter;
-import io.github.qishr.cascara.common.lang.util.LanguageOptions;
+import io.github.qishr.cascara.common.lang.util.LanguageConfig;
 import io.github.qishr.cascara.common.lang.processor.Emitter;
 import io.github.qishr.cascara.lang.json.ast.JsonProperty;
 import io.github.qishr.cascara.lang.json.ast.JsonObject;
@@ -45,7 +45,7 @@ import io.github.qishr.cascara.lang.json.ast.JsonNode;
 import io.github.qishr.cascara.lang.json.ast.JsonScalar;
 import io.github.qishr.cascara.lang.json.ast.JsonArray;
 import io.github.qishr.cascara.lang.json.internal.AbstractJsonProcessor;
-import io.github.qishr.cascara.lang.json.util.JsonOptions;
+import io.github.qishr.cascara.lang.json.util.JsonConfig;
 
 public class JsonEmitter extends AbstractJsonProcessor<JsonEmitter>  implements Emitter {
     private final StringBuilder output = new StringBuilder();
@@ -235,8 +235,8 @@ public class JsonEmitter extends AbstractJsonProcessor<JsonEmitter>  implements 
     }
 
     @Override
-    public JsonEmitter setOptions(LanguageOptions<?> options) {
-        if (options instanceof JsonOptions jsonOptions) {
+    public JsonEmitter setConfig(LanguageConfig<?> options) {
+        if (options instanceof JsonConfig jsonOptions) {
             this.options = jsonOptions;
         }
         return this;

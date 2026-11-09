@@ -44,11 +44,11 @@ import java.util.List;
 import java.util.Set;
 
 import io.github.qishr.cascara.common.lang.processor.Tokenizer;
-import io.github.qishr.cascara.common.lang.util.LanguageOptions;
+import io.github.qishr.cascara.common.lang.util.LanguageConfig;
 import io.github.qishr.cascara.common.lang.util.LexemeProvider;
 import io.github.qishr.cascara.common.lang.util.QuoteStyle;
 import io.github.qishr.cascara.common.lang.util.SourceBuffer;
-import io.github.qishr.cascara.common.lang.util.SourceBufferOptions;
+import io.github.qishr.cascara.common.lang.util.SourceBufferConfig;
 import io.github.qishr.cascara.common.lang.util.SourceInputStreamBuffer;
 import io.github.qishr.cascara.common.lang.util.SourceStringBuffer;
 import io.github.qishr.cascara.common.service.ServiceProviderFactory;
@@ -64,7 +64,7 @@ import io.github.qishr.cascara.lang.json.token.JsonToken;
 import io.github.qishr.cascara.lang.json.token.JsonLexemeBackedToken;
 import io.github.qishr.cascara.lang.json.token.JsonTokenType;
 import io.github.qishr.cascara.lang.json.token.ScannedNumber;
-import io.github.qishr.cascara.lang.json.util.JsonOptions;
+import io.github.qishr.cascara.lang.json.util.JsonConfig;
 import io.github.qishr.cascara.lang.json.util.JsonSourceBuffer;
 
 public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implements Tokenizer<JsonToken>{
@@ -169,7 +169,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     public JsonTokenizer() {
         // SPI will call this
         // Default is strict JSON
-        applyOptions(new JsonOptions());
+        applyOptions(new JsonConfig());
     }
 
     @Override
@@ -186,16 +186,16 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     }
 
     @Override
-    public JsonTokenizer setOptions(LanguageOptions<?> options) {
-        super.setOptions(options);
-        if (!(options instanceof JsonOptions jsonOptions)) {
-            throw new IllegalArgumentException("JsonTokenizer requires JsonOptions");
+    public JsonTokenizer setConfig(LanguageConfig<?> options) {
+        super.setConfig(options);
+        if (!(options instanceof JsonConfig jsonOptions)) {
+            throw new IllegalArgumentException("JsonTokenizer requires JsonConfig");
         }
         applyOptions(jsonOptions);
         return this;
     }
 
-    private void applyOptions(JsonOptions options) {
+    private void applyOptions(JsonConfig options) {
         this.ALLOW_COMMENTS              = options.allowComments();
         this.ALLOW_HEXADECIMAL_NUMBERS   = options.allowHexadecimalNumbers();
         this.ALLOW_JSON5_NUMBERS      = options.allowJson5Numbers();
@@ -1763,7 +1763,7 @@ public class JsonTokenizer extends AbstractJsonProcessor<JsonTokenizer> implemen
     }
 
     private SourceBuffer createSourceBuffer(boolean useSimd) {
-        SourceBufferOptions bufferOptions = new SourceBufferOptions();
+        SourceBufferConfig bufferOptions = new SourceBufferConfig();
         bufferOptions.setSupportsSimd(useSimd);
         bufferOptions.setStrictAsciiMode(!options.allowUnicode() && !options.validateUnicode());
         bufferOptions.setTrackPosition(options.trackPosition());

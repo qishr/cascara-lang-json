@@ -1,10 +1,10 @@
 package io.github.qishr.cascara.lang.json.util;
 
 import io.github.qishr.cascara.common.lang.util.SourceBuffer;
-import io.github.qishr.cascara.common.lang.util.SourceBufferOptions;
+import io.github.qishr.cascara.common.lang.util.SourceBufferConfig;
 
 public interface JsonSourceBuffer extends SourceBuffer {
-    JsonSourceBuffer setOptions(SourceBufferOptions options) ;
+    JsonSourceBuffer setConfig(SourceBufferConfig options) ;
 
     void skipWhitespaceSimd();
     byte peekByte();
