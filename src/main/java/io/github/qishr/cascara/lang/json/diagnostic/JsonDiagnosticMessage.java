@@ -35,9 +35,9 @@
 
 package io.github.qishr.cascara.lang.json.diagnostic;
 
-import io.github.qishr.cascara.common.diagnostic.message.DiagnosticMessage;
+import io.github.qishr.cascara.common.diagnostic.message.LocalizableMessage;
 
-public enum JsonDiagnosticMessage implements DiagnosticMessage {
+public enum JsonDiagnosticMessage implements LocalizableMessage {
 
     // Tokenizer
     EXPECTED_CLOSE_BRACE("JSON-102", "Expected '}'"),

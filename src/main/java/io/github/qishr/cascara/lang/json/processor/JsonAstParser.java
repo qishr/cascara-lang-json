@@ -43,7 +43,7 @@ import java.util.List;
 import java.util.Set;
 
 import io.github.qishr.cascara.common.diagnostic.report.Reporter;
-import io.github.qishr.cascara.common.diagnostic.message.DiagnosticMessage;
+import io.github.qishr.cascara.common.diagnostic.message.LocalizableMessage;
 import io.github.qishr.cascara.common.diagnostic.message.GenericMessage;
 import io.github.qishr.cascara.common.lang.diagnostic.ParserException;
 import io.github.qishr.cascara.common.lang.processor.AstParser;
@@ -593,7 +593,7 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
         return false;
     }
 
-    private JsonToken consume(JsonTokenType type, DiagnosticMessage code, Object... details) {
+    private JsonToken consume(JsonTokenType type, LocalizableMessage code, Object... details) {
         if (check(type)) return advance();
 
         // Report the error but don't crash
@@ -616,11 +616,11 @@ public class JsonAstParser extends AbstractJsonProcessor<JsonAstParser>
             tok.getStartLine(), tok.getStartColumn(), indent, methodName, tok.getType());
     }
 
-    private void warn(JsonToken token, DiagnosticMessage code, Object... details) {
+    private void warn(JsonToken token, LocalizableMessage code, Object... details) {
         reporter.warnAt(token, code, details);
     }
 
-    private void error(JsonToken token, DiagnosticMessage code, Object... details) {
+    private void error(JsonToken token, LocalizableMessage code, Object... details) {
 
         if (token instanceof JsonErrorToken error) {
             code = error.getCode();
