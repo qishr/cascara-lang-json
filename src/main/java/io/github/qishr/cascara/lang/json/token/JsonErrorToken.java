@@ -37,7 +37,7 @@ package io.github.qishr.cascara.lang.json.token;
 
 import java.util.List;
 
-import io.github.qishr.cascara.common.diagnostic.message.LocalizableMessage;
+import io.github.qishr.cascara.common.i18n.LocalizableMessage;
 import io.github.qishr.cascara.common.lang.util.QuoteStyle;
 
 public class JsonErrorToken implements JsonToken {

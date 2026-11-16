@@ -35,7 +35,7 @@
 
 package io.github.qishr.cascara.lang.json.diagnostic;
 
-import io.github.qishr.cascara.common.diagnostic.message.LocalizableMessage;
+import io.github.qishr.cascara.common.i18n.LocalizableMessage;
 
 public enum JsonDiagnosticMessage implements LocalizableMessage {
 

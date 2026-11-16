@@ -43,7 +43,7 @@ import java.util.List;
 import java.util.Set;
 
 import io.github.qishr.cascara.common.diagnostic.report.Reporter;
-import io.github.qishr.cascara.common.diagnostic.message.LocalizableMessage;
+import io.github.qishr.cascara.common.i18n.LocalizableMessage;
 import io.github.qishr.cascara.common.diagnostic.message.GenericMessage;
 import io.github.qishr.cascara.common.lang.diagnostic.ParserException;
 import io.github.qishr.cascara.common.lang.processor.AstParser;
