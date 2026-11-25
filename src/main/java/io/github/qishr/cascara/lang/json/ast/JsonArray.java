@@ -41,8 +41,6 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 
-import io.github.qishr.cascara.common.lang.ast.MapAstNode;
-import io.github.qishr.cascara.common.lang.ast.ScalarAstNode;
 import io.github.qishr.cascara.common.lang.ast.SequenceAstNode;
 
 public class JsonArray extends JsonNode implements SequenceAstNode<JsonNode> {

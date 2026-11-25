@@ -7,13 +7,13 @@ import java.util.List;
 
 import io.github.qishr.cascara.common.data.TextualTable;
 import io.github.qishr.cascara.common.util.StringUtils;
-import io.github.qishr.cascara.common.util.TermUtils;
 import io.github.qishr.cascara.lang.json.token.JsonErrorToken;
 import io.github.qishr.cascara.lang.json.token.JsonToken;
-import io.github.qishr.cascara.lang.json.token.JsonTokenType;
 
 public class TestUtils {
-        public static void dumpTokens(List<JsonToken> tokens) {
+    public static final String ANSI_WHITE = "\u001B[37m";
+
+    public static void dumpTokens(List<JsonToken> tokens) {
         dumpTokens(new PrintWriter(System.out), tokens, -1);
     }
 
@@ -36,7 +36,7 @@ public class TestUtils {
         TextualTable table = new TextualTable()
             .setStyle(TextualTable.Style.ROUNDED)
             .setMaxColumnWidth(maxColumnWidth)
-            .setBorderColor(TermUtils.ANSI_WHITE)
+            .setBorderColor(ANSI_WHITE)
             .addColumn("#")
             .addColumn("Token")
             .addColumn("Location")
